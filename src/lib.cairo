@@ -3,10 +3,6 @@
 
 #[starknet::interface]
 pub trait IHelloStarknet<TContractState> {
-    /// Increase contract balance.
-    fn increase_balance(ref self: TContractState, amount: felt252);
-    /// Retrieve contract balance.
-    fn get_balance(self: @TContractState) -> felt252;
     /// Iterate state once
     fn iterate_life_once(self: @TContractState,initial_state: felt252) -> felt252;
     // Load grid from state
@@ -18,14 +14,9 @@ pub trait IHelloStarknet<TContractState> {
 /// Simple contract for managing balance.
 #[starknet::contract]
 mod GameOfLife {
-    // use core::starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
-    use starknet::storage::{
-        StoragePointerReadAccess, StoragePointerWriteAccess, Map,
-    };
-    // use core::starknet::{ContractAddress};
     // use core::dict::Felt252Dict;    
     use core::array::ArrayTrait;
-            
+    const grid_size:u32 = 15;   
 
     #[storage]
     struct Storage {
@@ -34,66 +25,51 @@ mod GameOfLife {
 
     #[abi(embed_v0)]
     impl HelloStarknetImpl of super::IHelloStarknet<ContractState> {
-        fn increase_balance(ref self: ContractState, amount: felt252) {
-            assert(amount != 0, 'Amount cannot be 0');
-            self.balance.write(self.balance.read() + amount);
-        }
-
-        fn get_balance(self: @ContractState) -> felt252 {
-            self.balance.read()
-        }
-
+        
         fn iterate_life_once(self: @ContractState, initial_state: felt252) -> felt252 {
             let grid = self.unpack_grid_from_felt252(initial_state);
             let mut next_grid: Array<Array<bool>> = ArrayTrait::new();
             // Going though rows
             let mut row: usize = 0;
             loop {
-                if row >= 15 {
+                if row >= grid_size {
                     break;
                 }
                 let mut single_row: Array<bool> = ArrayTrait::new();
                 // Going though columns of a specific row
                 let mut column: usize = 0;
                 loop {
-                    if column >= 15 {
+                    if column >= grid_size {
                         break;
                     }
                     // Counting neighbouring cells
                     let mut neighbours_count = 0;
+                    // Calculate wrapped indices
+                    let row_above = ((row + 15 - 1) % 15);
+                    let row_below = ((row + 1) % 15);
+                    let col_left = ((column + 15 - 1) % 15);
+                    let col_right = ((column + 1) % 15);
                     // 3 cells above
-                    if *grid[row-1 % 15][column - 1 % 15] {neighbours_count += 1;}
-                    if *grid[row-1 % 15][column] {neighbours_count += 1;}
-                    if *grid[row-1 % 15][column + 1 % 15] {neighbours_count += 1;}
+                    if *grid[row_above][col_left] {neighbours_count += 1;}
+                    if *grid[row_above][column] {neighbours_count += 1;}
+                    if *grid[row_above][col_right] {neighbours_count += 1;}
                     // A cell to the left, a cell to the right
-                    if *grid[row][column + 1 % 15] {neighbours_count += 1;}
-                    if *grid[row][column - 1 % 15] {neighbours_count += 1;}
+                    if *grid[row][col_right] {neighbours_count += 1;}
+                    if *grid[row][col_left] {neighbours_count += 1;}
                     // 3 cells below
-                    if *grid[row+1 % 15][column - 1 % 15] {neighbours_count += 1;}
-                    if *grid[row+1 % 15][column] {neighbours_count += 1;}
-                    if *grid[row+1 % 15][column + 1 % 15] {neighbours_count += 1;}
-                    
-                    // If cell is alive .... 
-                    if *grid[row][column] {
-                        // It lives if it has 2 or 3 neighbours
-                        if neighbours_count == 2
-                            {single_row.append(true);}
-                        else if neighbours_count == 3
-                            {single_row.append(true);}
-                        // It dies otherwise
-                        else 
-                            {single_row.append(false);}
-                        
-                    }
-                    // If cell is dead...
-                    else {
-                        // It lives if it has exactly 3 neighbours
-                        if neighbours_count == 3
-                            {single_row.append(true);}
-                        // It stays dead otherwise
-                        else 
-                            {single_row.append(false);}
-                    }
+                    if *grid[row_below][col_left] {neighbours_count += 1;}
+                    if *grid[row_below][column] {neighbours_count += 1;}
+                    if *grid[row_below][col_right] {neighbours_count += 1;}
+
+                    // Living rules
+                    let will_live = if *grid[row][column] {
+                        // Living cell survives with 2 or 3 neighbours
+                        neighbours_count == 2 || neighbours_count == 3
+                    } else {
+                        // Dead cell comes alive with exactly 3 neighbours
+                        neighbours_count == 3
+                    };
+                    single_row.append(will_live);
                     column += 1;
                 };
                 next_grid.append(single_row);
