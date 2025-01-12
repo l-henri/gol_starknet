@@ -5,6 +5,8 @@
 pub trait IHelloStarknet<TContractState> {
     /// Iterate state once
     fn iterate_life_once(self: @TContractState,initial_state: felt252) -> felt252;
+    /// Iterate state once
+    fn iterate_life_several_times(self: @TContractState,initial_state: felt252, iterations: usize) -> felt252;
     // Load grid from state
     fn unpack_grid_from_felt252(self: @TContractState,state: felt252) -> Array<Array<bool>>;
     // Pack grid in felt
@@ -140,6 +142,23 @@ mod GameOfLife {
            
             
             packed_state
+        }
+
+        fn iterate_life_several_times(self: @ContractState,initial_state: felt252, iterations: usize) -> felt252{
+            let mut next_gen : felt252 = initial_state;
+            let mut sequence_of_states: Array<felt252> = ArrayTrait::new();
+            sequence_of_states.append(initial_state);
+            let mut generation: usize = 0;
+
+            loop {
+                if generation >= iterations {
+                    break;
+                }
+                next_gen = self.iterate_life_once(next_gen);
+                sequence_of_states.append(next_gen);
+                generation += 1;
+            };
+            next_gen
         }
 
     }
