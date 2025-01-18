@@ -162,49 +162,51 @@ mod GameOfLife {
             };
             sequence_of_states
         }
-        fn detect_loop(self: @ContractState,sequence_of_states: Array<felt252>) -> Array<felt252>
-        {
+        /// Detects cycles in a sequence of Game of Life states
+        /// Returns an array where:
+        /// - First element is 0 if no loop found, or the loop length if found
+        /// - Remaining elements are the states that form the loop (if found)
+        fn detect_loop(self: @ContractState, sequence_of_states: Array<felt252>) -> Array<felt252> {
             let mut loop_sequence: Array<felt252> = ArrayTrait::new();
             let mut sequence_positions: Felt252Dict<usize> = Default::default();
 
-            // Go through the proposed sequence and find the loop point
-            let raw_sequence_length = sequence_of_states.len();
-            let mut counter: usize = 0;
+            // Find the first repeated state
+            let sequence_length = sequence_of_states.len();
+            let mut position: usize = 0;
             loop {
-                // Breaking if it went through he array
-                if counter >= raw_sequence_length {
+                if position >= sequence_length {
                     break;
                 }
-                // Breaking if a loop was detected
-                if sequence_positions.get(*sequence_of_states[counter]) != 0 {
+                let current_state = *sequence_of_states[position];
+                if sequence_positions.get(current_state) != 0 {
+                    // Loop found
+                    let loop_start = sequence_positions.get(current_state) - 1;
+                    let loop_length = position - loop_start;
+                    
+                    // Add loop length as first element
+                    loop_sequence.append(loop_length.into());
+                    
+                    // Add the states that form the loop
+                    let mut loop_pos = loop_start;
+                    loop {
+                        if loop_pos >= position {
+                            break;
+                        }
+                        loop_sequence.append(*sequence_of_states[loop_pos]);
+                        loop_pos += 1;
+                    };
                     break;
                 }
-
-                sequence_positions.insert(*sequence_of_states[counter], counter + 1);
-                counter += 1;
+                
+                sequence_positions.insert(current_state, position + 1);
+                position += 1;
             };
 
-            // If there is no loop
-            if counter >= raw_sequence_length
-            {
+            // If no loop found
+            if position >= sequence_length {
                 loop_sequence.append(0);
             }
-            else
-            {
-            // Calculating loop length
-            let mut loop_length = counter + 1 - sequence_positions.get(*sequence_of_states[counter]);
-            loop_sequence.append(loop_length.into());
-            let mut test = *sequence_of_states[counter] - 1;
-            let mut counter_2 = test.try_into().unwrap();
-            loop {
-                // Breaking we finished the loop
-                if counter_2 >= counter {
-                    break;
-                }
-                loop_sequence.append(*sequence_of_states[counter_2]);
-                counter_2 += 1;
-                };
-            }
+            
             loop_sequence
         }
     }
