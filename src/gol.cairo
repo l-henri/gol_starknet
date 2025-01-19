@@ -258,22 +258,23 @@ mod GameOfLife {
             let mut current_state : felt252 = initial_state;
             let mut current_generation: usize = 0;
             let mut return_value = true;
-
+            let initial_state_u256 : u256 = initial_state.into();
             // Go through the sequence to check wether it is a single loop, and wether the start and finish element is the smallest
             loop {
-                if current_generation > generations {
+                if current_generation >= generations {
                     break;
                 }
                 current_state = self.iterate_life_once(current_state);
                 // Check wether the current item is equal, or smaller, than the first item (non single loop, non correct loop entry point)
                 // let mut is_valid = first_state - *sequence[position];
-                let initial_state_u256 : u256 = initial_state.into();
+                
                 let current_state_u256: u256 = current_state.into();
                 // let current_state_u256: u256 = *sequence[position].into();
                 // let test_2 : u256 = 2;
                 // let mut is_valid = test > test_2;
                 if initial_state_u256 >= current_state_u256 {
                     return_value = false;
+                    break;
                 }
                 current_generation += 1;
             };
