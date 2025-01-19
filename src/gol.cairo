@@ -13,6 +13,10 @@ pub trait IHelloStarknet<TContractState> {
     fn iterate_life_several_times(self: @TContractState,initial_state: felt252, iterations: usize) -> Array<felt252>;
     // Detect loops
     fn detect_loop(self: @TContractState,sequence_of_states: Array<felt252>) -> Array<felt252>;
+    // Validate loops are valid (single & entry point is the smallest)
+    fn validate_loop_from_array(self: @TContractState,sequence: Array<felt252>) -> bool;
+    // Validate loops are valid (single & entry point is the smallest)
+    fn validate_loop_from_initial_state(self: @TContractState,initial_state: felt252, generations: usize) -> bool;
 }
 
 /// Simple contract for managing balance.
@@ -95,6 +99,7 @@ mod GameOfLife {
             
             packed_state
         }
+
         fn iterate_life_once(self: @ContractState, initial_state: felt252) -> felt252 {
             let grid = self.unpack_grid_from_felt252(initial_state);
             let mut next_grid: Array<Array<bool>> = ArrayTrait::new();
@@ -146,6 +151,7 @@ mod GameOfLife {
             };
             self.pack_grid_in_felt252(next_grid)
         }
+
         fn iterate_life_several_times(self: @ContractState,initial_state: felt252, iterations: usize) ->  Array<felt252>{
             let mut next_gen : felt252 = initial_state;
             let mut sequence_of_states: Array<felt252> = ArrayTrait::new();
@@ -208,6 +214,76 @@ mod GameOfLife {
             }
             
             loop_sequence
+        }
+
+        fn validate_loop_from_array(self: @ContractState, sequence: Array<felt252>) -> bool {
+            if sequence.len() < 1 {
+                return false;
+            }
+            
+            let first_state = *sequence[0];
+            let last_state =  *sequence[sequence.len()-1]; 
+
+            // Check wether the sequence indeed loops
+            if first_state != last_state {
+                return false;
+            }
+
+            let mut position: usize = 1;
+            let mut return_value = true;
+            // Go through the sequence to check wether it is a single loop, and wether the start and finish element is the smallest
+            loop {
+                if position >= sequence.len() - 1 {
+                    break;
+                }
+                // Check wether the current item is equal, or smaller, than the first item (non single loop, non correct loop entry point)
+                // let mut is_valid = first_state - *sequence[position];
+                let first_state_u256 : u256 = first_state.into();
+                let current_state: felt252 = *sequence[position];
+                let current_state_u256: u256 = current_state.into();
+                // let current_state_u256: u256 = *sequence[position].into();
+                // let test_2 : u256 = 2;
+                // let mut is_valid = test > test_2;
+                if first_state_u256 >= current_state_u256 {
+                    return_value = false;
+                }
+                position += 1;
+            };
+            
+            return_value
+        }
+
+        fn validate_loop_from_initial_state(self: @ContractState, initial_state: felt252, generations: usize) -> bool {
+            
+            let mut current_state : felt252 = initial_state;
+            let mut current_generation: usize = 0;
+            let mut return_value = true;
+
+            // Go through the sequence to check wether it is a single loop, and wether the start and finish element is the smallest
+            loop {
+                if current_generation > generations {
+                    break;
+                }
+                current_state = self.iterate_life_once(current_state);
+                // Check wether the current item is equal, or smaller, than the first item (non single loop, non correct loop entry point)
+                // let mut is_valid = first_state - *sequence[position];
+                let initial_state_u256 : u256 = initial_state.into();
+                let current_state_u256: u256 = current_state.into();
+                // let current_state_u256: u256 = *sequence[position].into();
+                // let test_2 : u256 = 2;
+                // let mut is_valid = test > test_2;
+                if initial_state_u256 >= current_state_u256 {
+                    return_value = false;
+                }
+                current_generation += 1;
+            };
+            
+            // Check wether the sequence indeed loops
+            if current_state != initial_state {
+                return false;
+            }
+
+            return_value
         }
     }
 }
