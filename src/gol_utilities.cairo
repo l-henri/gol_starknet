@@ -1,38 +1,17 @@
-/// Interface representing `HelloContract`.
-/// This interface allows modification and retrieval of the contract balance.
-
-#[starknet::interface]
-pub trait IHelloStarknet<TContractState> {
-    // Load grid from state
-    fn unpack_grid_from_felt252(self: @TContractState,state: felt252) -> Array<Array<bool>>;
-    // Pack grid in felt
-    fn pack_grid_in_felt252(self: @TContractState, grid: Array<Array<bool>>) -> felt252;
-    /// Iterate state once
-    fn iterate_life_once(self: @TContractState,initial_state: felt252) -> felt252;
-    /// Iterate state several times
-    fn iterate_life_several_times(self: @TContractState,initial_state: felt252, iterations: usize) -> Array<felt252>;
-    // Detect loops
-    fn detect_loop(self: @TContractState,sequence_of_states: Array<felt252>) -> Array<felt252>;
-    // Validate loops are valid (single & entry point is the smallest)
-    fn validate_loop_from_array(self: @TContractState,sequence: Array<felt252>) -> bool;
-    // Validate loops are valid (single & entry point is the smallest)
-    fn validate_loop_from_initial_state(self: @TContractState,initial_state: felt252, generations: usize) -> bool;
-}
-
-/// Simple contract for managing balance.
+use gol_starknet::interfaces::{IGolUtilities};
+/// Game of life utilities
 #[starknet::contract]
-mod GameOfLife {
+mod GameOfLifeUtilities {
     use core::dict::Felt252Dict;    
     use core::array::ArrayTrait;
     const grid_size:u32 = 15;   
 
     #[storage]
     struct Storage {
-        balance: felt252,
     }
 
     #[abi(embed_v0)]
-    impl HelloStarknetImpl of super::IHelloStarknet<ContractState> {
+    impl GolUtilitiesImpl of super::IGolUtilities<ContractState> {
         
         
 
