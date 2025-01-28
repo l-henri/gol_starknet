@@ -21,7 +21,7 @@ pub trait IGolUtilities<TContractState> {
 #[starknet::interface]
 pub trait IGolLoopMinter<TContractState> {
     // Mint a loop
-    fn mint_loop(self: @TContractState, loop_id: felt252, loop_length: usize, recipient: ContractAddress) -> bool;
+    fn mint_loop(ref self: TContractState, loop_id: felt252, loop_length: usize, recipient: ContractAddress) -> bool;
 }
 
 

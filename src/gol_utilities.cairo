@@ -1,4 +1,4 @@
-use gol_starknet::interfaces::{IGolUtilities};
+use super::interfaces::{IGolUtilities};
 /// Game of life utilities
 #[starknet::contract]
 mod GameOfLifeUtilities {
@@ -12,9 +12,6 @@ mod GameOfLifeUtilities {
 
     #[abi(embed_v0)]
     impl GolUtilitiesImpl of super::IGolUtilities<ContractState> {
-        
-        
-
         fn unpack_grid_from_felt252(self: @ContractState, state: felt252) -> Array<Array<bool>> {
             let mut state_as_u256 : u256 = state.into();
             let mut grid: Array<Array<bool>> = ArrayTrait::new();
