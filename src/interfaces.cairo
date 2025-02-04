@@ -28,5 +28,12 @@ pub trait IGolLoopMinter<TContractState> {
 #[starknet::interface]
 pub trait IGolLifeForms<TContractState> {
     // Mint a token
-    fn mint(ref self: TContractState, recipient: ContractAddress, token_id: felt252);
+    fn mint(ref self: TContractState, recipient: ContractAddress, token_id: felt252, lifeform_data: LifeFormData);
+}
+
+#[derive(Drop, Serde, starknet::Store)]
+pub struct LifeFormData {
+    pub is_alive: bool,
+    pub is_dead: bool,
+    pub sequence_length: felt252,
 }
