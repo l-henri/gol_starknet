@@ -21,12 +21,21 @@ mod GolLoopMinter {
         let loop_exists = gol_utilities_contract.validate_loop_from_initial_state(loop_id, loop_length);
         if loop_exists {
             let gol_lifeforms = IGolLifeFormsDispatcher {contract_address: self.gol_lifeforms_nft.read()};
-            let mut test = LifeFormData {
+            let mut lifeform = LifeFormData {
+                is_loop: true,
+                is_still: false,
                 is_alive: true,
                 is_dead: false,
-                sequence_length: 0
+                sequence_length: loop_length.into()
             };
-            gol_lifeforms.mint(recipient, loop_id, test);
+            if (loop_id == 0) {
+                lifeform.is_alive = false;
+                lifeform.is_dead = true;
+            }
+            if (loop_length == 1) {
+                lifeform.is_still = true;
+            }
+            gol_lifeforms.mint(recipient, loop_id, lifeform);
         
         }
         loop_exists

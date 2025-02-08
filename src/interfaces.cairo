@@ -16,6 +16,8 @@ pub trait IGolUtilities<TContractState> {
     fn validate_loop_from_array(self: @TContractState,sequence: Array<felt252>) -> bool;
     // Validate loops are valid (single & entry point is the smallest)
     fn validate_loop_from_initial_state(self: @TContractState,initial_state: felt252, generations: usize) -> bool;
+    fn iterate_life_several_times_write(ref self: TContractState,initial_state: felt252, iterations: usize);
+
 }
 
 #[starknet::interface]
@@ -29,10 +31,13 @@ pub trait IGolLoopMinter<TContractState> {
 pub trait IGolLifeForms<TContractState> {
     // Mint a token
     fn mint(ref self: TContractState, recipient: ContractAddress, token_id: felt252, lifeform_data: LifeFormData);
+    fn get_lifeform_data(ref self: TContractState, token_id: felt252) -> LifeFormData;
 }
 
 #[derive(Drop, Serde, starknet::Store)]
 pub struct LifeFormData {
+    pub is_loop: bool,
+    pub is_still: bool,
     pub is_alive: bool,
     pub is_dead: bool,
     pub sequence_length: felt252,

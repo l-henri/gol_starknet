@@ -2,14 +2,15 @@ use super::interfaces::{IGolLifeForms, IGolUtilities };
 
 #[starknet::contract]
 mod GolLifeforms {
-    use openzeppelin::introspection::src5::SRC5Component;
+    use super::IGolUtilities;
+use openzeppelin::introspection::src5::SRC5Component;
     use openzeppelin::token::erc721::{ERC721Component, ERC721HooksEmptyImpl};
     use openzeppelin::access::accesscontrol::AccessControlComponent;
     use openzeppelin::access::accesscontrol::DEFAULT_ADMIN_ROLE;
     use openzeppelin::upgrades::UpgradeableComponent;
     use openzeppelin::upgrades::interface::IUpgradeable;
     use starknet::ClassHash;
-    use starknet::ContractAddress;
+    use starknet::{ContractAddress, get_caller_address};
     use starknet::storage::{Map, StorageMapReadAccess, StorageMapWriteAccess};
     use gol_starknet::interfaces::{ LifeFormData };
     use core::dict::Felt252Dict;    
@@ -63,20 +64,20 @@ mod GolLifeforms {
     #[constructor]
     fn constructor(
         ref self: ContractState,
-        recipient: ContractAddress,
-        creator: ContractAddress
+        // recipient: ContractAddress,
+        // creator: ContractAddress
     ) {
         let name = "GOL Lifeforms";
         let symbol = "GOL";
-        let base_uri = "https://api.example.com/v1/";
+        let base_uri = "<!DOCTYPE html><html><body>Hello World</body></html>";
         let token_id = 1;
 
         self.erc721.initializer(name, symbol, base_uri);
-        self.erc721.mint(recipient, token_id);
+        self.erc721.mint(get_caller_address(), token_id);
         // AccessControl-related initialization
         self.accesscontrol.initializer();
-        self.accesscontrol._grant_role(MINTER_ROLE, recipient);
-        self.accesscontrol._grant_role(DEFAULT_ADMIN_ROLE, creator);
+        // self.accesscontrol._grant_role(MINTER_ROLE, recipient);
+        // self.accesscontrol._grant_role(DEFAULT_ADMIN_ROLE, creator);
     }
 
     #[abi(embed_v0)]
@@ -86,7 +87,9 @@ mod GolLifeforms {
             self.erc721.mint(recipient, token_id.into());
             self.lifeform_data.write(token_id, lifeform_data);
         }
-    
+        fn get_lifeform_data(ref self: ContractState, token_id: felt252) -> LifeFormData{
+            self.lifeform_data.read(token_id)
+        }
     }
     #[abi(embed_v0)]
     impl UpgradeableImpl of IUpgradeable<ContractState> {
@@ -297,7 +300,7 @@ mod GolLifeforms {
             let mut return_value = true;
             // Go through the sequence to check wether it is a single loop, and wether the start and finish element is the smallest
             loop {
-                if position >= sequence.len() - 1 {
+                if position >= sequence.len() - 2 {
                     break;
                 }
                 // Check wether the current item is equal, or smaller, than the first item (non single loop, non correct loop entry point)
@@ -325,7 +328,7 @@ mod GolLifeforms {
             let initial_state_u256 : u256 = initial_state.into();
             // Go through the sequence to check wether it is a single loop, and wether the start and finish element is the smallest
             loop {
-                if current_generation >= generations {
+                if current_generation >= generations - 1{
                     break;
                 }
                 current_state = self.iterate_life_once(current_state);
@@ -342,6 +345,7 @@ mod GolLifeforms {
                 }
                 current_generation += 1;
             };
+            current_state = self.iterate_life_once(current_state);
             
             // Check wether the sequence indeed loops
             if current_state != initial_state {
@@ -349,6 +353,10 @@ mod GolLifeforms {
             }
 
             return_value
+        }
+        fn iterate_life_several_times_write(ref self: ContractState, initial_state: felt252, iterations: usize) {
+            self.iterate_life_several_times(initial_state, iterations);
+
         }
     }
 }
