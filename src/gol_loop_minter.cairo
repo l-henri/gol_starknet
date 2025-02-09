@@ -3,7 +3,7 @@ use super::interfaces::{IGolLoopMinter};
 #[starknet::contract]
 mod GolLoopMinter {
     use starknet::ContractAddress;
-    use starknet::storage::{StoragePointerReadAccess};
+    use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
     use gol_starknet::interfaces::{IGolUtilitiesDispatcher,IGolUtilitiesDispatcherTrait, IGolLifeFormsDispatcher, IGolLifeFormsDispatcherTrait, LifeFormData};
     
     #[storage]
@@ -62,9 +62,9 @@ mod GolLoopMinter {
     #[constructor]
     fn constructor(
         ref self: ContractState,
-        game_of_life_functions_address: ContractAddress
+        _gol_lifeforms_nft: ContractAddress
     ) {
-        // self.game_of_life_functions_contract.write(game_of_life_functions_address);
+        self.gol_lifeforms_nft.write(_gol_lifeforms_nft);
         // let name = "GOL Lifeforms";
         // let symbol = "GOL";
         // let base_uri = "https://api.example.com/v1/";

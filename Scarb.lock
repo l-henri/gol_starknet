@@ -5,9 +5,15 @@ version = 1
 name = "gol_starknet"
 version = "0.1.0"
 dependencies = [
+ "hdp_cairo",
  "openzeppelin",
  "snforge_std",
 ]
+
+[[package]]
+name = "hdp_cairo"
+version = "0.1.0"
+source = "git+https://github.com/HerodotusDev/hdp-cairo.git?rev=ba9dba20984bdd09a38dedbf07daa2b7e994b58a#ba9dba20984bdd09a38dedbf07daa2b7e994b58a"
 
 [[package]]
 name = "openzeppelin"

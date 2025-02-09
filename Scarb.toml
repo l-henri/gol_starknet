@@ -8,6 +8,7 @@ edition = "2024_07"
 [dependencies]
 starknet = "2.9.2"
 openzeppelin = "0.20.0"
+hdp_cairo = { git = "https://github.com/HerodotusDev/hdp-cairo.git", rev = "ba9dba20984bdd09a38dedbf07daa2b7e994b58a" }
 
 [dev-dependencies]
 snforge_std = "0.35.1"
