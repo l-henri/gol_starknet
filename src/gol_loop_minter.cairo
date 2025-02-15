@@ -18,7 +18,7 @@ mod GolLoopMinter {
         fn mint_loop(ref self: ContractState, loop_id: felt252, loop_length: usize, recipient: ContractAddress) -> bool {
 
         let gol_utilities_contract = IGolUtilitiesDispatcher { contract_address: self.gol_lifeforms_nft.read() };
-        let loop_exists = gol_utilities_contract.validate_loop_from_initial_state(loop_id, loop_length);
+        let loop_exists = gol_utilities_contract.is_single_loop_and_entrypoint_is_smallest_from_initial_state(loop_id, loop_length);
         if loop_exists {
             let gol_lifeforms = IGolLifeFormsDispatcher {contract_address: self.gol_lifeforms_nft.read()};
             let mut lifeform = LifeFormData {

@@ -10,14 +10,12 @@ pub trait IGolUtilities<TContractState> {
     fn iterate_life_once(self: @TContractState,initial_state: felt252) -> felt252;
     /// Iterate state several times
     fn iterate_life_several_times(self: @TContractState,initial_state: felt252, iterations: usize) -> Array<felt252>;
-    // Detect loops
-    fn detect_loop(self: @TContractState,sequence_of_states: Array<felt252>) -> Array<felt252>;
-    // Validate loops are valid (single & entry point is the smallest)
-    fn validate_loop_from_array(self: @TContractState,sequence: Array<felt252>) -> bool;
-    // Validate loops are valid (single & entry point is the smallest)
-    fn validate_loop_from_initial_state(self: @TContractState,initial_state: felt252, generations: usize) -> bool;
+    // Validate loops are valid (single loop)
+    fn is_single_loop_from_initial_state(self: @TContractState,initial_state: felt252, generations: usize) -> (bool, felt252);
+    // Validate loops are valid (single loop & entry point is the smallest)) 
+    fn is_single_loop_and_entrypoint_is_smallest_from_initial_state(self: @TContractState,initial_state: felt252, generations: usize) -> bool;
+    // Test function
     fn iterate_life_several_times_write(ref self: TContractState,initial_state: felt252, iterations: usize);
-
 }
 
 #[starknet::interface]
