@@ -157,7 +157,7 @@ pub mod GolUtilitiesComponent {
         // Returns a tuple:
         // First value is true if it is a loop
         // Second value returns lowest value in loop 
-        fn is_single_loop_from_initial_state(self: @ComponentState<TContractState>, initial_state: felt252, generations: usize) -> (bool, felt252) {
+        fn is_single_loop_from_initial_state(self: @ComponentState<TContractState>, initial_state: felt252, generations: usize) -> (bool, felt252, felt252) {
             
             let mut current_state : felt252 = initial_state;
             let mut current_generation: usize = 0;
@@ -184,18 +184,19 @@ pub mod GolUtilitiesComponent {
                 }
                 current_generation += 1;
             };
+            let second_to_last_element = current_state;
             current_state = self.iterate_life_once(current_state);
             
             // Check wether the sequence indeed loops
             if current_state != initial_state {
                 is_loop = false;
             }
-            (is_loop, smallest_element)
+            (is_loop, smallest_element, second_to_last_element)
         }
 
         fn is_single_loop_and_entrypoint_is_smallest_from_initial_state(self: @ComponentState<TContractState>, initial_state: felt252, generations: usize) -> bool {
             let returned_tuple  = self.is_single_loop_from_initial_state(initial_state, generations);
-            let (is_loop, smallest_element) = returned_tuple;
+            let (is_loop, smallest_element, _) = returned_tuple;
             let mut return_value = false;
             if (is_loop)
             {

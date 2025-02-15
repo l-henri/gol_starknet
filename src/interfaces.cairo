@@ -11,7 +11,7 @@ pub trait IGolUtilities<TContractState> {
     /// Iterate state several times
     fn iterate_life_several_times(self: @TContractState,initial_state: felt252, iterations: usize) -> Array<felt252>;
     // Validate loops are valid (single loop)
-    fn is_single_loop_from_initial_state(self: @TContractState,initial_state: felt252, generations: usize) -> (bool, felt252);
+    fn is_single_loop_from_initial_state(self: @TContractState,initial_state: felt252, generations: usize) -> (bool, felt252, felt252);
     // Validate loops are valid (single loop & entry point is the smallest)) 
     fn is_single_loop_and_entrypoint_is_smallest_from_initial_state(self: @TContractState,initial_state: felt252, generations: usize) -> bool;
     // Test function
@@ -27,7 +27,7 @@ pub trait IGolLoopMinter<TContractState> {
 #[starknet::interface]
 pub trait IGolPathMinter<TContractState> {
     // Mint a path
-    fn mint_path(ref self: TContractState, path_start_id: felt252, path_length: usize, recipient: ContractAddress) -> bool;
+    fn mint_path(ref self: TContractState, path_id: felt252, length_to_loop_entrypoint: usize, loop_entrypoint: felt252, loop_length: usize, recipient: ContractAddress) -> bool;
 }
 
 #[starknet::interface]
