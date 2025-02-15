@@ -1,7 +1,7 @@
-use super::interfaces::{IGolLoopMinter};
+use super::interfaces::{IGolPathMinter};
 
 #[starknet::contract]
-mod GolLoopMinter {
+mod GolPathMinter {
     use starknet::ContractAddress;
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
     use gol_starknet::interfaces::{IGolUtilitiesDispatcher,IGolUtilitiesDispatcherTrait, IGolLifeFormsDispatcher, IGolLifeFormsDispatcherTrait, LifeFormData};
@@ -13,33 +13,33 @@ mod GolLoopMinter {
 
     // ERC721 Mixin
     #[abi(embed_v0)]
-    impl GolLoopMinter of super::IGolLoopMinter<ContractState> {
+    impl GolPathMinter of super::IGolPathMinter<ContractState> {
         // Mint a token if and only if the submitted token id is in a loop, and if it is the smallest element in that loop.
-        fn mint_loop(ref self: ContractState, loop_id: felt252, loop_length: usize, recipient: ContractAddress) -> bool {
-
+        fn mint_path(ref self: ContractState, path_start_id: felt252, path_length: usize, recipient: ContractAddress) -> bool {
+        let path_exists = true;
         let gol_utilities_contract = IGolUtilitiesDispatcher { contract_address: self.gol_lifeforms_nft.read() };
-        let loop_exists = gol_utilities_contract.validate_loop_from_initial_state(loop_id, loop_length);
-        if loop_exists {
-            let gol_lifeforms = IGolLifeFormsDispatcher {contract_address: self.gol_lifeforms_nft.read()};
-            let mut lifeform = LifeFormData {
-                is_loop: true,
-                is_still: false,
-                is_alive: true,
-                is_dead: false,
-                sequence_length: loop_length.into(),
-                current_state: loop_id
-            };
-            if (loop_id == 0) {
-                lifeform.is_alive = false;
-                lifeform.is_dead = true;
-            }
-            if (loop_length == 1) {
-                lifeform.is_still = true;
-            }
-            gol_lifeforms.mint(recipient, loop_id, lifeform);
+        // let loop_exists = gol_utilities_contract.validate_loop_from_initial_state(loop_id, loop_length);
+        // if loop_exists {
+        //     let gol_lifeforms = IGolLifeFormsDispatcher {contract_address: self.gol_lifeforms_nft.read()};
+        //     let mut lifeform = LifeFormData {
+        //         is_loop: true,
+        //         is_still: false,
+        //         is_alive: true,
+        //         is_dead: false,
+        //         sequence_length: loop_length.into(),
+        //         current_state: loop_id
+        //     };
+        //     if (loop_id == 0) {
+        //         lifeform.is_alive = false;
+        //         lifeform.is_dead = true;
+        //     }
+        //     if (loop_length == 1) {
+        //         lifeform.is_still = true;
+        //     }
+        //     gol_lifeforms.mint(recipient, loop_id, lifeform);
         
-        }
-        loop_exists
+        // }
+        path_exists
         }
     }
     

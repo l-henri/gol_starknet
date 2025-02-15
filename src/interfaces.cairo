@@ -26,13 +26,26 @@ pub trait IGolLoopMinter<TContractState> {
     fn mint_loop(ref self: TContractState, loop_id: felt252, loop_length: usize, recipient: ContractAddress) -> bool;
 }
 
+#[starknet::interface]
+pub trait IGolPathMinter<TContractState> {
+    // Mint a path
+    fn mint_path(ref self: TContractState, path_start_id: felt252, path_length: usize, recipient: ContractAddress) -> bool;
+}
 
 #[starknet::interface]
 pub trait IGolLifeForms<TContractState> {
     // Mint a token
     fn mint(ref self: TContractState, recipient: ContractAddress, token_id: felt252, lifeform_data: LifeFormData);
     fn get_lifeform_data(ref self: TContractState, token_id: felt252) -> LifeFormData;
+    fn move_lifeform_forward(ref self: TContractState, token_id: felt252);
 }
+
+#[starknet::interface]
+pub trait IGolWindToken<TContractState> {
+    // Mint a token
+    fn mint(ref self: TContractState, recipient: ContractAddress, amount: u256);
+}
+
 
 #[derive(Drop, Serde, starknet::Store)]
 pub struct LifeFormData {
@@ -41,4 +54,5 @@ pub struct LifeFormData {
     pub is_alive: bool,
     pub is_dead: bool,
     pub sequence_length: felt252,
+    pub current_state: felt252,
 }

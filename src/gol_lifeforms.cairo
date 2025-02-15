@@ -6,14 +6,16 @@ mod GolLifeforms {
     use super::GolUtilitiesComponent;
     use openzeppelin::introspection::src5::SRC5Component;
     use openzeppelin::token::erc721::{ERC721Component, ERC721HooksEmptyImpl};
+    use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
     use openzeppelin::access::accesscontrol::AccessControlComponent;
     use openzeppelin::access::accesscontrol::DEFAULT_ADMIN_ROLE;
     use openzeppelin::upgrades::UpgradeableComponent;
     use openzeppelin::upgrades::interface::IUpgradeable;
     use starknet::ClassHash;
-    use starknet::{ContractAddress, get_caller_address};
+    use starknet::{ContractAddress, get_caller_address, get_contract_address};
     use starknet::storage::{Map, StorageMapReadAccess, StorageMapWriteAccess};
-    use gol_starknet::interfaces::{ LifeFormData };
+    use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
+    use gol_starknet::interfaces::{ LifeFormData, IGolWindTokenDispatcher, IGolWindTokenDispatcherTrait};
     use core::array::ArrayTrait;
     const grid_size:u32 = 15;   
 
@@ -35,6 +37,8 @@ mod GolLifeforms {
     impl AccessControlInternalImpl = AccessControlComponent::InternalImpl<ContractState>;
     // Upgradeable
     impl UpgradeableInternalImpl = UpgradeableComponent::InternalImpl<ContractState>;
+    // Gol utilities
+    impl GolUtilitiesImpl = GolUtilitiesComponent::GolUtilitiesImpl<ContractState>;
 
     #[storage]
     struct Storage {
@@ -48,7 +52,9 @@ mod GolLifeforms {
         upgradeable: UpgradeableComponent::Storage,
         #[substorage(v0)]
         golutilities: GolUtilitiesComponent::Storage,
-        pub lifeform_data: Map<felt252, LifeFormData>
+        pub lifeform_data: Map<felt252, LifeFormData>,
+        pub total_supply: felt252,
+        pub wind_token_contract: ContractAddress
     }
 
     #[event]
@@ -88,13 +94,39 @@ mod GolLifeforms {
     #[abi(embed_v0)]
     impl GolLifeFormsImpl of super::IGolLifeForms<ContractState> {
         fn mint(ref self: ContractState, recipient: ContractAddress, token_id: felt252, lifeform_data: LifeFormData) {
+            // Checking wether caller can mint
             self.accesscontrol.assert_only_role(MINTER_ROLE);
             self.erc721.mint(recipient, token_id.into());
+            let sequence_length =  lifeform_data.sequence_length;
+            // Writing lifeform data
             self.lifeform_data.write(token_id, lifeform_data);
+            // Increasing total supply
+            self.total_supply.write(self.total_supply.read() + 1);
+            // Get the caller's address
+            let caller = get_caller_address();
+            // Get this contract's address
+            let this_contract = get_contract_address();
+            // Create a dispatcher to interact with the ERC20 token
+            let wind_token = IERC20Dispatcher{ contract_address: self.wind_token_contract.read() };
+            // Charge the minter with the relevant price
+            wind_token.transfer_from(caller, this_contract, sequence_length.into());
+
         }
         fn get_lifeform_data(ref self: ContractState, token_id: felt252) -> LifeFormData{
             self.lifeform_data.read(token_id)
         }
+        fn move_lifeform_forward(ref self: ContractState, token_id: felt252){
+            let mut lifeform_data = self.lifeform_data.read(token_id);
+            lifeform_data.current_state = self.golutilities.iterate_life_once(lifeform_data.current_state);
+            self.lifeform_data.write(token_id, lifeform_data);
+            // Get the caller's address
+            let caller = get_caller_address();
+            // Create a dispatcher to interact with the Wind token
+            let wind_token = IGolWindTokenDispatcher{ contract_address: self.wind_token_contract.read() };
+            // Mint wind token for sender
+            wind_token.mint(caller, 1);
+        }
+        
     }
     #[abi(embed_v0)]
     impl UpgradeableImpl of IUpgradeable<ContractState> {

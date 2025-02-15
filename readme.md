@@ -36,17 +36,18 @@ Think about it. That is 2^225 combinations already - it’s pretty huge
 - Create game of life functions
 - Create an ERC721 for infinite lifeforms
 - Create a minter for infinite lifeforms
+- Create an ERC20 (wind token)
+- Charge wind token to mint 
+- Mint wind token to move lifeform forward
 
 *Front end* 
 - Simple UX to visualize lifeforms and look for alive patterns
 
 ### To do
 *Smart contracts* 
-- Create a minter for infinite lifeforms using client side proving
 - Create a minter for dead / alive paths
+- Create a minter for infinite lifeforms using client side proving
 - Create a minter for dead / alive paths using client side proving
-- Create an ERC20
-- Create a minter for breathing life into lifeforms
 - Store js render on chain
 - Write a bunch of tests
 - Write a deployment script
