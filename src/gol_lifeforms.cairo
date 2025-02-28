@@ -75,20 +75,21 @@ mod GolLifeforms {
     #[constructor]
     fn constructor(
         ref self: ContractState,
-        // recipient: ContractAddress,
-        // creator: ContractAddress
+        creator: ContractAddress,
+        wind_token_contract: ContractAddress,
     ) {
         let name = "GOL Lifeforms";
         let symbol = "GOL";
         let base_uri = "<!DOCTYPE html><html><body>Hello World</body></html>";
-        let token_id = 1;
+        let token_id = 0;
 
         self.erc721.initializer(name, symbol, base_uri);
-        self.erc721.mint(get_caller_address(), token_id);
+        self.erc721.mint(creator, token_id);
         // AccessControl-related initialization
         self.accesscontrol.initializer();
         // self.accesscontrol._grant_role(MINTER_ROLE, recipient);
-        // self.accesscontrol._grant_role(DEFAULT_ADMIN_ROLE, creator);
+        self.accesscontrol._grant_role(DEFAULT_ADMIN_ROLE, creator);
+        self.wind_token_contract.write(wind_token_contract);
     }
 
     #[abi(embed_v0)]

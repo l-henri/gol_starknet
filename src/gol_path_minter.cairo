@@ -26,26 +26,22 @@ mod GolPathMinter {
         let (is_loop, _, second_to_last_element) = returned_tuple;
         assert(is_loop, 'Not entering a loop');
         assert(second_to_last_element != *path_sequence[path_sequence.len()-2], 'Incorrect loop entrypoint');
-        // if loop_exists {
-        //     let gol_lifeforms = IGolLifeFormsDispatcher {contract_address: self.gol_lifeforms_nft.read()};
-        //     let mut lifeform = LifeFormData {
-        //         is_loop: true,
-        //         is_still: false,
-        //         is_alive: true,
-        //         is_dead: false,
-        //         sequence_length: loop_length.into(),
-        //         current_state: loop_id
-        //     };
-        //     if (loop_id == 0) {
-        //         lifeform.is_alive = false;
-        //         lifeform.is_dead = true;
-        //     }
-        //     if (loop_length == 1) {
-        //         lifeform.is_still = true;
-        //     }
-        //     gol_lifeforms.mint(recipient, loop_id, lifeform);
-        
-        // }
+        let gol_lifeforms = IGolLifeFormsDispatcher {contract_address: self.gol_lifeforms_nft.read()};
+        let mut lifeform = LifeFormData {
+            is_loop: false,
+            is_still: false,
+            is_alive: true,
+            is_dead: false,
+            sequence_length: length_to_loop_entrypoint.into(),
+            current_state: path_id
+        };
+        if (loop_entrypoint == 0)
+        {
+            lifeform.is_alive = false;
+            lifeform.is_dead = true;
+        }
+        gol_lifeforms.mint(recipient, path_id, lifeform);
+    
         path_exists
         }
     }
@@ -73,12 +69,5 @@ mod GolPathMinter {
         _gol_lifeforms_nft: ContractAddress
     ) {
         self.gol_lifeforms_nft.write(_gol_lifeforms_nft);
-        // let name = "GOL Lifeforms";
-        // let symbol = "GOL";
-        // let base_uri = "https://api.example.com/v1/";
-        // let token_id = 1;
-
-        // self.erc721.initializer(name, symbol, base_uri);
-        // self.erc721.mint(recipient, token_id);
     }
 }

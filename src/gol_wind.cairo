@@ -58,14 +58,15 @@ mod MyToken {
     fn constructor(
         ref self: ContractState,
         initial_supply: u256,
-        recipient: ContractAddress
+        creator: ContractAddress
     ) {
         let name = "Game of life wind";
         let symbol = "WIND";
 
         self.erc20.initializer(name, symbol);
-        self.erc20.mint(recipient, initial_supply);
+        self.erc20.mint(creator, initial_supply);
         self.accesscontrol.initializer();
+        self.accesscontrol._grant_role(DEFAULT_ADMIN_ROLE, creator);
     }
     #[abi(embed_v0)]
     impl GolWindToken of super::IGolWindToken<ContractState> {
