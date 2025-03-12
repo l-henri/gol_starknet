@@ -38,6 +38,7 @@ mod GolLifeforms {
     // Upgradeable
     impl UpgradeableInternalImpl = UpgradeableComponent::InternalImpl<ContractState>;
     // Gol utilities
+    #[abi(embed_v0)]
     impl GolUtilitiesImpl = GolUtilitiesComponent::GolUtilitiesImpl<ContractState>;
 
     #[storage]
@@ -76,7 +77,6 @@ mod GolLifeforms {
     fn constructor(
         ref self: ContractState,
         creator: ContractAddress,
-        wind_token_contract: ContractAddress,
     ) {
         let name = "GOL Lifeforms";
         let symbol = "GOL";
@@ -89,12 +89,11 @@ mod GolLifeforms {
         self.accesscontrol.initializer();
         // self.accesscontrol._grant_role(MINTER_ROLE, recipient);
         self.accesscontrol._grant_role(DEFAULT_ADMIN_ROLE, creator);
-        self.wind_token_contract.write(wind_token_contract);
     }
 
     #[abi(embed_v0)]
     impl GolLifeFormsImpl of super::IGolLifeForms<ContractState> {
-        fn mint(ref self: ContractState, recipient: ContractAddress, token_id: felt252, lifeform_data: LifeFormData) {
+        fn mint(ref self: ContractState, recipient: ContractAddress, minter: ContractAddress, token_id: felt252, lifeform_data: LifeFormData) {
             // Checking wether caller can mint
             self.accesscontrol.assert_only_role(MINTER_ROLE);
             self.erc721.mint(recipient, token_id.into());
@@ -103,14 +102,12 @@ mod GolLifeforms {
             self.lifeform_data.write(token_id, lifeform_data);
             // Increasing total supply
             self.total_supply.write(self.total_supply.read() + 1);
-            // Get the caller's address
-            let caller = get_caller_address();
             // Get this contract's address
             let this_contract = get_contract_address();
             // Create a dispatcher to interact with the ERC20 token
             let wind_token = IERC20Dispatcher{ contract_address: self.wind_token_contract.read() };
             // Charge the minter with the relevant price
-            wind_token.transfer_from(caller, this_contract, sequence_length.into());
+            wind_token.transfer_from(minter, this_contract, sequence_length.into());
 
         }
         fn get_lifeform_data(ref self: ContractState, token_id: felt252) -> LifeFormData{
@@ -138,5 +135,11 @@ mod GolLifeforms {
             // Replace the class hash upgrading the contract
             self.upgradeable.upgrade(new_class_hash);
         }
+    }
+
+    #[external(v0)]
+    fn update_wind_contract_address(ref self: ContractState, wind_contract_address: ContractAddress) {
+        self.accesscontrol.assert_only_role(DEFAULT_ADMIN_ROLE);
+        self.wind_token_contract.write(wind_contract_address);
     }
 }

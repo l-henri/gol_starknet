@@ -2,7 +2,7 @@ use super::interfaces::{IGolLoopMinter};
 
 #[starknet::contract]
 mod GolLoopMinter {
-    use starknet::ContractAddress;
+    use starknet::{ContractAddress, get_caller_address};
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
     use gol_starknet::interfaces::{IGolUtilitiesDispatcher,IGolUtilitiesDispatcherTrait, IGolLifeFormsDispatcher, IGolLifeFormsDispatcherTrait, LifeFormData};
     
@@ -36,7 +36,9 @@ mod GolLoopMinter {
             if (loop_length == 1) {
                 lifeform.is_still = true;
             }
-            gol_lifeforms.mint(recipient, loop_id, lifeform);
+            // Get the caller's address
+            let minter = get_caller_address();
+            gol_lifeforms.mint(recipient, minter, loop_id, lifeform);
         
         }
         loop_exists

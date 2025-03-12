@@ -2,7 +2,7 @@ use super::interfaces::{IGolPathMinter};
 
 #[starknet::contract]
 mod GolPathMinter {
-    use starknet::ContractAddress;
+    use starknet::{ContractAddress, get_caller_address};
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
     use gol_starknet::interfaces::{IGolUtilitiesDispatcher,IGolUtilitiesDispatcherTrait, IGolLifeFormsDispatcher, IGolLifeFormsDispatcherTrait, LifeFormData};
     
@@ -40,7 +40,9 @@ mod GolPathMinter {
             lifeform.is_alive = false;
             lifeform.is_dead = true;
         }
-        gol_lifeforms.mint(recipient, path_id, lifeform);
+        // Get the minter's address
+        let minter = get_caller_address();
+        gol_lifeforms.mint(recipient, minter, path_id, lifeform);
     
         path_exists
         }

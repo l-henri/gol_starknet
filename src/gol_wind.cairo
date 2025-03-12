@@ -1,7 +1,7 @@
 use super::interfaces::{IGolWindToken };
 
 #[starknet::contract]
-mod MyToken {
+mod Wind {
     use openzeppelin::token::erc20::{ERC20Component, ERC20HooksEmptyImpl};
     use openzeppelin::introspection::src5::SRC5Component;
     use openzeppelin::access::accesscontrol::AccessControlComponent;

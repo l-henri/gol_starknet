@@ -33,7 +33,7 @@ pub trait IGolPathMinter<TContractState> {
 #[starknet::interface]
 pub trait IGolLifeForms<TContractState> {
     // Mint a token
-    fn mint(ref self: TContractState, recipient: ContractAddress, token_id: felt252, lifeform_data: LifeFormData);
+    fn mint(ref self: TContractState, recipient: ContractAddress, minter: ContractAddress, token_id: felt252, lifeform_data: LifeFormData);
     fn get_lifeform_data(ref self: TContractState, token_id: felt252) -> LifeFormData;
     fn move_lifeform_forward(ref self: TContractState, token_id: felt252);
 }
