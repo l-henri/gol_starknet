@@ -27,7 +27,8 @@ mod GolLoopMinter {
                 is_alive: true,
                 is_dead: false,
                 sequence_length: loop_length.into(),
-                current_state: loop_id
+                current_state: loop_id, 
+                age: 0
             };
             if (loop_id == 0) {
                 lifeform.is_alive = false;
@@ -43,6 +44,10 @@ mod GolLoopMinter {
         }
         loop_exists
         }
+
+       // fn compute_path(ref self: ContractState, loop_id: felt252, loop_length: usize, recipient: ContractAddress) -> bool {
+
+       // } 
     }
     
     // #[storage]

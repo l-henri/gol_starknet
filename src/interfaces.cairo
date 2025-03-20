@@ -9,13 +9,21 @@ pub trait IGolUtilities<TContractState> {
     /// Iterate state once
     fn iterate_life_once(self: @TContractState,initial_state: felt252) -> felt252;
     /// Iterate state several times
-    fn iterate_life_several_times(self: @TContractState,initial_state: felt252, iterations: usize) -> Array<felt252>;
+    fn iterate_life_several_times(self: @TContractState,initial_state: felt252, generations: usize) -> Array<felt252>;
+    // Iterate life several times and:
+    // - Return false is a specific incorrect value is found
+    // - Return the smallest value in the sequence
+    // - Return the sequence of states it went through
+    fn iterate_life_several_times_enhanced(self: @TContractState, initial_state: felt252, trigger_state: felt252,  generations: usize)->  (bool, felt252, Array<felt252>); 
     // Validate loops are valid (single loop)
-    fn is_single_loop_from_initial_state(self: @TContractState,initial_state: felt252, generations: usize) -> (bool, felt252, felt252);
+    fn is_single_loop_from_initial_state(self: @TContractState,initial_state: felt252, generations: usize) -> (bool, felt252, Array<felt252>);
     // Validate loops are valid (single loop & entry point is the smallest)) 
     fn is_single_loop_and_entrypoint_is_smallest_from_initial_state(self: @TContractState,initial_state: felt252, generations: usize) -> bool;
-    // Test function
-    fn iterate_life_several_times_write(ref self: TContractState,initial_state: felt252, iterations: usize);
+    // Compute a partial path data
+    fn compute_partial_path(self: @TContractState, initial_state: felt252, trigger_state: felt252, generations: usize) -> PartialPathData;
+    // Combine partial paths
+    fn combine_partial_path(self: @TContractState, partial_path_1: PartialPathData, partial_path_2: PartialPathData) -> PartialPathData;
+        
 }
 
 #[starknet::interface]
@@ -45,7 +53,7 @@ pub trait IGolWindToken<TContractState> {
 }
 
 
-#[derive(Drop, Serde, starknet::Store)]
+#[derive(Drop, Serde, Copy, starknet::Store)]
 pub struct LifeFormData {
     pub is_loop: bool,
     pub is_still: bool,
@@ -53,4 +61,14 @@ pub struct LifeFormData {
     pub is_dead: bool,
     pub sequence_length: felt252,
     pub current_state: felt252,
+    pub age: felt252,
+}
+
+#[derive(Drop, Serde, Copy, starknet::Store)]
+pub struct PartialPathData {
+    pub entrypoint: felt252,
+    pub exitpoint: felt252,
+    pub length: felt252,
+    pub trigger_state: felt252,
+    pub smallest_element: felt252
 }

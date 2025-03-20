@@ -3,8 +3,11 @@ use super::interfaces::{IGolUtilities };
 #[starknet::component]
 pub mod GolUtilitiesComponent {
     use super::IGolUtilities;
+    use gol_starknet::interfaces::{PartialPathData};
+
     // use core::dict::Felt252Dict;    
     use core::array::ArrayTrait;
+    use core::traits::{PartialEq, PartialOrd};
     const grid_size:u32 = 15;   
 
     #[storage]
@@ -138,14 +141,14 @@ pub mod GolUtilitiesComponent {
             self.pack_grid_in_felt252(next_grid)
         }
 
-        fn iterate_life_several_times(self: @ComponentState<TContractState>,initial_state: felt252, iterations: usize) ->  Array<felt252>{
+        fn iterate_life_several_times(self: @ComponentState<TContractState>,initial_state: felt252, generations: usize) ->  Array<felt252>{
             let mut next_gen : felt252 = initial_state;
             let mut sequence_of_states: Array<felt252> = ArrayTrait::new();
             sequence_of_states.append(initial_state);
             let mut generation: usize = 0;
 
             loop {
-                if generation >= iterations {
+                if generation >= generations {
                     break;
                 }
                 next_gen = self.iterate_life_once(next_gen);
@@ -154,44 +157,80 @@ pub mod GolUtilitiesComponent {
             };
             sequence_of_states
         }
-        // Returns a tuple:
-        // First value is true if it is a loop
-        // Second value returns lowest value in loop 
-        fn is_single_loop_from_initial_state(self: @ComponentState<TContractState>, initial_state: felt252, generations: usize) -> (bool, felt252, felt252) {
-            
+
+        fn iterate_life_several_times_enhanced(self: @ComponentState<TContractState>, initial_state: felt252, trigger_state: felt252,  generations: usize) ->  (bool, felt252, Array<felt252>){            
             let mut current_state : felt252 = initial_state;
+            let mut sequence_of_states: Array<felt252> = ArrayTrait::new();
+            sequence_of_states.append(initial_state);
             let mut current_generation: usize = 0;
             let mut smallest_element = initial_state;
-            let mut is_loop = true;
-            let initial_state_u256 : u256 = initial_state.into();
+            let mut is_triggered = false;
+            let trigger_state_u256 : u256 = trigger_state.into();
             
-            // Go through the sequence to check wether it is a single loop, and wether the start and finish element is the smallest
+            // Go through the sequence and:
+            // - Detect a trigger value
+            // - Find the smallest element in the sequence
+            // - Returns the sequence
             loop {
-                if current_generation >= generations - 1{
+                if current_generation >= generations {
                     break;
                 }
                 current_state = self.iterate_life_once(current_state);
+                sequence_of_states.append(current_state);
                 let current_state_u256: u256 = current_state.into();
-                // Check if the current state is equal to the initial state (means this is not a single loop)
-                if initial_state_u256 == current_state_u256 {
-                    is_loop = false;
-                    break;
+                // Check if the current state is equal to the trigger state
+                if trigger_state_u256 == current_state_u256 {
+                    is_triggered = true;
                 }
-                let mut smallest_element_u256 = smallest_element.into();
                 // Check wether the current state is the lowest element in the loop
+                let mut smallest_element_u256 = smallest_element.into();
                 if smallest_element_u256 > current_state_u256 {
                     smallest_element = current_state;
                 }
                 current_generation += 1;
             };
-            let second_to_last_element = current_state;
-            current_state = self.iterate_life_once(current_state);
-            
-            // Check wether the sequence indeed loops
-            if current_state != initial_state {
+
+            (is_triggered, smallest_element, sequence_of_states)
+        }
+        // Returns a tuple:
+        // First value is true if it is a loop
+        // Second value returns lowest value in loop 
+        // Third value is the list of states in the loop
+        fn is_single_loop_from_initial_state(self: @ComponentState<TContractState>, initial_state: felt252, generations: usize) -> (bool, felt252, Array<felt252>) {
+            assert(generations > 0, 'No loop is smaller than 1');
+            let mut is_loop = true;
+            // Compute path from initial state until one step before loop completes
+            let returned_tuple  = self.iterate_life_several_times_enhanced(initial_state, initial_state, generations - 1);
+            let (mut is_triggered, mut smallest_element, mut sequence) = returned_tuple; 
+            // Exception if it's a still figure
+            let mut second_to_last_element = 0;
+            if (generations == 1)
+            {
+                second_to_last_element = initial_state;
+                sequence.append(initial_state);
+            }
+            else
+            {
+                // Compute the last step and check wether it loops back
+                second_to_last_element = *sequence[generations - 2];
+            }
+            let last_state = self.iterate_life_once(second_to_last_element);
+            sequence.append(last_state);
+            if (is_triggered)
+            {
                 is_loop = false;
             }
-            (is_loop, smallest_element, second_to_last_element)
+            if (last_state != initial_state)
+            {
+                is_loop = false;
+                let smallest_element_u256: u256 = smallest_element.into();
+                let last_state_u256: u256 = last_state.into();
+                if (last_state < smallest_element)
+                {
+                    smallest_element = last_state;
+                }
+            }
+            (is_loop, smallest_element, sequence)
         }
 
         fn is_single_loop_and_entrypoint_is_smallest_from_initial_state(self: @ComponentState<TContractState>, initial_state: felt252, generations: usize) -> bool {
@@ -207,10 +246,23 @@ pub mod GolUtilitiesComponent {
             }
             return_value
         }
+        fn compute_partial_path(self: @ComponentState<TContractState>, initial_state: felt252, trigger_state: felt252, generations: usize) -> PartialPathData{
 
-        fn iterate_life_several_times_write(ref self: ComponentState<TContractState>, initial_state: felt252, iterations: usize) {
-            self.iterate_life_several_times(initial_state, iterations);
-
+            let returned_values = self.iterate_life_several_times_enhanced(initial_state, trigger_state, generations);
+            let (is_triggered, smallest_element, sequence_of_states) = returned_values;
+            assert(!is_triggered, 'Triggered state reached');
+            let mut partialPathData = PartialPathData {
+                entrypoint: initial_state,
+                exitpoint: *sequence_of_states[generations.into() - 1],
+                length: generations.into(),
+                trigger_state: trigger_state,
+                smallest_element: smallest_element
+             };
+            partialPathData
+        }
+        fn combine_partial_path(self: @ComponentState<TContractState>, partial_path_1: PartialPathData, partial_path_2: PartialPathData) -> PartialPathData{
+        assert(partial_path_1.exitpoint == partial_path_2.entrypoint, 'Not combinable');
+        assert(partial_path_1.trigger_state == partial_path_2.trigger_state, 'Different trigger state');
         }
     }
 }

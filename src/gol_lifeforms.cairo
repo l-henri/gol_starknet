@@ -57,7 +57,21 @@ mod GolLifeforms {
         pub total_supply: felt252,
         pub wind_token_contract: ContractAddress
     }
-
+    #[derive(Drop, starknet::Event)]
+    struct NewLifeFormEvent {
+        owner: ContractAddress, 
+        token_id: felt252, 
+        lifeform_data: LifeFormData
+    }
+    #[derive(Drop, starknet::Event)]
+    struct NewMoveEvent {
+        token_id: felt252, 
+        age: felt252
+    }
+    #[derive(Drop, starknet::Event)]
+    struct WindContractUpdatedEvent {
+        wind_contract_address: ContractAddress, 
+    }
     #[event]
     #[derive(Drop, starknet::Event)]
     enum Event {
@@ -71,6 +85,9 @@ mod GolLifeforms {
         UpgradeableEvent: UpgradeableComponent::Event,
         #[flat]
         GolUtilitiesEvent: GolUtilitiesComponent::Event,
+        NewLifeForm: NewLifeFormEvent,
+        NewMove: NewMoveEvent,
+        WindContractUpdated: WindContractUpdatedEvent
     }
 
     #[constructor]
@@ -100,6 +117,7 @@ mod GolLifeforms {
             let sequence_length =  lifeform_data.sequence_length;
             // Writing lifeform data
             self.lifeform_data.write(token_id, lifeform_data);
+            self.emit(Event::NewLifeForm(NewLifeFormEvent{owner: recipient, token_id, lifeform_data}));
             // Increasing total supply
             self.total_supply.write(self.total_supply.read() + 1);
             // Get this contract's address
@@ -116,7 +134,9 @@ mod GolLifeforms {
         fn move_lifeform_forward(ref self: ContractState, token_id: felt252){
             let mut lifeform_data = self.lifeform_data.read(token_id);
             lifeform_data.current_state = self.golutilities.iterate_life_once(lifeform_data.current_state);
+            lifeform_data.age += 1;
             self.lifeform_data.write(token_id, lifeform_data);
+            self.emit(Event::NewMove(NewMoveEvent{token_id, age: lifeform_data.age }));
             // Get the caller's address
             let caller = get_caller_address();
             // Create a dispatcher to interact with the Wind token
@@ -141,5 +161,6 @@ mod GolLifeforms {
     fn update_wind_contract_address(ref self: ContractState, wind_contract_address: ContractAddress) {
         self.accesscontrol.assert_only_role(DEFAULT_ADMIN_ROLE);
         self.wind_token_contract.write(wind_contract_address);
+        self.emit(Event::WindContractUpdated(WindContractUpdatedEvent{wind_contract_address}));
     }
 }
