@@ -10,6 +10,24 @@ pub mod GolUtilitiesComponent {
     use core::traits::{PartialEq, PartialOrd};
     const grid_size:u32 = 15;   
 
+    impl Felt252PartialOrd of PartialOrd<felt252> {
+        fn lt(lhs: felt252, rhs: felt252) -> bool {
+            lhs < rhs
+        }
+    
+        fn le(lhs: felt252, rhs: felt252) -> bool {
+            lhs <= rhs
+        }
+    
+        fn gt(lhs: felt252, rhs: felt252) -> bool {
+            lhs > rhs
+        }
+    
+        fn ge(lhs: felt252, rhs: felt252) -> bool {
+            lhs >= rhs
+        }
+    }
+    
     #[storage]
     pub struct Storage {
     }
@@ -225,7 +243,7 @@ pub mod GolUtilitiesComponent {
                 is_loop = false;
                 let smallest_element_u256: u256 = smallest_element.into();
                 let last_state_u256: u256 = last_state.into();
-                if (last_state < smallest_element)
+                if (last_state_u256 < smallest_element_u256)
                 {
                     smallest_element = last_state;
                 }
@@ -263,6 +281,24 @@ pub mod GolUtilitiesComponent {
         fn combine_partial_path(self: @ComponentState<TContractState>, partial_path_1: PartialPathData, partial_path_2: PartialPathData) -> PartialPathData{
         assert(partial_path_1.exitpoint == partial_path_2.entrypoint, 'Not combinable');
         assert(partial_path_1.trigger_state == partial_path_2.trigger_state, 'Different trigger state');
+        // let mut val1 : felt252 = 12;
+        // let mut val2 : felt252 = 15;
+        // if (val1 < val2)
+        // {
+        //     val1 = val2;
+        // }
+        let mut partialPathData = PartialPathData {
+            entrypoint: partial_path_1.entrypoint,
+            exitpoint: partial_path_2.exitpoint,
+            length: partial_path_1.length + partial_path_2.length - 1,
+            trigger_state: partial_path_1.trigger_state,
+            smallest_element: partial_path_1.smallest_element
+         };
+         if (partial_path_1.smallest_element > partial_path_2.smallest_element)
+         {
+            partialPathData.smallest_element = partial_path_2.smallest_element;
+         }
+        partialPathData
         }
     }
 }
