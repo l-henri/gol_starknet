@@ -17,7 +17,7 @@ mod GolLifeforms {
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
     use gol_starknet::interfaces::{ LifeFormData, IGolNutrientTokenDispatcher, IGolNutrientTokenDispatcherTrait};
     use core::array::ArrayTrait;
-    const grid_size:u32 = 16;   
+    const grid_size:u32 = 15;   
 
     component!(path: ERC721Component, storage: erc721, event: ERC721Event);
     component!(path: SRC5Component, storage: src5, event: SRC5Event);
