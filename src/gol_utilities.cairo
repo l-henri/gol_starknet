@@ -6,7 +6,7 @@ pub mod GolUtilitiesComponent {
     use gol_starknet::interfaces::{PartialPathData};
 
     use core::array::ArrayTrait;
-    const grid_size:u32 = 15;   
+    const grid_size:u32 = 16;   
 
     #[storage]
     pub struct Storage {
