@@ -15,7 +15,7 @@ mod GolPathMinter {
     #[abi(embed_v0)]
     impl GolPathMinter of super::IGolPathMinter<ContractState> {
         // Mint a token if and only if the submitted token id leads to a loop, but is not in a loop himself
-        fn mint_path(ref self: ContractState, path_id: felt252, length_to_loop_entrypoint: usize, loop_entrypoint: felt252, loop_length: usize, recipient: ContractAddress) -> bool {
+        fn mint_path(ref self: ContractState, path_id: u256, length_to_loop_entrypoint: usize, loop_entrypoint: u256, loop_length: usize, recipient: ContractAddress) -> bool {
             let path_exists = true;
             let gol_utilities_contract = IGolUtilitiesDispatcher { contract_address: self.gol_lifeforms_nft.read() };
             // Compute path to loop entry point. The loop entry point is the last element in the array

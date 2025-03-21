@@ -53,20 +53,20 @@ mod GolLifeforms {
         upgradeable: UpgradeableComponent::Storage,
         #[substorage(v0)]
         golutilities: GolUtilitiesComponent::Storage,
-        pub lifeform_data: Map<felt252, LifeFormData>,
-        pub total_supply: felt252,
+        pub lifeform_data: Map<u256, LifeFormData>,
+        pub total_supply: u256,
         pub wind_token_contract: ContractAddress
     }
     #[derive(Drop, starknet::Event)]
     struct NewLifeFormEvent {
         owner: ContractAddress, 
-        token_id: felt252, 
+        token_id: u256, 
         lifeform_data: LifeFormData
     }
     #[derive(Drop, starknet::Event)]
     struct NewMoveEvent {
-        token_id: felt252, 
-        age: felt252
+        token_id: u256, 
+        age: u32
     }
     #[derive(Drop, starknet::Event)]
     struct WindContractUpdatedEvent {
@@ -110,10 +110,10 @@ mod GolLifeforms {
 
     #[abi(embed_v0)]
     impl GolLifeFormsImpl of super::IGolLifeForms<ContractState> {
-        fn mint(ref self: ContractState, recipient: ContractAddress, minter: ContractAddress, token_id: felt252, lifeform_data: LifeFormData) {
+        fn mint(ref self: ContractState, recipient: ContractAddress, minter: ContractAddress, token_id: u256, lifeform_data: LifeFormData) {
             // Checking wether caller can mint
             self.accesscontrol.assert_only_role(MINTER_ROLE);
-            self.erc721.mint(recipient, token_id.into());
+            self.erc721.mint(recipient, token_id);
             let sequence_length =  lifeform_data.sequence_length;
             // Writing lifeform data
             self.lifeform_data.write(token_id, lifeform_data);
@@ -128,10 +128,10 @@ mod GolLifeforms {
             wind_token.transfer_from(minter, this_contract, sequence_length.into());
 
         }
-        fn get_lifeform_data(ref self: ContractState, token_id: felt252) -> LifeFormData{
+        fn get_lifeform_data(ref self: ContractState, token_id: u256) -> LifeFormData{
             self.lifeform_data.read(token_id)
         }
-        fn move_lifeform_forward(ref self: ContractState, token_id: felt252){
+        fn move_lifeform_forward(ref self: ContractState, token_id: u256){
             let mut lifeform_data = self.lifeform_data.read(token_id);
             lifeform_data.current_state = self.golutilities.iterate_life_once(lifeform_data.current_state);
             lifeform_data.age += 1;

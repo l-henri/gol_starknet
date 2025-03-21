@@ -5,29 +5,9 @@ pub mod GolUtilitiesComponent {
     use super::IGolUtilities;
     use gol_starknet::interfaces::{PartialPathData};
 
-    // use core::dict::Felt252Dict;    
     use core::array::ArrayTrait;
-    use core::traits::{PartialEq, PartialOrd};
     const grid_size:u32 = 15;   
 
-    impl Felt252PartialOrd of PartialOrd<felt252> {
-        fn lt(lhs: felt252, rhs: felt252) -> bool {
-            lhs < rhs
-        }
-    
-        fn le(lhs: felt252, rhs: felt252) -> bool {
-            lhs <= rhs
-        }
-    
-        fn gt(lhs: felt252, rhs: felt252) -> bool {
-            lhs > rhs
-        }
-    
-        fn ge(lhs: felt252, rhs: felt252) -> bool {
-            lhs >= rhs
-        }
-    }
-    
     #[storage]
     pub struct Storage {
     }
@@ -43,14 +23,13 @@ pub mod GolUtilitiesComponent {
         +HasComponent<TContractState>,
         +Drop<TContractState>,
     > of super::IGolUtilities<ComponentState<TContractState>>  {
-        fn unpack_grid_from_felt252(self: @ComponentState<TContractState>, state: felt252) -> Array<Array<bool>> {
-            let mut state_as_u256 : u256 = state.into();
+        fn unpack_grid_from_uint(self: @ComponentState<TContractState>, state: u256) -> Array<Array<bool>> {
             let mut grid: Array<Array<bool>> = ArrayTrait::new();
             let mut power: u256 = 1;
             // Going though rows
             let mut row: usize = 0;
             loop {
-                if row >= 15 {
+                if row >= grid_size {
                     break;
                     }
                 let mut single_row: Array<bool> = ArrayTrait::new();
@@ -58,11 +37,11 @@ pub mod GolUtilitiesComponent {
                 // Going though columns of a specific row
                 let mut column: usize = 0;
                 loop {
-                    if column >= 15 {
+                    if column >= grid_size {
                         break;
                     }
                     // let test3 = test & test2;
-                    let pixel = state_as_u256 & power;
+                    let pixel = state & power;
                     if pixel != 0 {
                         single_row.append(true);
                     }
@@ -78,19 +57,19 @@ pub mod GolUtilitiesComponent {
             grid
         }
 
-        fn pack_grid_in_felt252(self: @ComponentState<TContractState>, grid: Array<Array<bool>>) -> felt252 {
-            let mut packed_state: felt252 = 0;
-            let mut power: felt252 = 1;
+        fn pack_grid_in_uint(self: @ComponentState<TContractState>, grid: Array<Array<bool>>) -> u256 {
+            let mut packed_state: u256 = 0;
+            let mut power: u256 = 1;
             // Going though rows
             let mut row: usize = 0;
             loop {
-                if row >= 15 {
+                if row >= grid_size {
                     break;
                 }
                 // Going though columns of a specific row
                 let mut column: usize = 0;
                 loop {
-                    if column >= 15 {
+                    if column >= grid_size {
                         break;
                     }
                     
@@ -107,8 +86,8 @@ pub mod GolUtilitiesComponent {
             packed_state
         }
 
-        fn iterate_life_once(self: @ComponentState<TContractState>, initial_state: felt252) -> felt252 {
-            let grid = self.unpack_grid_from_felt252(initial_state);
+        fn iterate_life_once(self: @ComponentState<TContractState>, initial_state: u256) -> u256 {
+            let grid = self.unpack_grid_from_uint(initial_state);
             let mut next_grid: Array<Array<bool>> = ArrayTrait::new();
             // Going though rows
             let mut row: usize = 0;
@@ -126,10 +105,10 @@ pub mod GolUtilitiesComponent {
                     // Counting neighbouring cells
                     let mut neighbours_count = 0;
                     // Calculate wrapped indices
-                    let row_above = ((row + 15 - 1) % 15);
-                    let row_below = ((row + 1) % 15);
-                    let col_left = ((column + 15 - 1) % 15);
-                    let col_right = ((column + 1) % 15);
+                    let row_above = ((row + grid_size - 1) % grid_size);
+                    let row_below = ((row + 1) % grid_size);
+                    let col_left = ((column + grid_size - 1) % grid_size);
+                    let col_right = ((column + 1) % grid_size);
                     // 3 cells above
                     if *grid[row_above][col_left] {neighbours_count += 1;}
                     if *grid[row_above][column] {neighbours_count += 1;}
@@ -156,12 +135,12 @@ pub mod GolUtilitiesComponent {
                 next_grid.append(single_row);
                 row += 1;
             };
-            self.pack_grid_in_felt252(next_grid)
+            self.pack_grid_in_uint(next_grid)
         }
 
-        fn iterate_life_several_times(self: @ComponentState<TContractState>,initial_state: felt252, generations: usize) ->  Array<felt252>{
-            let mut next_gen : felt252 = initial_state;
-            let mut sequence_of_states: Array<felt252> = ArrayTrait::new();
+        fn iterate_life_several_times(self: @ComponentState<TContractState>,initial_state: u256, generations: usize) ->  Array<u256>{
+            let mut next_gen = initial_state;
+            let mut sequence_of_states: Array<u256> = ArrayTrait::new();
             sequence_of_states.append(initial_state);
             let mut generation: usize = 0;
 
@@ -176,14 +155,13 @@ pub mod GolUtilitiesComponent {
             sequence_of_states
         }
 
-        fn iterate_life_several_times_enhanced(self: @ComponentState<TContractState>, initial_state: felt252, trigger_state: felt252,  generations: usize) ->  (bool, felt252, Array<felt252>){            
-            let mut current_state : felt252 = initial_state;
-            let mut sequence_of_states: Array<felt252> = ArrayTrait::new();
+        fn iterate_life_several_times_enhanced(self: @ComponentState<TContractState>, initial_state: u256, trigger_state: u256,  generations: usize) ->  (bool, u256, Array<u256>){            
+            let mut current_state = initial_state;
+            let mut sequence_of_states: Array<u256> = ArrayTrait::new();
             sequence_of_states.append(initial_state);
             let mut current_generation: usize = 0;
             let mut smallest_element = initial_state;
             let mut is_triggered = false;
-            let trigger_state_u256 : u256 = trigger_state.into();
             
             // Go through the sequence and:
             // - Detect a trigger value
@@ -195,14 +173,12 @@ pub mod GolUtilitiesComponent {
                 }
                 current_state = self.iterate_life_once(current_state);
                 sequence_of_states.append(current_state);
-                let current_state_u256: u256 = current_state.into();
                 // Check if the current state is equal to the trigger state
-                if trigger_state_u256 == current_state_u256 {
+                if trigger_state == current_state {
                     is_triggered = true;
                 }
                 // Check wether the current state is the lowest element in the loop
-                let mut smallest_element_u256 = smallest_element.into();
-                if smallest_element_u256 > current_state_u256 {
+                if smallest_element > current_state {
                     smallest_element = current_state;
                 }
                 current_generation += 1;
@@ -214,7 +190,7 @@ pub mod GolUtilitiesComponent {
         // First value is true if it is a loop
         // Second value returns lowest value in loop 
         // Third value is the list of states in the loop
-        fn is_single_loop_from_initial_state(self: @ComponentState<TContractState>, initial_state: felt252, generations: usize) -> (bool, felt252, Array<felt252>) {
+        fn is_single_loop_from_initial_state(self: @ComponentState<TContractState>, initial_state: u256, generations: usize) -> (bool, u256, Array<u256>) {
             assert(generations > 0, 'No loop is smaller than 1');
             let mut is_loop = true;
             // Compute path from initial state until one step before loop completes
@@ -241,9 +217,7 @@ pub mod GolUtilitiesComponent {
             if (last_state != initial_state)
             {
                 is_loop = false;
-                let smallest_element_u256: u256 = smallest_element.into();
-                let last_state_u256: u256 = last_state.into();
-                if (last_state_u256 < smallest_element_u256)
+                if (last_state < smallest_element)
                 {
                     smallest_element = last_state;
                 }
@@ -251,7 +225,7 @@ pub mod GolUtilitiesComponent {
             (is_loop, smallest_element, sequence)
         }
 
-        fn is_single_loop_and_entrypoint_is_smallest_from_initial_state(self: @ComponentState<TContractState>, initial_state: felt252, generations: usize) -> bool {
+        fn is_single_loop_and_entrypoint_is_smallest_from_initial_state(self: @ComponentState<TContractState>, initial_state: u256, generations: usize) -> bool {
             let returned_tuple  = self.is_single_loop_from_initial_state(initial_state, generations);
             let (is_loop, smallest_element, _) = returned_tuple;
             let mut return_value = false;
@@ -264,7 +238,7 @@ pub mod GolUtilitiesComponent {
             }
             return_value
         }
-        fn compute_partial_path(self: @ComponentState<TContractState>, initial_state: felt252, trigger_state: felt252, generations: usize) -> PartialPathData{
+        fn compute_partial_path(self: @ComponentState<TContractState>, initial_state: u256, trigger_state: u256, generations: usize) -> PartialPathData{
 
             let returned_values = self.iterate_life_several_times_enhanced(initial_state, trigger_state, generations);
             let (is_triggered, smallest_element, sequence_of_states) = returned_values;
@@ -279,26 +253,20 @@ pub mod GolUtilitiesComponent {
             partialPathData
         }
         fn combine_partial_path(self: @ComponentState<TContractState>, partial_path_1: PartialPathData, partial_path_2: PartialPathData) -> PartialPathData{
-        assert(partial_path_1.exitpoint == partial_path_2.entrypoint, 'Not combinable');
-        assert(partial_path_1.trigger_state == partial_path_2.trigger_state, 'Different trigger state');
-        // let mut val1 : felt252 = 12;
-        // let mut val2 : felt252 = 15;
-        // if (val1 < val2)
-        // {
-        //     val1 = val2;
-        // }
-        let mut partialPathData = PartialPathData {
-            entrypoint: partial_path_1.entrypoint,
-            exitpoint: partial_path_2.exitpoint,
-            length: partial_path_1.length + partial_path_2.length - 1,
-            trigger_state: partial_path_1.trigger_state,
-            smallest_element: partial_path_1.smallest_element
-         };
-         if (partial_path_1.smallest_element > partial_path_2.smallest_element)
-         {
-            partialPathData.smallest_element = partial_path_2.smallest_element;
-         }
-        partialPathData
+            assert(partial_path_1.exitpoint == partial_path_2.entrypoint, 'Not combinable');
+            assert(partial_path_1.trigger_state == partial_path_2.trigger_state, 'Different trigger state');
+            let mut partialPathData = PartialPathData {
+                entrypoint: partial_path_1.entrypoint,
+                exitpoint: partial_path_2.exitpoint,
+                length: partial_path_1.length + partial_path_2.length - 1,
+                trigger_state: partial_path_1.trigger_state,
+                smallest_element: partial_path_1.smallest_element
+            };
+            if (partial_path_1.smallest_element > partial_path_2.smallest_element)
+            {
+                partialPathData.smallest_element = partial_path_2.smallest_element;
+            }
+            partialPathData
         }
     }
 }
