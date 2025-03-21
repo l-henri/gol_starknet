@@ -206,10 +206,11 @@ pub mod GolUtilitiesComponent {
             else
             {
                 // Compute the last step and check wether it loops back
-                second_to_last_element = *sequence[generations - 2];
+                second_to_last_element = *sequence[generations - 1];
             }
             let last_state = self.iterate_life_once(second_to_last_element);
             sequence.append(last_state);
+            assert(!is_triggered, 'triggered in ISLFIS');
             if (is_triggered)
             {
                 is_loop = false;
@@ -222,6 +223,7 @@ pub mod GolUtilitiesComponent {
                     smallest_element = last_state;
                 }
             }
+            assert(is_loop, 'no loop in ISLFIS');
             (is_loop, smallest_element, sequence)
         }
 

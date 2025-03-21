@@ -8,7 +8,7 @@ mod GolLoopMinter {
     
     #[storage]
     struct Storage {
-        gol_lifeforms_nft: ContractAddress,
+        pub gol_lifeforms_nft: ContractAddress,
     }
 
     // ERC721 Mixin
@@ -19,6 +19,7 @@ mod GolLoopMinter {
 
         let gol_utilities_contract = IGolUtilitiesDispatcher { contract_address: self.gol_lifeforms_nft.read() };
         let loop_exists = gol_utilities_contract.is_single_loop_and_entrypoint_is_smallest_from_initial_state(loop_id, loop_length);
+        assert(loop_exists, 'Not a loop');
         if loop_exists {
             let gol_lifeforms = IGolLifeFormsDispatcher {contract_address: self.gol_lifeforms_nft.read()};
             let mut lifeform = LifeFormData {

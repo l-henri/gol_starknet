@@ -8,7 +8,7 @@ mod GolPathMinter {
     
     #[storage]
     struct Storage {
-        gol_lifeforms_nft: ContractAddress,
+        pub gol_lifeforms_nft: ContractAddress,
     }
 
     // ERC721 Mixin
@@ -50,22 +50,6 @@ mod GolPathMinter {
         }
     }
     
-    // #[storage]
-    // struct Storage {
-    //     // #[substorage(v0)]
-    //     // erc721: ERC721Component::Storage,
-    //     // #[substorage(v0)]
-    //     // src5: SRC5Component::Storage
-    // }
-
-    // #[event]
-    // #[derive(Drop, starknet::Event)]
-    // enum Event {
-    //     #[flat]
-    //     ERC721Event: ERC721Component::Event,
-    //     #[flat]
-    //     SRC5Event: SRC5Component::Event
-    // }
 
     #[constructor]
     fn constructor(

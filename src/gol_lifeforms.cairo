@@ -15,7 +15,7 @@ mod GolLifeforms {
     use starknet::{ContractAddress, get_caller_address, get_contract_address};
     use starknet::storage::{Map, StorageMapReadAccess, StorageMapWriteAccess};
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
-    use gol_starknet::interfaces::{ LifeFormData, IGolWindTokenDispatcher, IGolWindTokenDispatcherTrait};
+    use gol_starknet::interfaces::{ LifeFormData, IGolNutrientTokenDispatcher, IGolNutrientTokenDispatcherTrait};
     use core::array::ArrayTrait;
     const grid_size:u32 = 15;   
 
@@ -55,7 +55,7 @@ mod GolLifeforms {
         golutilities: GolUtilitiesComponent::Storage,
         pub lifeform_data: Map<u256, LifeFormData>,
         pub total_supply: u256,
-        pub wind_token_contract: ContractAddress
+        pub nutrient_token_contract: ContractAddress
     }
     #[derive(Drop, starknet::Event)]
     struct NewLifeFormEvent {
@@ -69,8 +69,8 @@ mod GolLifeforms {
         age: u32
     }
     #[derive(Drop, starknet::Event)]
-    struct WindContractUpdatedEvent {
-        wind_contract_address: ContractAddress, 
+    struct NutrientContractUpdatedEvent {
+        nutrient_contract_address: ContractAddress, 
     }
     #[event]
     #[derive(Drop, starknet::Event)]
@@ -87,7 +87,7 @@ mod GolLifeforms {
         GolUtilitiesEvent: GolUtilitiesComponent::Event,
         NewLifeForm: NewLifeFormEvent,
         NewMove: NewMoveEvent,
-        WindContractUpdated: WindContractUpdatedEvent
+        NutrientContractUpdated: NutrientContractUpdatedEvent
     }
 
     #[constructor]
@@ -95,13 +95,13 @@ mod GolLifeforms {
         ref self: ContractState,
         creator: ContractAddress,
     ) {
-        let name = "GOL Lifeforms";
-        let symbol = "GOL";
+        let name = "Digital bacterias";
+        let symbol = "BACT";
         let base_uri = "<!DOCTYPE html><html><body>Hello World</body></html>";
-        let token_id = 0;
+        // let token_id = 0;
 
         self.erc721.initializer(name, symbol, base_uri);
-        self.erc721.mint(creator, token_id);
+        // self.erc721.mint(creator, token_id);
         // AccessControl-related initialization
         self.accesscontrol.initializer();
         // self.accesscontrol._grant_role(MINTER_ROLE, recipient);
@@ -123,12 +123,12 @@ mod GolLifeforms {
             // Get this contract's address
             let this_contract = get_contract_address();
             // Create a dispatcher to interact with the ERC20 token
-            let wind_token = IERC20Dispatcher{ contract_address: self.wind_token_contract.read() };
+            let nutrient_token = IERC20Dispatcher{ contract_address: self.nutrient_token_contract.read() };
             // Charge the minter with the relevant price
-            wind_token.transfer_from(minter, this_contract, sequence_length.into());
+            nutrient_token.transfer_from(minter, this_contract, sequence_length.into() * 1000000000000000000);
 
         }
-        fn get_lifeform_data(ref self: ContractState, token_id: u256) -> LifeFormData{
+        fn get_lifeform_data( self: @ContractState, token_id: u256) -> LifeFormData{
             self.lifeform_data.read(token_id)
         }
         fn move_lifeform_forward(ref self: ContractState, token_id: u256){
@@ -139,10 +139,10 @@ mod GolLifeforms {
             self.emit(Event::NewMove(NewMoveEvent{token_id, age: lifeform_data.age }));
             // Get the caller's address
             let caller = get_caller_address();
-            // Create a dispatcher to interact with the Wind token
-            let wind_token = IGolWindTokenDispatcher{ contract_address: self.wind_token_contract.read() };
-            // Mint wind token for sender
-            wind_token.mint(caller, 1);
+            // Create a dispatcher to interact with the Nutrient token
+            let nutrient_token = IGolNutrientTokenDispatcher{ contract_address: self.nutrient_token_contract.read() };
+            // Mint nutrient token for sender
+            nutrient_token.mint(caller, 1 * 1000000000000000000);
         }
         
     }
@@ -158,9 +158,9 @@ mod GolLifeforms {
     }
 
     #[external(v0)]
-    fn update_wind_contract_address(ref self: ContractState, wind_contract_address: ContractAddress) {
+    fn update_nutrient_contract_address(ref self: ContractState, nutrient_contract_address: ContractAddress) {
         self.accesscontrol.assert_only_role(DEFAULT_ADMIN_ROLE);
-        self.wind_token_contract.write(wind_contract_address);
-        self.emit(Event::WindContractUpdated(WindContractUpdatedEvent{wind_contract_address}));
+        self.nutrient_token_contract.write(nutrient_contract_address);
+        self.emit(Event::NutrientContractUpdated(NutrientContractUpdatedEvent{nutrient_contract_address}));
     }
 }
