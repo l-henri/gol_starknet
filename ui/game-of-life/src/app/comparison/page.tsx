@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 
-const GRID_SIZE = 15;
+const GRID_SIZE = 16;
 
 export default function ComparisonPage() {
   // Canvas (left) grid state
@@ -90,7 +90,7 @@ export default function ComparisonPage() {
       <div className="flex flex-col items-center gap-8 mr-16">
         <h2 className="text-2xl font-bold">Canvas</h2>
         <div className="border border-gray-300 bg-white p-2">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(15, minmax(0, 1fr))', gap: '1px', backgroundColor: '#E5E7EB' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(16, minmax(0, 1fr))', gap: '1px', backgroundColor: '#E5E7EB' }}>
             {canvasGrid.map((row, rowIndex) => (
               row.map((cell, colIndex) => (
                 <div
@@ -113,7 +113,7 @@ export default function ComparisonPage() {
       <div className="flex flex-col items-center gap-8">
         <h2 className="text-2xl font-bold">Render</h2>
         <div className="border border-gray-300 bg-white p-2">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(15, minmax(0, 1fr))', gap: '1px', backgroundColor: '#E5E7EB' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(16, minmax(0, 1fr))', gap: '1px', backgroundColor: '#E5E7EB' }}>
             {renderGrid.map((row, rowIndex) => (
               row.map((cell, colIndex) => (
                 <div

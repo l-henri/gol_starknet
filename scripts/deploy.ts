@@ -22,17 +22,17 @@ async function main() {
 
   */
   // Load Sierra and casm codes
-  let windSierraCode, windCasmCode;
+  let nutrientSierraCode, nutrientCasmCode;
   let lifeFormSierraCode, lifeFormCasmCode;
   let loopMinterSierraCode, loopMinterCasmCode;
   let pathMinterSierraCode, pathMinterCasmCode;
 
   try {
-    ({ sierraCode: windSierraCode, casmCode: windCasmCode} = await getCompiledCode(
-      "gol_starknet_Wind"
+    ({ sierraCode: nutrientSierraCode, casmCode: nutrientCasmCode} = await getCompiledCode(
+      "gol_starknet_Nutrient"
     ));
   } catch (error: any) {
-    console.log("Failed to read gol_starknet_Wind files");
+    console.log("Failed to read gol_starknet_Nutrient files");
     process.exit(1);
   }
   try {
@@ -65,19 +65,19 @@ async function main() {
   Declaring & deploying contract
 
   */
-  // Declare & deploy wind
-  const windCallData = new CallData(windSierraCode.abi);
-  const windConstructor = windCallData.compile("constructor", {
-    initial_supply: 100,
+  // Declare & deploy nutrient
+  const nutrientCallData = new CallData(nutrientSierraCode.abi);
+  const nutrientConstructor = nutrientCallData.compile("constructor", {
+    initial_supply: "1001000000000000000000",
       creator: process.env.DEPLOYER_ADDRESS ?? "",
   });
-  const windDeployResponse = await account0.declareAndDeploy({
-    contract: windSierraCode,
-    casm: windCasmCode,
-    constructorCalldata: windConstructor,
+  const nutrientDeployResponse = await account0.declareAndDeploy({
+    contract: nutrientSierraCode,
+    casm: nutrientCasmCode,
+    constructorCalldata: nutrientConstructor,
     salt: stark.randomAddress(),
   });
-  console.log(`✅ Wind has been deploy with the address: ${windDeployResponse.deploy.contract_address}`);
+  console.log(`✅ nutrient has been deploy with the address: ${nutrientDeployResponse.deploy.contract_address}`);
 
     // Declare & deploy lifeform
     const lifeformCallData = new CallData(lifeFormSierraCode.abi);
@@ -125,13 +125,13 @@ async function main() {
 
   */
 
-  // Instantiate wind contract
-  const windContract = new Contract(
-    windSierraCode.abi,
-    windDeployResponse.deploy.contract_address,
+  // Instantiate nutrient contract
+  const nutrientContract = new Contract(
+    nutrientSierraCode.abi,
+    nutrientDeployResponse.deploy.contract_address,
     provider
   );
-  windContract.connect(account0)
+  nutrientContract.connect(account0)
    // Instantiate lifeform contract
    const lifeFormContract = new Contract(
     lifeFormSierraCode.abi,
@@ -155,7 +155,7 @@ async function main() {
   pathMinterContract.connect(account0)
     /* 
   
-  Setting up permissipons
+  Setting up permissions
 
   */
 
@@ -163,10 +163,10 @@ async function main() {
   // Create minter role id
  const MINTER_ROLE = hash.starknetKeccak("MINTER_ROLE");
 
-  // Grant wind minter role to lifeform contract
-  const grantRole1Response = await windContract.grant_role(MINTER_ROLE, lifeFormDeployResponse.deploy.contract_address);
+  // Grant nutrient minter role to lifeform contract
+  const grantRole1Response = await nutrientContract.grant_role(MINTER_ROLE, lifeFormDeployResponse.deploy.contract_address);
     await provider.waitForTransaction(grantRole1Response.transaction_hash);
-    console.log("✅ Successfully called grant role function on windContract:", lifeFormDeployResponse.deploy.contract_address);
+    console.log("✅ Successfully called grant role function on nutrientContract:", lifeFormDeployResponse.deploy.contract_address);
     console.log("Transaction hash:", grantRole1Response.transaction_hash);
 
  // Grant lifeform minter role to loop minter contract
@@ -181,26 +181,44 @@ async function main() {
  console.log("✅ Successfully called grant role function on lifeform:", pathMinterDeployResponse.deploy.contract_address);
  console.log("Transaction hash:", grantRole3Response.transaction_hash);   
 
-    // Set wind contract address in lifeform contract
+    // Set nutrient contract address in lifeform contract
     // console.log("Available methods:", Object.keys(lifeFormContract.functions));
-    const setWindContractResponse = await lifeFormContract.update_wind_contract_address(windDeployResponse.deploy.contract_address);
-    await provider.waitForTransaction(setWindContractResponse.transaction_hash);
-    console.log("✅ Successfully set wind contract in lifeform");
-    console.log("Transaction hash:", setWindContractResponse.transaction_hash);   
+    const setNutrientContractResponse = await lifeFormContract.update_nutrient_contract_address(nutrientDeployResponse.deploy.contract_address);
+    await provider.waitForTransaction(setNutrientContractResponse.transaction_hash);
+    console.log("✅ Successfully set nutrient contract in lifeform");
+    console.log("Transaction hash:", setNutrientContractResponse.transaction_hash);   
 
       // Test mint
   // console.log(account0)
-  const allowanceResponse = await windContract.approve(lifeFormDeployResponse.deploy.contract_address, "100000000000000000000000000");
+  const allowanceResponse = await nutrientContract.approve(lifeFormDeployResponse.deploy.contract_address, "100000000000000000000000000");
   await provider.waitForTransaction(allowanceResponse.transaction_hash);
-  console.log("✅ Successfully alllowed on windContract:");
+  console.log("✅ Successfully alllowed on nutrientContract:");
   console.log("Transaction hash:", allowanceResponse.transaction_hash);
 
 // Test mint
 // console.log(account0)
-const testMintResponse = await loopMinterContract.mint_loop("2115620184325601055735808",2,accountAddress0);
-  await provider.waitForTransaction(testMintResponse.transaction_hash);
-  console.log("✅ Successfully mint on loop minter:");
-  console.log("Transaction hash:", testMintResponse.transaction_hash);
+// const testMintResponse2 = await loopMinterContract.mint_loop("0",1,account0.address);
+//   await provider.waitForTransaction(testMintResponse2.transaction_hash);
+//   console.log("✅ Successfully mint 0 on loop minter:");
+//   console.log("Transaction hash:", testMintResponse2.transaction_hash);
+  
+//   const testMintResponse4 = await loopMinterContract.mint_loop("237691741097710700555680088064",1,account0.address);
+//   await provider.waitForTransaction(testMintResponse4.transaction_hash);
+//   console.log("✅ Successfully mint 237691741097710700555680088064 on loop minter:");
+//   console.log("Transaction hash:", testMintResponse2.transaction_hash);
+  
+  
+//   const testMintResponse = await loopMinterContract.mint_loop("2115620184325601055735808",2,accountAddress0);
+//   await provider.waitForTransaction(testMintResponse.transaction_hash);
+//   console.log("✅ Successfully mint 2115620184325601055735808 on loop minter:");
+//   console.log("Transaction hash:", testMintResponse.transaction_hash);
+//57 no loop
+// 62 triggered
+const testMintResponse3 = await loopMinterContract.mint_loop("4295360522",60,account0.address);
+  await provider.waitForTransaction(testMintResponse3.transaction_hash);
+  console.log("✅ Successfully mint 4295360522 on loop minter:");
+  console.log("Transaction hash:", testMintResponse3.transaction_hash);
+
 
 }
 main()
