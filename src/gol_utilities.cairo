@@ -31,7 +31,7 @@ pub mod GolUtilitiesComponent {
             loop {
                 if row >= grid_size {
                     break;
-                    }
+                }
                 let mut single_row: Array<bool> = ArrayTrait::new();
 
                 // Going though columns of a specific row
@@ -40,9 +40,9 @@ pub mod GolUtilitiesComponent {
                     if column >= grid_size {
                         break;
                     }
-                    // let test3 = test & test2;
+                    // Check exact bit value (must be exactly 1, not just non-zero)
                     let pixel = state & power;
-                    if pixel != 0 {
+                    if pixel == power {
                         single_row.append(true);
                     }
                     else {
@@ -50,7 +50,7 @@ pub mod GolUtilitiesComponent {
                     }
                     column += 1;
                     power *=2;
-                    };
+                };
                 grid.append(single_row);
                 row += 1;
             };
@@ -241,7 +241,7 @@ pub mod GolUtilitiesComponent {
             return_value
         }
         fn compute_partial_path(self: @ComponentState<TContractState>, initial_state: u256, trigger_state: u256, generations: usize) -> PartialPathData{
-
+            assert(generations > 0, 'No path smaller than 1');
             let returned_values = self.iterate_life_several_times_enhanced(initial_state, trigger_state, generations);
             let (is_triggered, smallest_element, sequence_of_states) = returned_values;
             assert(!is_triggered, 'Triggered state reached');
@@ -255,6 +255,8 @@ pub mod GolUtilitiesComponent {
             partialPathData
         }
         fn combine_partial_path(self: @ComponentState<TContractState>, partial_path_1: PartialPathData, partial_path_2: PartialPathData) -> PartialPathData{
+            assert(partial_path_1.length > 0, 'No path smaller than 1');
+            assert(partial_path_2.length > 0, 'No path smaller than 1');
             assert(partial_path_1.exitpoint == partial_path_2.entrypoint, 'Not combinable');
             assert(partial_path_1.trigger_state == partial_path_2.trigger_state, 'Different trigger state');
             let mut partialPathData = PartialPathData {
