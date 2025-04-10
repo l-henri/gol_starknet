@@ -23,7 +23,6 @@ pub trait IGolUtilities<TContractState> {
     fn compute_partial_path(self: @TContractState, initial_state: u256, trigger_state: u256, generations: usize) -> PartialPathData;
     // Combine partial paths
     fn combine_partial_path(self: @TContractState, partial_path_1: PartialPathData, partial_path_2: PartialPathData) -> PartialPathData;
-        
 }
 
 #[starknet::interface]
@@ -48,7 +47,7 @@ pub trait IGolPathMinter<TContractState> {
 pub trait IGolLifeForms<TContractState> {
     // Mint a token
     fn mint(ref self: TContractState, recipient: ContractAddress, minter: ContractAddress, token_id: u256, lifeform_data: LifeFormData);
-    fn get_lifeform_data( self: @TContractState, token_id: u256) -> LifeFormData;
+    fn get_lifeform_data(self: @TContractState, token_id: u256) -> LifeFormData;
     fn move_lifeform_forward(ref self: TContractState, token_id: u256);
 }
 

@@ -48,7 +48,7 @@ mod GolPathMinter {
             let returned_tuple = gol_utilities_contract.is_single_loop_from_initial_state(*path_sequence[path_sequence.len()-1], loop_length);
             // Verify if we enter the loop from a non loop
             let (is_loop, _, loop_sequence) = returned_tuple;
-            let second_to_last_element = *loop_sequence[loop_length-2];
+            let second_to_last_element = *loop_sequence[loop_length-1];
             assert(is_loop, 'Not entering a loop');
             assert(second_to_last_element != *path_sequence[path_sequence.len()-2], 'Incorrect loop entrypoint');
             let gol_lifeforms = IGolLifeFormsDispatcher {contract_address: self.gol_lifeforms_nft.read()};
