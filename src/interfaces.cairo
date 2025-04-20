@@ -2,6 +2,8 @@ use starknet::ContractAddress;
 
 #[starknet::interface]
 pub trait IGolUtilities<TContractState> {
+    // Read grid size
+    fn get_grid_size(self: @TContractState) -> u32;
     // Load grid from state
     fn unpack_grid_from_uint(self: @TContractState,state: u256) -> Array<Array<bool>>;
     // Pack grid in u256

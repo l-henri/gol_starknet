@@ -23,6 +23,9 @@ pub mod GolUtilitiesComponent {
         +HasComponent<TContractState>,
         +Drop<TContractState>,
     > of super::IGolUtilities<ComponentState<TContractState>>  {
+        fn get_grid_size(self: @ComponentState<TContractState>) -> u32 {
+            grid_size
+        }
         fn unpack_grid_from_uint(self: @ComponentState<TContractState>, state: u256) -> Array<Array<bool>> {
             let mut grid: Array<Array<bool>> = ArrayTrait::new();
             let mut power: u256 = 1;
@@ -56,7 +59,6 @@ pub mod GolUtilitiesComponent {
             };
             grid
         }
-
         fn pack_grid_in_uint(self: @ComponentState<TContractState>, grid: Array<Array<bool>>) -> u256 {
             let mut packed_state: u256 = 0;
             let mut power: u256 = 1;
