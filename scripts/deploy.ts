@@ -91,7 +91,7 @@ async function main() {
       salt: stark.randomAddress(),
     });
     console.log(`✅ Lifeform has been deploy with the address: ${lifeFormDeployResponse.deploy.contract_address}`);
-
+    
     // Declare & deploy loop minter
     const loopMinterCallData = new CallData(loopMinterSierraCode.abi);
     const loopMinterConstructor = loopMinterCallData.compile("constructor", {
@@ -190,10 +190,11 @@ async function main() {
 
       // Test mint
   // console.log(account0)
-  const allowanceResponse = await nutrientContract.approve(lifeFormDeployResponse.deploy.contract_address, "100000000000000000000000000");
-  await provider.waitForTransaction(allowanceResponse.transaction_hash);
-  console.log("✅ Successfully alllowed on nutrientContract:");
-  console.log("Transaction hash:", allowanceResponse.transaction_hash);
+  
+  // const allowanceResponse = await nutrientContract.approve(lifeFormDeployResponse.deploy.contract_address, "100000000000000000000000000");
+  // await provider.waitForTransaction(allowanceResponse.transaction_hash);
+  // console.log("✅ Successfully alllowed on nutrientContract:");
+  // console.log("Transaction hash:", allowanceResponse.transaction_hash);
 
 // Test mint
 // console.log(account0)
@@ -201,23 +202,32 @@ async function main() {
 //   await provider.waitForTransaction(testMintResponse2.transaction_hash);
 //   console.log("✅ Successfully mint 0 on loop minter:");
 //   console.log("Transaction hash:", testMintResponse2.transaction_hash);
+
   
-//   const testMintResponse4 = await loopMinterContract.mint_loop("237691741097710700555680088064",1,account0.address);
-//   await provider.waitForTransaction(testMintResponse4.transaction_hash);
-//   console.log("✅ Successfully mint 237691741097710700555680088064 on loop minter:");
-//   console.log("Transaction hash:", testMintResponse2.transaction_hash);
+  // const testMintResponse4 = await loopMinterContract.mint_loop("237691741097710700555680088064",1,account0.address);
+  // await provider.waitForTransaction(testMintResponse4.transaction_hash);
+  // console.log("✅ Successfully mint 237691741097710700555680088064 on loop minter:");
+  // console.log("Transaction hash:", testMintResponse4.transaction_hash);
   
-  
-//   const testMintResponse = await loopMinterContract.mint_loop("2115620184325601055735808",2,accountAddress0);
-//   await provider.waitForTransaction(testMintResponse.transaction_hash);
-//   console.log("✅ Successfully mint 2115620184325601055735808 on loop minter:");
-//   console.log("Transaction hash:", testMintResponse.transaction_hash);
+
+  // const testMintResponse = await loopMinterContract.mint_loop("2115620184325601055735808",2,accountAddress0);
+  // await provider.waitForTransaction(testMintResponse.transaction_hash);
+  // console.log("✅ Successfully mint 2115620184325601055735808 on loop minter:");
+  // console.log("Transaction hash:", testMintResponse.transaction_hash);
+
+  // Test minting path
+//   const testMintResponse3 = await pathMinterContract.mint_path("3626814352332034943221760",1,"3626888139308329781428224",1,account0.address);
+// await provider.waitForTransaction(testMintResponse3.transaction_hash);
+// console.log("✅ Successfully mint path 3626814352332034943221760 on path minter:");
+// console.log("Transaction hash:", testMintResponse3.transaction_hash);
+
+
 //57 no loop
 // 62 triggered
-const testMintResponse3 = await loopMinterContract.mint_loop("4295360522",60,account0.address);
-  await provider.waitForTransaction(testMintResponse3.transaction_hash);
-  console.log("✅ Successfully mint 4295360522 on loop minter:");
-  console.log("Transaction hash:", testMintResponse3.transaction_hash);
+// const testMintResponse3 = await loopMinterContract.mint_loop("4295360522",60,account0.address);
+//   await provider.waitForTransaction(testMintResponse3.transaction_hash);
+//   console.log("✅ Successfully mint 4295360522 on loop minter:");
+//   console.log("Transaction hash:", testMintResponse3.transaction_hash);
 
 
 }

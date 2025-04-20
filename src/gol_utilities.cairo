@@ -76,8 +76,12 @@ pub mod GolUtilitiesComponent {
                     if *grid[row][column] {
                         packed_state += power;
                     }
-                    power *= 2; // Increment power for the next cell
-                    column += 1;
+                    
+                    // Only double the power if this isn't the very last cell
+                    if !(row == grid_size -1 && column == grid_size - 1) {
+                        power *= 2; // Increment power for the next cell
+                        }      
+                    column += 1;        
                     };
                 row += 1;
             };

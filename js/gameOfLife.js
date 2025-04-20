@@ -1,5 +1,5 @@
 // Using BigInt since regular Numbers in JavaScript can't safely handle 225 bits
-const GRID_SIZE = 16;
+const GRID_SIZE = 15;
 const fps = 1; // Frames per second
 
 // Configuration
@@ -8,8 +8,8 @@ const cellSize = 10; // Size of each cell in pixels
 // Canvas Setup
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
-canvas.width = 160;
-canvas.height = 160;
+canvas.width = 150;
+canvas.height = 150;
 
 
 /// Packing functions
