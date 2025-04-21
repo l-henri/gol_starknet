@@ -188,20 +188,21 @@ async function main() {
     console.log("✅ Successfully set nutrient contract in lifeform");
     console.log("Transaction hash:", setNutrientContractResponse.transaction_hash);   
 
-      // Test mint
+      
+  // Test mint
   // console.log(account0)
   
-  // const allowanceResponse = await nutrientContract.approve(lifeFormDeployResponse.deploy.contract_address, "100000000000000000000000000");
-  // await provider.waitForTransaction(allowanceResponse.transaction_hash);
-  // console.log("✅ Successfully alllowed on nutrientContract:");
-  // console.log("Transaction hash:", allowanceResponse.transaction_hash);
+  const allowanceResponse = await nutrientContract.approve(lifeFormDeployResponse.deploy.contract_address, "100000000000000000000000000");
+  await provider.waitForTransaction(allowanceResponse.transaction_hash);
+  console.log("✅ Successfully alllowed on nutrientContract:");
+  console.log("Transaction hash:", allowanceResponse.transaction_hash);
 
 // Test mint
 // console.log(account0)
-// const testMintResponse2 = await loopMinterContract.mint_loop("0",1,account0.address);
-//   await provider.waitForTransaction(testMintResponse2.transaction_hash);
-//   console.log("✅ Successfully mint 0 on loop minter:");
-//   console.log("Transaction hash:", testMintResponse2.transaction_hash);
+const testMintResponse2 = await loopMinterContract.mint_loop("1073856514",60,account0.address);
+  await provider.waitForTransaction(testMintResponse2.transaction_hash);
+  console.log("✅ Successfully mint 0 on loop minter:");
+  console.log("Transaction hash:", testMintResponse2.transaction_hash);
 
   
   // const testMintResponse4 = await loopMinterContract.mint_loop("237691741097710700555680088064",1,account0.address);
