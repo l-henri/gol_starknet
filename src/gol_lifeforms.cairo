@@ -6,7 +6,9 @@ mod GolLifeforms {
     use super::GolUtilitiesComponent;
     use openzeppelin::introspection::src5::SRC5Component;
     use openzeppelin::token::erc721::{ERC721Component, ERC721HooksEmptyImpl};
+    use openzeppelin::interfaces::erc721::{IERC721Metadata, IERC721MetadataCamelOnly};
     use openzeppelin::interfaces::erc20::{IERC20Dispatcher, IERC20DispatcherTrait};
+    use gol_starknet::gol_metadata;
     use openzeppelin::access::accesscontrol::AccessControlComponent;
     use openzeppelin::access::accesscontrol::DEFAULT_ADMIN_ROLE;
     use openzeppelin::upgrades::UpgradeableComponent;
@@ -26,9 +28,14 @@ mod GolLifeforms {
 
     const MINTER_ROLE: felt252 = selector!("MINTER_ROLE");
 
-    // ERC721 Mixin
+    // ERC721 core + SRC5. token_uri/tokenURI are overridden below (see ERC721MetadataImpl)
+    // so lifeforms render on-chain, so we embed the pieces individually instead of the Mixin.
     #[abi(embed_v0)]
-    impl ERC721MixinImpl = ERC721Component::ERC721MixinImpl<ContractState>;
+    impl ERC721Impl = ERC721Component::ERC721Impl<ContractState>;
+    #[abi(embed_v0)]
+    impl ERC721CamelOnlyImpl = ERC721Component::ERC721CamelOnlyImpl<ContractState>;
+    #[abi(embed_v0)]
+    impl SRC5Impl = SRC5Component::SRC5Impl<ContractState>;
     impl ERC721InternalImpl = ERC721Component::InternalImpl<ContractState>;
      // AccessControl
     #[abi(embed_v0)]
@@ -39,6 +46,26 @@ mod GolLifeforms {
     // Gol utilities
     #[abi(embed_v0)]
     impl GolUtilitiesImpl = GolUtilitiesComponent::GolUtilitiesImpl<ContractState>;
+
+    // Custom ERC721 metadata: token_uri renders the lifeform's current state as an on-chain SVG.
+    #[abi(embed_v0)]
+    impl ERC721MetadataImpl of IERC721Metadata<ContractState> {
+        fn name(self: @ContractState) -> ByteArray {
+            self.erc721.ERC721_name.read()
+        }
+        fn symbol(self: @ContractState) -> ByteArray {
+            self.erc721.ERC721_symbol.read()
+        }
+        fn token_uri(self: @ContractState, token_id: u256) -> ByteArray {
+            gol_metadata::token_uri(token_id, self.lifeform_data.read(token_id))
+        }
+    }
+    #[abi(embed_v0)]
+    impl ERC721MetadataCamelImpl of IERC721MetadataCamelOnly<ContractState> {
+        fn tokenURI(self: @ContractState, tokenId: u256) -> ByteArray {
+            gol_metadata::token_uri(tokenId, self.lifeform_data.read(tokenId))
+        }
+    }
 
     #[storage]
     struct Storage {
@@ -96,7 +123,8 @@ mod GolLifeforms {
     ) {
         let name = "Digital bacterias";
         let symbol = "BACT";
-        let base_uri = "<!DOCTYPE html><html><body>Hello World</body></html>";
+        // token_uri is rendered on-chain (see gol_metadata), so no base URI is needed.
+        let base_uri = "";
         // let token_id = 0;
 
         self.erc721.initializer(name, symbol, base_uri);

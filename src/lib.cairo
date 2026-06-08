@@ -4,3 +4,5 @@ pub mod interfaces;
 pub mod gol_utilities;
 pub mod gol_nutrient;
 pub mod gol_path_minter;
+pub mod base64;
+pub mod gol_metadata;

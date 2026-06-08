@@ -18,6 +18,18 @@
 
 ---
 
+## 2026-06-08 — Phase 2: on-chain SVG `token_uri`
+- **Goal:** make the NFTs render — override `token_uri` with on-chain metadata + an SVG.
+- **Branch:** `chore/modernize-and-prune`
+- **Changed:** added `src/base64.cairo` (base64 encoder) and `src/gol_metadata.cairo` (SVG + JSON
+  builders, decimal helpers); overrode `token_uri`/`tokenURI` in `gol_lifeforms` (embed the ERC721
+  pieces individually instead of the Mixin + supply a custom `IERC721Metadata`); set the base URI
+  to empty; re-extracted the lifeforms ABI for the frontend.
+- **Verified:** `scarb build` + `snforge test` green (14, +6): base64 RFC vectors, exact SVG and
+  JSON output, and an end-to-end `token_uri` read after minting.
+- **Next:** Phase 3 (economy redesign + security review) — or maintainer deploys to Sepolia.
+- **Blockers:** none for Phase 2.
+
 ## 2026-06-08 — Documentation system
 - **Goal:** document the code written so far and establish a prescriptive project-management process.
 - **Branch:** `chore/modernize-and-prune`

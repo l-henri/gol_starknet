@@ -35,6 +35,7 @@ The Cairo source lives in `src/`:
 | `gol_lifeforms.cairo` | the ERC721 NFT; embeds the utilities component; charges/rewards NUT |
 | `gol_nutrient.cairo` | the NUT ERC20 token |
 | `gol_loop_minter.cairo` / `gol_path_minter.cairo` | validate patterns and mint lifeforms |
+| `gol_metadata.cairo` / `base64.cairo` | on-chain `token_uri` rendering (grid → SVG + ERC721 JSON, base64-encoded) |
 
 Tests live in `tests/` and deploy the full contract graph (mirroring `deploy_full.ts`).
 See [project-management/ROADMAP.md](project-management/ROADMAP.md) for known test gaps

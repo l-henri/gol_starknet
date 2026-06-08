@@ -10,6 +10,9 @@ mod tests {
         IAccessControlDispatcher, IAccessControlDispatcherTrait,
     };
     use openzeppelin::interfaces::erc20::{IERC20Dispatcher, IERC20DispatcherTrait};
+    use openzeppelin::interfaces::erc721::{
+        IERC721MetadataDispatcher, IERC721MetadataDispatcherTrait,
+    };
     use gol_starknet::interfaces::{
         IGolUtilitiesDispatcher, IGolUtilitiesDispatcherTrait, IGolLoopMinterDispatcher,
         IGolLoopMinterDispatcherTrait, IGolPathMinterDispatcher, IGolPathMinterDispatcherTrait,
@@ -132,6 +135,11 @@ mod tests {
         stop_cheat_caller_address(d.loop_minter);
 
         assert(success, 'Should mint still life');
+
+        // The NFT renders on-chain: token_uri returns a populated data URI.
+        let uri = IERC721MetadataDispatcher { contract_address: d.lifeforms }
+            .token_uri(block_state);
+        assert(uri.len() > 100, 'token_uri renders');
     }
 
     #[test]

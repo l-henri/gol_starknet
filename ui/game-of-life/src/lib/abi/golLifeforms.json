@@ -1,8 +1,26 @@
 [
   {
     "type": "impl",
-    "name": "GolLifeFormsImpl",
-    "interface_name": "gol_starknet::interfaces::IGolLifeForms"
+    "name": "ERC721MetadataImpl",
+    "interface_name": "openzeppelin_interfaces::token::erc721::IERC721Metadata"
+  },
+  {
+    "type": "struct",
+    "name": "core::byte_array::ByteArray",
+    "members": [
+      {
+        "name": "data",
+        "type": "core::array::Array::<core::bytes_31::bytes31>"
+      },
+      {
+        "name": "pending_word",
+        "type": "core::felt252"
+      },
+      {
+        "name": "pending_word_len",
+        "type": "core::internal::bounded_int::BoundedInt::<0, 30>"
+      }
+    ]
   },
   {
     "type": "struct",
@@ -17,6 +35,82 @@
         "type": "core::integer::u128"
       }
     ]
+  },
+  {
+    "type": "interface",
+    "name": "openzeppelin_interfaces::token::erc721::IERC721Metadata",
+    "items": [
+      {
+        "type": "function",
+        "name": "name",
+        "inputs": [],
+        "outputs": [
+          {
+            "type": "core::byte_array::ByteArray"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "symbol",
+        "inputs": [],
+        "outputs": [
+          {
+            "type": "core::byte_array::ByteArray"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "token_uri",
+        "inputs": [
+          {
+            "name": "token_id",
+            "type": "core::integer::u256"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::byte_array::ByteArray"
+          }
+        ],
+        "state_mutability": "view"
+      }
+    ]
+  },
+  {
+    "type": "impl",
+    "name": "ERC721MetadataCamelImpl",
+    "interface_name": "openzeppelin_interfaces::token::erc721::IERC721MetadataCamelOnly"
+  },
+  {
+    "type": "interface",
+    "name": "openzeppelin_interfaces::token::erc721::IERC721MetadataCamelOnly",
+    "items": [
+      {
+        "type": "function",
+        "name": "tokenURI",
+        "inputs": [
+          {
+            "name": "tokenId",
+            "type": "core::integer::u256"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::byte_array::ByteArray"
+          }
+        ],
+        "state_mutability": "view"
+      }
+    ]
+  },
+  {
+    "type": "impl",
+    "name": "GolLifeFormsImpl",
+    "interface_name": "gol_starknet::interfaces::IGolLifeForms"
   },
   {
     "type": "enum",
@@ -149,8 +243,8 @@
   },
   {
     "type": "impl",
-    "name": "ERC721MixinImpl",
-    "interface_name": "openzeppelin_interfaces::token::erc721::ERC721ABI"
+    "name": "ERC721Impl",
+    "interface_name": "openzeppelin_interfaces::token::erc721::IERC721"
   },
   {
     "type": "struct",
@@ -163,26 +257,8 @@
     ]
   },
   {
-    "type": "struct",
-    "name": "core::byte_array::ByteArray",
-    "members": [
-      {
-        "name": "data",
-        "type": "core::array::Array::<core::bytes_31::bytes31>"
-      },
-      {
-        "name": "pending_word",
-        "type": "core::felt252"
-      },
-      {
-        "name": "pending_word_len",
-        "type": "core::internal::bounded_int::BoundedInt::<0, 30>"
-      }
-    ]
-  },
-  {
     "type": "interface",
-    "name": "openzeppelin_interfaces::token::erc721::ERC721ABI",
+    "name": "openzeppelin_interfaces::token::erc721::IERC721",
     "items": [
       {
         "type": "function",
@@ -327,61 +403,18 @@
           }
         ],
         "state_mutability": "view"
-      },
-      {
-        "type": "function",
-        "name": "supports_interface",
-        "inputs": [
-          {
-            "name": "interface_id",
-            "type": "core::felt252"
-          }
-        ],
-        "outputs": [
-          {
-            "type": "core::bool"
-          }
-        ],
-        "state_mutability": "view"
-      },
-      {
-        "type": "function",
-        "name": "name",
-        "inputs": [],
-        "outputs": [
-          {
-            "type": "core::byte_array::ByteArray"
-          }
-        ],
-        "state_mutability": "view"
-      },
-      {
-        "type": "function",
-        "name": "symbol",
-        "inputs": [],
-        "outputs": [
-          {
-            "type": "core::byte_array::ByteArray"
-          }
-        ],
-        "state_mutability": "view"
-      },
-      {
-        "type": "function",
-        "name": "token_uri",
-        "inputs": [
-          {
-            "name": "token_id",
-            "type": "core::integer::u256"
-          }
-        ],
-        "outputs": [
-          {
-            "type": "core::byte_array::ByteArray"
-          }
-        ],
-        "state_mutability": "view"
-      },
+      }
+    ]
+  },
+  {
+    "type": "impl",
+    "name": "ERC721CamelOnlyImpl",
+    "interface_name": "openzeppelin_interfaces::token::erc721::IERC721CamelOnly"
+  },
+  {
+    "type": "interface",
+    "name": "openzeppelin_interfaces::token::erc721::IERC721CamelOnly",
+    "items": [
       {
         "type": "function",
         "name": "balanceOf",
@@ -509,19 +542,30 @@
           }
         ],
         "state_mutability": "view"
-      },
+      }
+    ]
+  },
+  {
+    "type": "impl",
+    "name": "SRC5Impl",
+    "interface_name": "openzeppelin_interfaces::introspection::ISRC5"
+  },
+  {
+    "type": "interface",
+    "name": "openzeppelin_interfaces::introspection::ISRC5",
+    "items": [
       {
         "type": "function",
-        "name": "tokenURI",
+        "name": "supports_interface",
         "inputs": [
           {
-            "name": "tokenId",
-            "type": "core::integer::u256"
+            "name": "interface_id",
+            "type": "core::felt252"
           }
         ],
         "outputs": [
           {
-            "type": "core::byte_array::ByteArray"
+            "type": "core::bool"
           }
         ],
         "state_mutability": "view"

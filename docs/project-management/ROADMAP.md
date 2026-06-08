@@ -23,10 +23,12 @@
 - [x] "My lifeforms" view (events → owner reconfirm) + token-id lookup
 - [ ] **Runtime verification against a live Sepolia deployment** (blocked — see STATUS)
 
-### Phase 2 — Make the NFTs render ⬜
-- [ ] On-chain `tokenURI` returning an SVG (or animated) render of the grid
-- [ ] Tests for the metadata/encoding
-- [ ] Frontend: show the on-chain art (reuse the rendering logic)
+### Phase 2 — Make the NFTs render ✅ (done 2026-06-08)
+- [x] On-chain `token_uri`/`tokenURI` returning a base64 `data:` URI with ERC721 JSON + an SVG
+      render of the grid (`src/gol_metadata.cairo`, `src/base64.cairo`)
+- [x] Tests for the metadata/encoding (base64 RFC vectors, exact SVG/JSON, end-to-end `token_uri`)
+- [x] Frontend already renders the same grid client-side via `GridPreview` (mirrors the on-chain
+      SVG); reading `token_uri` directly is optional polish
 
 ### Phase 3 — Economy + security ⬜ (gate before mainnet)
 - [ ] Fix the `move_lifeform_forward` NUT faucet (no ownership/existence check, no rate

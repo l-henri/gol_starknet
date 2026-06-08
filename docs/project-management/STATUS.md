@@ -5,7 +5,7 @@
 
 **Last updated:** 2026-06-08
 **Active branch:** `chore/modernize-and-prune` (not yet merged to `main`, not pushed)
-**Build/test:** `scarb build` ✅ · `snforge test` ✅ (8 passing) · `npm run build` ✅
+**Build/test:** `scarb build` ✅ · `snforge test` ✅ (14 passing) · `npm run build` ✅
 
 ## Done
 
@@ -18,10 +18,13 @@
   `useGol` actions (mint loop/path, breathe-life, balance/lifeform reads), a reliable pure
   fate-finder (`computeFate`, unit-verified), a "my lifeforms" view, and grid previews.
   `next build` passes.
+- **Phase 2 — on-chain rendering.** `token_uri`/`tokenURI` now return a base64 `data:` URI with
+  ERC721 JSON and an SVG of the lifeform's grid (`src/gol_metadata.cairo` + `src/base64.cairo`);
+  verified by 6 tests (base64 vectors, exact SVG/JSON, end-to-end after mint).
 
 ## In progress
 
-- Nothing actively in flight. Documentation just landed (this session).
+- Nothing actively in flight.
 
 ## Blocked
 
@@ -34,10 +37,9 @@
 
 Recommended order (see [ROADMAP.md](ROADMAP.md) for detail):
 
-1. **Phase 2 — on-chain `tokenURI`/SVG** so minted lifeforms render. Pure contract work,
-   fully verifiable with `snforge` tests; does not need a deployment.
-2. **Deploy to Sepolia** (maintainer) → fill `.env.local` → runtime-verify Phase 1.
-3. **Phase 3 — economy redesign + security review** before any mainnet (the
+1. **Deploy to Sepolia** (maintainer) → fill `.env.local` → runtime-verify Phase 1 and see the
+   on-chain art render.
+2. **Phase 3 — economy redesign + security review** before any mainnet (the
    `move_lifeform_forward` NUT faucet must be fixed first).
 
 ## Merge state
