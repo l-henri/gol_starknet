@@ -7,13 +7,13 @@ const GRID_SIZE = 15;
 export default function ComparisonPage() {
   // Canvas (left) grid state
   const [canvasGrid, setCanvasGrid] = useState(() => 
-    Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(false))
+    Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(false))
   );
   const [canvasId, setCanvasId] = useState(0n);
   
   // Render (right) grid state
   const [renderGrid, setRenderGrid] = useState(() => 
-    Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(false))
+    Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(false))
   );
   const [renderGeneration, setRenderGeneration] = useState(0);
 

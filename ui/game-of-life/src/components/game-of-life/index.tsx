@@ -1,13 +1,17 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react';
+import ConnectButton from '@/components/connect-button';
+import { useWallet } from '@/lib/wallet';
+import { useGol } from '@/lib/useGol';
+import { isConfigured } from '@/lib/contracts';
 
 const GRID_SIZE = 15;
 
 const GameOfLife = () => {
   // State for the grid
   const [grid, setGrid] = useState(() => 
-    Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(false))
+    Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(false))
   );
   
   //Game & display state
@@ -22,6 +26,31 @@ const GameOfLife = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [seenStates, setSeenStates] = useState<Map<bigint, number>>(new Map());
   const [stateHistory, setStateHistory] = useState<bigint[]>([]);
+
+  // On-chain wiring
+  const { address } = useWallet();
+  const { mintLoop, getNutBalance } = useGol();
+  const [nutBalance, setNutBalance] = useState<string>('0');
+  const [txStatus, setTxStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!address) { setNutBalance('0'); return; }
+    getNutBalance(address)
+      .then((bal) => setNutBalance((bal / 1000000000000000000n).toString()))
+      .catch(() => setNutBalance('0'));
+  }, [address, getNutBalance]);
+
+  const handleMint = async () => {
+    if (!address || smallestLoopId === null || loopLength === null) return;
+    setTxStatus('Confirm in your wallet…');
+    try {
+      const hash = await mintLoop(smallestLoopId, loopLength, address);
+      setTxStatus(`Submitted: ${hash.slice(0, 10)}…`);
+    } catch (err) {
+      setTxStatus(`Failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
   // Function to toggle a cell
   const toggleCell = (row: number, col: number) => {
     const newGrid = grid.map((r, rowIndex) =>
@@ -128,7 +157,7 @@ const GameOfLife = () => {
     }
   }, [generation, stateHistory]);
   const generateRandomGrid = () => {
-    const newGrid = Array(GRID_SIZE).fill().map(() => 
+    const newGrid = Array(GRID_SIZE).fill(null).map(() => 
       Array(GRID_SIZE).fill(false).map(() => 
         Math.random() < 0.3
       )
@@ -163,6 +192,15 @@ const GameOfLife = () => {
     <div className="flex justify-between w-full max-w-6xl mx-auto p-8">
       {/* Left side - controls */}
       <div className="flex flex-col gap-4">
+        <ConnectButton />
+        {address && (
+          <div className="text-sm text-gray-600">NUT balance: {nutBalance}</div>
+        )}
+        {!isConfigured() && (
+          <div className="text-xs text-amber-600 max-w-[12rem]">
+            Contracts not configured — on-chain actions disabled. See .env.local.example.
+          </div>
+        )}
         <button
           onClick={generateRandomGrid}
           className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
@@ -259,6 +297,17 @@ const GameOfLife = () => {
               <div>
                 Smallest ID in loop: {smallestLoopId?.toString()}
               </div>
+              {address && isConfigured() && (
+                <button
+                  onClick={handleMint}
+                  className="mt-2 px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700"
+                >
+                  Mint this loop
+                </button>
+              )}
+              {txStatus && (
+                <div className="text-xs text-gray-600 break-all">{txStatus}</div>
+              )}
             </div>
           )}
         </div>
