@@ -248,7 +248,13 @@ pub mod GolUtilitiesComponent {
         }
         fn compute_partial_path(self: @ComponentState<TContractState>, initial_state: u256, trigger_state: u256, generations: usize) -> PartialPathData{
             assert(generations > 0, 'No path smaller than 1');
-            let returned_values = self.iterate_life_several_times_enhanced(initial_state, trigger_state, generations);
+            // A partial path of `generations` states spans indices 0..generations-1, so we iterate
+            // exactly `generations - 1` times. The trigger guard then covers only the states the
+            // segment actually stores -- it must NOT peek one step past the exitpoint, because that
+            // peeked step is the loop-closure state the `*_from_partial_paths` mints legitimately
+            // need (== loop_id == trigger_state). Peeking made the closing segment unregisterable
+            // and left both of those mints unreachable for any real loop.
+            let returned_values = self.iterate_life_several_times_enhanced(initial_state, trigger_state, generations - 1);
             let (is_triggered, smallest_element, sequence_of_states) = returned_values;
             assert(!is_triggered, 'Triggered state reached');
             let mut partialPathData = PartialPathData {

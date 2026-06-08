@@ -18,6 +18,46 @@
 
 ---
 
+## 2026-06-08 — Fix the partial-path closing-segment bug + happy-path mint tests
+- **Goal:** make the `*_from_partial_paths` mints reachable (the prior session pinned them as dead)
+  and prove it end-to-end.
+- **Branch:** `chore/modernize-and-prune`
+- **Changed:** `compute_partial_path` now iterates `generations - 1` (one fewer step), so the
+  trigger guard covers only the states the segment stores instead of peeking one step past the
+  exitpoint. Replaced the bug-pinning `test_partial_path_cannot_span_a_full_period` with two
+  end-to-end mints (`test_mint_loop_from_partial_paths` via a blinker, `test_mint_path_from_partial_paths`
+  via L-tromino -> block) and a `test_partial_path_rejects_overshooting_the_period` guard test.
+  Updated ROADMAP/STATUS.
+- **Verified:** `scarb build` + `snforge test` green (23, +2 net). The two `*_from_partial_paths`
+  entrypoints now mint successfully; over-length segments still revert `'Triggered state reached'`.
+- **Decisions:** maintainer greenlit the fix. exitpoint/length semantics are unchanged (same index,
+  same value) — the change only drops the spurious peek; `is_single_loop_from_initial_state` calls
+  the underlying util directly and is unaffected. Flagged as an on-chain semantic change for the
+  pre-mainnet audit scope.
+- **Next:** Phase 4 (indexer/gallery, Sepolia deploy by maintainer → mainnet) and the independent
+  audit, which should cover this change.
+- **Blockers:** none.
+
+## 2026-06-08 — Partial-path test coverage (+ latent bug found)
+- **Goal:** cover the partial-path discovery/combination/mint flows (ROADMAP backlog).
+- **Branch:** `chore/modernize-and-prune`
+- **Changed:** added 5 tests to `tests/test_minters.cairo`: a positive create+combine test (events
+  asserted via `spy_events`), combine's two guard reverts (`'Not combinable'`,
+  `'Different trigger state'`), the `mint_loop_from_partial_paths` registration guard, and
+  `test_partial_path_cannot_span_a_full_period` which pins the bug below. Updated ROADMAP/STATUS.
+- **Verified:** `scarb build` + `snforge test` green (21, +5).
+- **Finding:** the two `*_from_partial_paths` mints are **unreachable for real loops.**
+  `compute_partial_path` trigger-checks one step past the segment's stored exitpoint (it iterates
+  `generations` times but stores index `generations-1`), and that peeked step is exactly the
+  closure state `== loop_id == trigger_state` the mints require — so the closing segment always
+  reverts `'Triggered state reached'`. Proposed fix: iterate `generations-1` in
+  `compute_partial_path` (exitpoint/length unchanged); localized — nothing else calls it.
+- **Decisions:** did **not** apply the fix — it's an on-chain semantic change, so it's the
+  maintainer's call (cf. the economy-design episode). Tests document current behaviour honestly.
+- **Next:** maintainer decides fix-now vs defer; if fix, add happy-path mint tests for the full
+  partial-path loop/path flows.
+- **Blockers:** none for the tests; the bug fix is gated on sign-off.
+
 ## 2026-06-08 — Movement-integrity guard + economy reframing
 - **Goal:** stop NUT being earned on phantom (unminted) ids; correct docs that mis-framed the
   NUT economy as a flaw.

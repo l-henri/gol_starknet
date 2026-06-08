@@ -47,8 +47,19 @@ ownership intentionally doesn't matter (you may advance anyone's lifeform).
 
 ## Backlog (cross-cutting / known issues)
 
-- [ ] **Partial-path test coverage** — `mint_partial_path` / `combine_partial_path` /
-      `mint_*_from_partial_paths` are untested (the originals were incorrect and were removed).
+- [x] **Partial-path test coverage** (2026-06-08) — the full partial-path machinery is now covered
+      end-to-end: registration + combination + event emission, the validation reverts, and both
+      `mint_loop_from_partial_paths` / `mint_path_from_partial_paths` happy paths. Surfaced and fixed
+      the bug below.
+- [x] **Bug fixed: `*_from_partial_paths` mints were unreachable for real loops** (2026-06-08).
+      `compute_partial_path` trigger-checked one step *past* the segment's stored exitpoint, and that
+      peeked step is exactly the loop-closure state (`== loop_id == trigger_state`) the mints require —
+      so registering the closing segment always reverted `'Triggered state reached'`. Fix:
+      `compute_partial_path` now iterates `generations - 1`, so the trigger guard covers only the
+      states the segment stores (exitpoint/length unchanged; nothing else calls it). The guard still
+      rejects overshooting the period. Verified by `test_mint_loop_from_partial_paths`,
+      `test_mint_path_from_partial_paths`, `test_partial_path_rejects_overshooting_the_period`.
+      ⚠️ On-chain semantic change — include in the pre-mainnet audit scope.
 - [ ] **Frontend test runner** — add Vitest; home the `computeFate` checks there.
 - [ ] **`deploy_full.ts` cleanup** — remove the hardcoded trailing test-mint.
 - [ ] **Root `package.json` `deploy` script** points at a non-existent `scripts/deploy.ts`.

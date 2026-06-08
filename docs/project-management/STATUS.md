@@ -5,7 +5,7 @@
 
 **Last updated:** 2026-06-08
 **Active branch:** `chore/modernize-and-prune` (not yet merged to `main`, not pushed)
-**Build/test:** `scarb build` ✅ · `snforge test` ✅ (16 passing) · `npm run build` ✅
+**Build/test:** `scarb build` ✅ · `snforge test` ✅ (23 passing) · `npm run build` ✅
 
 ## Done
 
@@ -27,7 +27,8 @@
 
 ## In progress
 
-- Nothing actively in flight.
+- Nothing actively in flight. (Partial-path machinery is now covered end-to-end and the
+  closing-segment bug is fixed — see the LOG and ROADMAP backlog.)
 
 ## Blocked
 
