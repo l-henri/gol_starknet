@@ -1,82 +1,90 @@
 # Game of Immortal Lifeforms
 
-A decentralized ecosystem of autonomous digital bacteria living on StarkNet, powered by Conway's Game of Life. These digital life forms persist through social coordination and economic incentives.
+A decentralized ecosystem of autonomous digital bacteria living on Starknet, powered by
+Conway's Game of Life. Each life form follows Conway's rules on a 15×15 grid and persists
+on-chain — independent of its creator — sustained by social coordination and the NUT token.
 
-## Overview
+- **Discover** a pattern and run it to find its fate: a repeating **loop** (life) or an empty
+  grid (death).
+- **Mint** discovered loops and paths as NFTs.
+- **Breathe life** into existing lifeforms to move them forward and earn NUT, which is what
+  lets you mint new ones.
 
-This project implements digital bacteria as NFTs on StarkNet, where each life form follows Conway's Game of Life rules. The ecosystem is sustained through:
-- Social coordination among participants
-- Economic incentives via the NUT token
-- On-chain puzzle solving for minting
-- Autonomous evolution mechanics
+See [docs/purpose.md](docs/purpose.md) for the full vision.
 
-## Documentation
+## Repository layout
 
-### Core Concepts
-- [Purpose](docs/purpose.md) - The vision and goals of the project
-- [Terminology](terminology.md) - Key terms and concepts
-- [Technical Overview](docs/technical-overview.md) - High-level system architecture
+```
+src/                 Cairo smart contracts (NFT, NUT token, minters, GoL engine)
+tests/               snforge integration tests
+scripts/             deploy scripts (starknet.js)
+ui/game-of-life/     the Next.js web app (the frontend)
+js/                  standalone JavaScript reference implementation
+docs/                all documentation (start at docs/README.md)
+```
 
-### Technical Documentation
-- [Project Structure](docs/project-structure.md) - Complete system architecture and contract interactions
-- [Loop Minter](docs/loop-minter.md) - Documentation for loop-type life form minting
-- [Path Minter](docs/path-minter.md) - Documentation for path-type life form minting
-- [Nutrient Token](docs/nutrient-token.md) - Documentation for the NUT token system
+## Quick start
 
-### User Guides
-- [Usage Guide](docs/usage-guide.md) - How to interact with the system
-- [Minting Guide](docs/usage-guide.md#minting) - How to mint new life forms
-- [Evolution Guide](docs/usage-guide.md#evolution) - How to participate in evolution
-
-## Quick Start
-
-1. **Understanding Life Forms**
-   - Read the [Purpose](docs/purpose.md) document to understand the vision
-   - Review [Terminology](terminology.md) for key concepts
-
-2. **Technical Setup**
-   - Check the [Technical Overview](docs/technical-overview.md)
-   - Follow the [Usage Guide](docs/usage-guide.md) for setup instructions
-
-3. **Creating Life**
-   - Learn about [Loop Minting](docs/loop-minter.md) and [Path Minting](docs/path-minter.md)
-   - Understand the [NUT token system](docs/nutrient-token.md)
-   - Follow the [Minting Guide](docs/usage-guide.md#minting)
-
-## Development
-
-### Prerequisites
-- Cairo 1.0
-- Starknet Foundry
-- Node.js and npm
-
-### Setup
+**Contracts**
 ```bash
-# Install dependencies
 scarb build
-
-# Run tests
 snforge test
 ```
 
-### Contract Addresses
+**Web app**
+```bash
+cd ui/game-of-life
+npm install
+cp .env.local.example .env.local   # fill in addresses after deploying
+npm run dev                         # http://localhost:3000
+```
 
-- Mainnet:
-  - GOL Lifeforms: [TBD]
-  - NUT Token: [TBD]
-  - Loop Minter: [TBD]
-  - Path Minter: [TBD]
+Full build/test/deploy instructions: [docs/development.md](docs/development.md).
 
-- Testnet:
-  - GOL Lifeforms: [TBD]
-  - NUT Token: [TBD]
-  - Loop Minter: [TBD]
-  - Path Minter: [TBD]
+## Documentation
+
+All docs live in [`docs/`](docs/). **Start at [docs/README.md](docs/README.md)** — it's the
+index and tells you where to find everything. The short version:
+
+- **Concept:** [purpose.md](docs/purpose.md), [overview.md](docs/overview.md)
+- **Contracts:** [technical-overview.md](docs/technical-overview.md),
+  [project-structure.md](docs/project-structure.md),
+  [loop-minter.md](docs/loop-minter.md), [path-minter.md](docs/path-minter.md),
+  [nutrient-token.md](docs/nutrient-token.md)
+- **Frontend:** [frontend.md](docs/frontend.md)
+- **Development** (build/test/deploy/CI): [development.md](docs/development.md)
+- **Usage** (interacting with the deployed system): [usage-guide.md](docs/usage-guide.md)
+- **Terminology:** see [overview.md](docs/overview.md#key-terminology)
+
+## Project status & management
+
+The development of this project is tracked in
+[**docs/project-management/**](docs/project-management/):
+
+- [STATUS.md](docs/project-management/STATUS.md) — where things stand right now
+- [ROADMAP.md](docs/project-management/ROADMAP.md) — the phased plan and backlog
+- [LOG.md](docs/project-management/LOG.md) — the work history
+- [README.md](docs/project-management/README.md) — **the process**: how to log progress and
+  how to pick up work where it was left off
+
+If you're returning to this project or taking it over, read
+[docs/project-management/README.md](docs/project-management/README.md) first and follow its
+resume checklist.
 
 ## Contributing
 
-We welcome contributions! Please check our [contribution guidelines](docs/CONTRIBUTING.md) before submitting PRs.
+- **Code:** follow the workflow (branching, Definition of Done, commit conventions) in
+  [docs/project-management/README.md](docs/project-management/README.md).
+- **Docs:** follow the organization rules in
+  [docs/README.md](docs/README.md#contributing-to-the-docs) so the documentation stays
+  navigable.
+
+## Contract addresses
+
+Not yet deployed. Addresses are produced by `scripts/deploy_full.ts` and recorded in
+[STATUS.md](docs/project-management/STATUS.md) once a deployment exists.
 
 ## License
 
-This project is licensed under [LICENSE] - see the LICENSE file for details.
+Not yet specified. ⚠️ Add a `LICENSE` file before any public release — verify the choice
+independently.
