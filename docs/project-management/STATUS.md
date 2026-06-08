@@ -5,7 +5,7 @@
 
 **Last updated:** 2026-06-08
 **Active branch:** `chore/modernize-and-prune` (not yet merged to `main`, not pushed)
-**Build/test:** `scarb build` ✅ · `snforge test` ✅ (14 passing) · `npm run build` ✅
+**Build/test:** `scarb build` ✅ · `snforge test` ✅ (16 passing) · `npm run build` ✅
 
 ## Done
 
@@ -21,6 +21,9 @@
 - **Phase 2 — on-chain rendering.** `token_uri`/`tokenURI` now return a base64 `data:` URI with
   ERC721 JSON and an SVG of the lifeform's grid (`src/gol_metadata.cairo` + `src/base64.cairo`);
   verified by 6 tests (base64 vectors, exact SVG/JSON, end-to-end after mint).
+- **Phase 3 (started) — movement integrity.** `move_lifeform_forward` now reverts on phantom
+  (unminted) token ids (`'Lifeform not minted'`), so NUT is only earned by advancing real
+  lifeforms. The NUT economy itself is intentional and unchanged.
 
 ## In progress
 
@@ -39,8 +42,9 @@ Recommended order (see [ROADMAP.md](ROADMAP.md) for detail):
 
 1. **Deploy to Sepolia** (maintainer) → fill `.env.local` → runtime-verify Phase 1 and see the
    on-chain art render.
-2. **Phase 3 — economy redesign + security review** before any mainnet (the
-   `move_lifeform_forward` NUT faucet must be fixed first).
+2. **Phase 3 — security review** before any mainnet. The NUT economy is intentional
+   (free-to-earn proof-of-participation), not a bug; the phantom-movement guard is done, so what
+   remains is a real security review (access control, upgrade auth, minter validation).
 
 ## Merge state
 

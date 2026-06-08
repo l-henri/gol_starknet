@@ -16,6 +16,7 @@ mod tests {
     use gol_starknet::interfaces::{
         IGolUtilitiesDispatcher, IGolUtilitiesDispatcherTrait, IGolLoopMinterDispatcher,
         IGolLoopMinterDispatcherTrait, IGolPathMinterDispatcher, IGolPathMinterDispatcherTrait,
+        IGolLifeFormsDispatcher, IGolLifeFormsDispatcherTrait,
     };
 
     const MINTER_ROLE: felt252 = selector!("MINTER_ROLE");
@@ -181,6 +182,48 @@ mod tests {
 
         assert(success, 'Should mint path to block');
     }
+    #[test]
+    #[should_panic(expected: 'Lifeform not minted')]
+    fn test_move_forward_rejects_phantom_token() {
+        let d = deploy_all();
+        let lifeforms = IGolLifeFormsDispatcher { contract_address: d.lifeforms };
+        // 999999 was never minted: advancing it is not real movement and must not earn NUT.
+        start_cheat_caller_address(d.lifeforms, d.creator);
+        lifeforms.move_lifeform_forward(999999);
+        stop_cheat_caller_address(d.lifeforms);
+    }
+
+    #[test]
+    fn test_move_forward_advances_minted_lifeform() {
+        let d = deploy_all();
+        let utils = IGolUtilitiesDispatcher { contract_address: d.lifeforms };
+
+        // Mint a blinker (period 2) so advancing it changes the state.
+        let vertical = utils.pack_grid_in_uint(grid_with(array![(1, 1), (2, 1), (3, 1)].span()));
+        let horizontal = utils.iterate_life_once(vertical);
+        let loop_id = if horizontal < vertical {
+            horizontal
+        } else {
+            vertical
+        };
+        start_cheat_caller_address(d.loop_minter, d.creator);
+        IGolLoopMinterDispatcher { contract_address: d.loop_minter }
+            .mint_loop(loop_id, 2, d.creator);
+        stop_cheat_caller_address(d.loop_minter);
+
+        let lifeforms = IGolLifeFormsDispatcher { contract_address: d.lifeforms };
+        let before = lifeforms.get_lifeform_data(loop_id);
+        assert(before.age == 0, 'age starts at 0');
+
+        start_cheat_caller_address(d.lifeforms, d.creator);
+        lifeforms.move_lifeform_forward(loop_id);
+        stop_cheat_caller_address(d.lifeforms);
+
+        let after = lifeforms.get_lifeform_data(loop_id);
+        assert(after.age == 1, 'age incremented');
+        assert(after.current_state != before.current_state, 'state advanced');
+    }
+
     // TODO(phase-0): partial-path discovery + combination flows (mint_partial_path,
     // combine_partial_path, mint_loop_from_partial_paths, mint_path_from_partial_paths) still
     // need correct integration coverage. The previous tests for these never passed (they

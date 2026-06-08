@@ -18,6 +18,20 @@
 
 ---
 
+## 2026-06-08 — Movement-integrity guard + economy reframing
+- **Goal:** stop NUT being earned on phantom (unminted) ids; correct docs that mis-framed the
+  NUT economy as a flaw.
+- **Branch:** `chore/modernize-and-prune`
+- **Changed:** `move_lifeform_forward` now asserts `self.erc721.exists(token_id)` and reverts
+  `'Lifeform not minted'`; added a negative + positive test. Reframed ROADMAP Phase 3 + STATUS:
+  the free NUT faucet is **intentional** (proof-of-participation that drives on-chain movement),
+  so Phase 3 is a security review, not an economy redesign.
+- **Verified:** `scarb build` + `snforge test` green (16, +2).
+- **Decisions:** per Henri — earning NUT requires advancing a *real* lifeform, but ownership
+  still doesn't matter (you may advance anyone's). No NUT fees/sinks added; inflation is by design.
+- **Next:** independent security review of the contracts.
+- **Blockers:** none.
+
 ## 2026-06-08 — Phase 2: on-chain SVG `token_uri`
 - **Goal:** make the NFTs render — override `token_uri` with on-chain metadata + an SVG.
 - **Branch:** `chore/modernize-and-prune`

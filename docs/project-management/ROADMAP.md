@@ -30,12 +30,16 @@
 - [x] Frontend already renders the same grid client-side via `GridPreview` (mirrors the on-chain
       SVG); reading `token_uri` directly is optional polish
 
-### Phase 3 — Economy + security ⬜ (gate before mainnet)
-- [ ] Fix the `move_lifeform_forward` NUT faucet (no ownership/existence check, no rate
-      limit, unlimited free NUT) — see the project memory and `usage-guide.md`
-- [ ] Reconsider the reward curve and the NUT sink (spent NUT is currently locked with no
-      withdrawal path)
-- [ ] Independent security review before deploying real value
+### Phase 3 — Security review 🟡 (gate before mainnet)
+The NUT economy is **intentional, not a flaw.** NUT is free to *earn* via `move_lifeform_forward`,
+but earning it is on-chain movement (gas + effort), and you must earn it to mint — the point is to
+turn interest in the protocol into on-chain activity, not to capture value. So this is **not** an
+economy redesign: NUT "inflation" and spent-NUT sitting in the contract are by design, and
+ownership intentionally doesn't matter (you may advance anyone's lifeform).
+- [x] Guard `move_lifeform_forward` so NUT is only earned by advancing a real (minted) lifeform —
+      phantom/unminted ids revert with `'Lifeform not minted'` (done 2026-06-08)
+- [ ] Independent security review before deploying real value (access control / `MINTER_ROLE`
+      wiring, upgrade authorization, minter validation math, cross-contract call ordering)
 
 ### Phase 4 — Ecosystem + launch ⬜
 - [ ] Indexer + gallery (browse living lifeforms, oldest, longest loops)

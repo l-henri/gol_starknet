@@ -159,6 +159,10 @@ mod GolLifeforms {
             self.lifeform_data.read(token_id)
         }
         fn move_lifeform_forward(ref self: ContractState, token_id: u256){
+            // NUT is earned by advancing a real, minted lifeform — not phantom/unminted ids.
+            // (Earning NUT is meant to be free-but-effortful on-chain movement; advancing a
+            // token that doesn't exist is not movement, so it doesn't earn.)
+            assert(self.erc721.exists(token_id), 'Lifeform not minted');
             let mut lifeform_data = self.lifeform_data.read(token_id);
             lifeform_data.current_state = self.golutilities.iterate_life_once(lifeform_data.current_state);
             lifeform_data.age += 1;
