@@ -51,7 +51,7 @@ mod GolPathMinter {
             let second_to_last_element = *loop_sequence[loop_length-1];
             assert(is_loop, 'Not entering a loop');
             assert(second_to_last_element != *path_sequence[path_sequence.len()-2], 'Incorrect loop entrypoint');
-            let gol_lifeforms = IGolLifeFormsDispatcher {contract_address: self.gol_lifeforms_nft.read()};
+            let mut gol_lifeforms = IGolLifeFormsDispatcher {contract_address: self.gol_lifeforms_nft.read()};
             let mut lifeform = LifeFormData {
                 is_loop: false,
                 is_still: false,
@@ -112,7 +112,7 @@ mod GolPathMinter {
             assert(loop_exitpoint == loop_partial_path.entrypoint, 'Loop does not loop');
             assert(main_path.exitpoint != loop_partial_path.exitpoint, 'Loop is the main path');
             // Recording path
-            let gol_lifeforms = IGolLifeFormsDispatcher {contract_address: self.gol_lifeforms_nft.read()};
+            let mut gol_lifeforms = IGolLifeFormsDispatcher {contract_address: self.gol_lifeforms_nft.read()};
             let mut lifeform = LifeFormData {
                 is_loop: false,
                 is_still: false,

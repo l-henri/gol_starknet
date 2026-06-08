@@ -42,7 +42,7 @@ mod GolLoopMinter {
         let loop_exists = gol_utilities_contract.is_single_loop_and_entrypoint_is_smallest_from_initial_state(loop_id, loop_length);
         assert(loop_exists, 'Not a loop');
         if loop_exists {
-            let gol_lifeforms = IGolLifeFormsDispatcher {contract_address: self.gol_lifeforms_nft.read()};
+            let mut gol_lifeforms = IGolLifeFormsDispatcher {contract_address: self.gol_lifeforms_nft.read()};
             let mut lifeform = LifeFormData {
                 is_loop: true,
                 is_still: false,
@@ -80,7 +80,7 @@ mod GolLoopMinter {
             
             assert(loop_exitpoint == loop_id, 'Loop does not loop');
 
-            let gol_lifeforms = IGolLifeFormsDispatcher {contract_address: self.gol_lifeforms_nft.read()};
+            let mut gol_lifeforms = IGolLifeFormsDispatcher {contract_address: self.gol_lifeforms_nft.read()};
             let mut lifeform = LifeFormData {
                 is_loop: true,
                 is_still: false,

@@ -2,12 +2,12 @@ use super::interfaces::{IGolNutrientToken };
 
 #[starknet::contract]
 mod Nutrient {
-    use openzeppelin::token::erc20::{ERC20Component, ERC20HooksEmptyImpl};
+    use openzeppelin::token::erc20::{DefaultConfig, ERC20Component, ERC20HooksEmptyImpl};
     use openzeppelin::introspection::src5::SRC5Component;
     use openzeppelin::access::accesscontrol::AccessControlComponent;
     use openzeppelin::access::accesscontrol::DEFAULT_ADMIN_ROLE;
     use openzeppelin::upgrades::UpgradeableComponent;
-    use openzeppelin::upgrades::interface::IUpgradeable;
+    use openzeppelin::interfaces::upgrades::IUpgradeable;
     use starknet::ClassHash;
     use starknet::ContractAddress;
 

@@ -6,11 +6,11 @@ mod GolLifeforms {
     use super::GolUtilitiesComponent;
     use openzeppelin::introspection::src5::SRC5Component;
     use openzeppelin::token::erc721::{ERC721Component, ERC721HooksEmptyImpl};
-    use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
+    use openzeppelin::interfaces::erc20::{IERC20Dispatcher, IERC20DispatcherTrait};
     use openzeppelin::access::accesscontrol::AccessControlComponent;
     use openzeppelin::access::accesscontrol::DEFAULT_ADMIN_ROLE;
     use openzeppelin::upgrades::UpgradeableComponent;
-    use openzeppelin::upgrades::interface::IUpgradeable;
+    use openzeppelin::interfaces::upgrades::IUpgradeable;
     use starknet::ClassHash;
     use starknet::{ContractAddress, get_caller_address, get_contract_address};
     use starknet::storage::{Map, StorageMapReadAccess, StorageMapWriteAccess};
@@ -122,7 +122,7 @@ mod GolLifeforms {
             // Get this contract's address
             let this_contract = get_contract_address();
             // Create a dispatcher to interact with the ERC20 token
-            let nutrient_token = IERC20Dispatcher{ contract_address: self.nutrient_token_contract.read() };
+            let mut nutrient_token = IERC20Dispatcher{ contract_address: self.nutrient_token_contract.read() };
             // Charge the minter with the relevant price
             nutrient_token.transfer_from(minter, this_contract, sequence_length.into() * 1000000000000000000);
 
@@ -139,7 +139,7 @@ mod GolLifeforms {
             // Get the caller's address
             let caller = get_caller_address();
             // Create a dispatcher to interact with the Nutrient token
-            let nutrient_token = IGolNutrientTokenDispatcher{ contract_address: self.nutrient_token_contract.read() };
+            let mut nutrient_token = IGolNutrientTokenDispatcher{ contract_address: self.nutrient_token_contract.read() };
             // Mint nutrient token for sender
             nutrient_token.mint(caller, 1 * 1000000000000000000);
         }

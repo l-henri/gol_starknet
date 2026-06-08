@@ -6,10 +6,10 @@ mod tests {
         declare, ContractClassTrait, DeclareResultTrait, start_cheat_caller_address,
         stop_cheat_caller_address,
     };
-    use openzeppelin::access::accesscontrol::interface::{
+    use openzeppelin::interfaces::accesscontrol::{
         IAccessControlDispatcher, IAccessControlDispatcherTrait,
     };
-    use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
+    use openzeppelin::interfaces::erc20::{IERC20Dispatcher, IERC20DispatcherTrait};
     use gol_starknet::interfaces::{
         IGolUtilitiesDispatcher, IGolUtilitiesDispatcherTrait, IGolLoopMinterDispatcher,
         IGolLoopMinterDispatcherTrait, IGolPathMinterDispatcher, IGolPathMinterDispatcherTrait,
