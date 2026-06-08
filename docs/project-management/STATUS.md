@@ -30,22 +30,36 @@
 - Nothing actively in flight. (Partial-path machinery is now covered end-to-end and the
   closing-segment bug is fixed — see the LOG and ROADMAP backlog.)
 
+## Sepolia deployment (live — 2026-06-08)
+
+Deployed via `sncast` from the `deployer` account; roles + allowance wired in one multicall; a
+2×2-block loop NFT (token `98307`) minted to confirm the full path. `ui/game-of-life/.env.local`
+is set to these (RPC: `https://api.cartridge.gg/x/starknet/sepolia`).
+
+| Contract | Address |
+|---|---|
+| Nutrient (NUT) | `0x060e3d6a6f181235e0d4993ddde5a7db7d8ff5275830bcc916969dfdbf3e1858` |
+| GolLifeforms | `0x0535f6cb8e98f78de9b4dc71b78839cd8119af301b8b300d715b32872d07494e` |
+| GolLoopMinter | `0x021f2ee4afeb2593fb957911f500c06424bb045ec64e172bd8ee0af5aefd4ffc` |
+| GolPathMinter | `0x07e46847ece8c083da4e8a3eb17bd8d3f7138b08cda3ad6a2ffa884b918d2503` |
+
+Verified on-chain: all three `MINTER_ROLE` grants, the nutrient-address wiring, the allowance, the
+mint (owner + `LifeFormData`), the 1-NUT charge, and that `token_uri` returns the base64 JSON+SVG.
+
 ## Blocked
 
-- **Live verification of the frontend** is blocked on a **Sepolia deployment**, which requires
-  the maintainer's funded account + private key (an agent must not handle keys). Once deployed,
-  set `NEXT_PUBLIC_*` in `ui/game-of-life/.env.local`. Until then the wallet/mint/event paths
-  are **build-verified only**, not runtime-verified.
+- Nothing blocked. (The frontend's wallet/mint/event paths are still **build-verified**; the
+  next step is a manual click-through against this deployment — see Next up.)
 
 ## Next up
 
 Recommended order (see [ROADMAP.md](ROADMAP.md) for detail):
 
-1. **Deploy to Sepolia** (maintainer) → fill `.env.local` → runtime-verify Phase 1 and see the
-   on-chain art render.
-2. **Phase 3 — security review** before any mainnet. The NUT economy is intentional
-   (free-to-earn proof-of-participation), not a bug; the phantom-movement guard is done, so what
-   remains is a real security review (access control, upgrade auth, minter validation).
+1. **Manual frontend smoke test** — `cd ui/game-of-life && npm run dev`, connect a Sepolia wallet,
+   confirm the NUT balance, the minted lifeform (`98307`) in "my lifeforms", and a fresh mint.
+2. **Independent security review** before mainnet (access control, upgrade auth, minter validation,
+   and the partial-path semantic change). The NUT economy is intentional, not a bug.
+3. **Phase 4 — indexer/gallery, then mainnet.**
 
 ## Merge state
 

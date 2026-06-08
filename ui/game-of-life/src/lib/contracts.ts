@@ -8,7 +8,7 @@ import pathMinterAbi from "./abi/golPathMinter.json";
 // Public Sepolia endpoint by default; override with NEXT_PUBLIC_RPC_URL.
 export const RPC_URL =
   process.env.NEXT_PUBLIC_RPC_URL ??
-  "https://starknet-sepolia.public.blastapi.io/rpc/v0_8";
+  "https://api.cartridge.gg/x/starknet/sepolia";
 
 // Filled in after deployment — see .env.local.example.
 export const ADDRESSES = {

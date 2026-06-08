@@ -21,7 +21,11 @@
 - [x] Reliable pure fate-finder (`computeFate`, unit-verified)
 - [x] Mint loop + mint path; breathe-life (`move_lifeform_forward`)
 - [x] "My lifeforms" view (events → owner reconfirm) + token-id lookup
-- [ ] **Runtime verification against a live Sepolia deployment** (blocked — see STATUS)
+- [x] **Deployed to Sepolia** (2026-06-08) — all four contracts live + wired; a block-loop NFT
+      minted and verified on-chain (owner, data, 1-NUT charge, `token_uri` render). Addresses in
+      STATUS. `.env.local` points the frontend at them.
+- [ ] **Manual frontend click-through** against the live deployment (connect wallet, balance, mint,
+      "my lifeforms") — the only remaining Phase 1 verification.
 
 ### Phase 2 — Make the NFTs render ✅ (done 2026-06-08)
 - [x] On-chain `token_uri`/`tokenURI` returning a base64 `data:` URI with ERC721 JSON + an SVG
@@ -41,9 +45,10 @@ ownership intentionally doesn't matter (you may advance anyone's lifeform).
 - [ ] Independent security review before deploying real value (access control / `MINTER_ROLE`
       wiring, upgrade authorization, minter validation math, cross-contract call ordering)
 
-### Phase 4 — Ecosystem + launch ⬜
+### Phase 4 — Ecosystem + launch 🟡
 - [ ] Indexer + gallery (browse living lifeforms, oldest, longest loops)
-- [ ] Sepolia deploy with recorded addresses → mainnet
+- [x] Sepolia deploy with recorded addresses (2026-06-08 — see STATUS)
+- [ ] Mainnet deploy (after the independent security review)
 
 ## Backlog (cross-cutting / known issues)
 

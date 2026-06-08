@@ -18,6 +18,27 @@
 
 ---
 
+## 2026-06-08 — Deploy to Sepolia + wire the frontend
+- **Goal:** stand up the full contract graph on Sepolia and point the web app at it.
+- **Branch:** `chore/modernize-and-prune` (config changes; `.env.local` is gitignored)
+- **Changed:** deployed all four contracts via `sncast` from the `deployer` account
+  (`0x319…532`), declared the classes, deployed, and wired roles + nutrient address + allowance in
+  a single atomic multicall. Set `ui/game-of-life/.env.local` to the live addresses; fixed the dead
+  `blastapi` default RPC in `.env.local.example` and `contracts.ts` to the Cartridge Sepolia node.
+  Addresses recorded in STATUS.
+- **Verified:** on-chain reads confirm the three `MINTER_ROLE` grants, the allowance (1001 NUT),
+  a real `mint_loop` of a 2×2 block (token `98307`: owner = deployer, `LifeFormData` correct,
+  NUT 1001→1000), and `token_uri` returning the base64 `data:application/json` (decodes to
+  `{"name":"Lifeform #98307…`). Frontend wallet/mint/event paths remain build-verified — manual
+  click-through is the next step.
+- **Decisions:** deployed with `sncast` (keys stay in its account file; the agent never handles
+  them) rather than the private-key TS script. The `deployer` account was topped up to ~123 STRK
+  because GolLifeforms' declare alone wanted a ~35-STRK max-fee bound. Skipped the TS script's
+  hardcoded test-mint; did one clean verification mint instead.
+- **Next:** manual frontend smoke test against the deployment; then the independent security review
+  (incl. the partial-path semantic change) ahead of mainnet.
+- **Blockers:** none.
+
 ## 2026-06-08 — Fix the partial-path closing-segment bug + happy-path mint tests
 - **Goal:** make the `*_from_partial_paths` mints reachable (the prior session pinned them as dead)
   and prove it end-to-end.
