@@ -87,6 +87,25 @@ mod tests {
     }
 
     #[test]
+    fn test_iterate_in_place_matches_looped() {
+        let utils = deploy_utilities();
+        // A glider keeps changing every generation, so this is a real multi-generation check.
+        let glider = utils
+            .pack_grid_in_uint(grid_with(array![(0, 1), (1, 2), (2, 0), (2, 1), (2, 2)].span()));
+
+        // Looping iterate_life_once N times must equal the in-place result for the same N.
+        let mut looped = glider;
+        let mut i: usize = 0;
+        while i < 13 {
+            looped = utils.iterate_life_once(looped);
+            i += 1;
+        };
+        assert(utils.iterate_life_several_in_place(glider, 13) == looped, 'in_place == looped');
+        // Zero generations is the identity.
+        assert(utils.iterate_life_several_in_place(glider, 0) == glider, '0 gens is identity');
+    }
+
+    #[test]
     fn test_empty_grid_stays_empty() {
         let utils = deploy_utilities();
         assert(utils.iterate_life_once(0) == 0, 'empty grid stays empty');

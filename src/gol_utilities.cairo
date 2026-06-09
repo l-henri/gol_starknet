@@ -94,54 +94,21 @@ pub mod GolUtilitiesComponent {
 
         fn iterate_life_once(self: @ComponentState<TContractState>, initial_state: u256) -> u256 {
             let grid = self.unpack_grid_from_uint(initial_state);
-            let mut next_grid: Array<Array<bool>> = ArrayTrait::new();
-            // Going though rows
-            let mut row: usize = 0;
-            loop {
-                if row >= grid_size {
-                    break;
-                }
-                let mut single_row: Array<bool> = ArrayTrait::new();
-                // Going though columns of a specific row
-                let mut column: usize = 0;
-                loop {
-                    if column >= grid_size {
-                        break;
-                    }
-                    // Counting neighbouring cells
-                    let mut neighbours_count = 0;
-                    // Calculate wrapped indices
-                    let row_above = ((row + grid_size - 1) % grid_size);
-                    let row_below = ((row + 1) % grid_size);
-                    let col_left = ((column + grid_size - 1) % grid_size);
-                    let col_right = ((column + 1) % grid_size);
-                    // 3 cells above
-                    if *grid[row_above][col_left] {neighbours_count += 1;}
-                    if *grid[row_above][column] {neighbours_count += 1;}
-                    if *grid[row_above][col_right] {neighbours_count += 1;}
-                    // A cell to the left, a cell to the right
-                    if *grid[row][col_right] {neighbours_count += 1;}
-                    if *grid[row][col_left] {neighbours_count += 1;}
-                    // 3 cells below
-                    if *grid[row_below][col_left] {neighbours_count += 1;}
-                    if *grid[row_below][column] {neighbours_count += 1;}
-                    if *grid[row_below][col_right] {neighbours_count += 1;}
-
-                    // Living rules
-                    let will_live = if *grid[row][column] {
-                        // Living cell survives with 2 or 3 neighbours
-                        neighbours_count == 2 || neighbours_count == 3
-                    } else {
-                        // Dead cell comes alive with exactly 3 neighbours
-                        neighbours_count == 3
-                    };
-                    single_row.append(will_live);
-                    column += 1;
-                };
-                next_grid.append(single_row);
-                row += 1;
-            };
+            let next_grid = step_grid(@grid);
             self.pack_grid_in_uint(next_grid)
+        }
+
+        fn iterate_life_several_in_place(self: @ComponentState<TContractState>, initial_state: u256, generations: usize) -> u256 {
+            // Unpack and pack the u256 grid exactly once; step the grid in place in between. The
+            // per-generation cost is then just `step_grid`, not the expensive u256 pack/unpack, so
+            // this advances many more generations per call/tx than looping `iterate_life_once`.
+            let mut grid = self.unpack_grid_from_uint(initial_state);
+            let mut generation: usize = 0;
+            while generation < generations {
+                grid = step_grid(@grid);
+                generation += 1;
+            };
+            self.pack_grid_in_uint(grid)
         }
 
         fn iterate_life_several_times(self: @ComponentState<TContractState>,initial_state: u256, generations: usize) ->  Array<u256>{
@@ -284,5 +251,52 @@ pub mod GolUtilitiesComponent {
             }
             partialPathData
         }
+    }
+
+    // Pure Game-of-Life step on an unpacked (toroidal) grid. Extracted so the neighbour-count and
+    // survival rules live in exactly one place, shared by `iterate_life_once` and
+    // `iterate_life_several_in_place`. Reads through a snapshot so callers keep ownership.
+    fn step_grid(grid: @Array<Array<bool>>) -> Array<Array<bool>> {
+        let mut next_grid: Array<Array<bool>> = ArrayTrait::new();
+        let mut row: usize = 0;
+        loop {
+            if row >= grid_size {
+                break;
+            }
+            let mut single_row: Array<bool> = ArrayTrait::new();
+            let mut column: usize = 0;
+            loop {
+                if column >= grid_size {
+                    break;
+                }
+                let mut neighbours_count = 0;
+                let row_above = ((row + grid_size - 1) % grid_size);
+                let row_below = ((row + 1) % grid_size);
+                let col_left = ((column + grid_size - 1) % grid_size);
+                let col_right = ((column + 1) % grid_size);
+                // 3 cells above
+                if *grid.at(row_above).at(col_left) { neighbours_count += 1; }
+                if *grid.at(row_above).at(column) { neighbours_count += 1; }
+                if *grid.at(row_above).at(col_right) { neighbours_count += 1; }
+                // left and right
+                if *grid.at(row).at(col_right) { neighbours_count += 1; }
+                if *grid.at(row).at(col_left) { neighbours_count += 1; }
+                // 3 cells below
+                if *grid.at(row_below).at(col_left) { neighbours_count += 1; }
+                if *grid.at(row_below).at(column) { neighbours_count += 1; }
+                if *grid.at(row_below).at(col_right) { neighbours_count += 1; }
+
+                let will_live = if *grid.at(row).at(column) {
+                    neighbours_count == 2 || neighbours_count == 3
+                } else {
+                    neighbours_count == 3
+                };
+                single_row.append(will_live);
+                column += 1;
+            };
+            next_grid.append(single_row);
+            row += 1;
+        };
+        next_grid
     }
 }
