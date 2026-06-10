@@ -18,6 +18,54 @@
 
 ---
 
+## 2026-06-09 — SNIP-36 benchmark: on-chain vs off-chain generation ceiling
+- **Goal:** measure the max GoL generations advanceable in one transaction — on-chain vs
+  off-chain via SNIP-36 — using the in-place iteration.
+- **Branch:** `main` (bench code authored in a prior session; this session is measurement
+  only — **no product code changed**).
+- **Changed:** no product code. Benchmark-only `src/gol_bench.cairo` (`GolBench`, SNIP-36) is
+  deployed on Sepolia at `0x0057ac40958e78244ba405fcbf4ba37e20af65c45ad8c305bf61d3d211a6eb99`
+  (class `0x4460e11a…14cc`). Added `docs/strkd-snip36-feature-request.md` (portable; for the
+  strkd maintainer).
+- **Verified — the result:**
+  - **On-chain ceiling: 170 generations** in one tx (`iterate_life_several_in_place`), bounded
+    by the **1.2e9 L2-gas-per-tx protocol cap**. Measured via `starknet_estimateFee`
+    (`/tmp/golbench/estimate.py`, SKIP_VALIDATE, no spend): ~7M L2 gas/gen; n=170 = 1,193M gas
+    (ok), n=171 = 1,201M (> cap). **Correction:** an earlier note said "97" — that was a wrong
+    gas-per-gen estimate (~12M assumed vs ~7M actual) and was never broadcast (n=64 was the
+    highest confirmed). The same `estimateFee` simulates full execution, so n≤170 demonstrably
+    runs to completion on-chain. **Confirmed by real broadcast** of `move_forward_in_place(170)`
+    via strkd from the agent account — tx `0x50fd2c79…bdedc`, SUCCEEDED/ACCEPTED_ON_L2,
+    `get_age` 58→228, actual L2 gas 1,085,322,855 (l1_gas 0), fee 8.68 STRK. (Actual came in
+    under the estimate, so 170 had ~115M gas of headroom under the cap.)
+  - **Off-chain SNIP-36 ceiling: 43 generations** — on the **local** native stwo "Dinner"
+    build. n=43 proves (~32–40 s, ~408 KB proof); n≥44 fails fast (~16–24 s) with the stwo
+    error **`Not enough twiddles!`** — the circle-FFT domain max, i.e. that build's
+    **trace-size cap**. Binary search: ✅ 15/35/40/43 · ❌ 44/45/56/97/150.
+  - Funded the bench agent account 30 STRK (balance limit ≈ 220 gens) → **balance was not the
+    binding constraint; the local prover capped first.**
+  - Full round-trip validated at n=15 and at the ceiling n=43: strkd sign-only → Dinner prove
+    → on-chain `verify_move_forward` (checks `proof_facts[8] == message_hash`). Bench `get_age`
+    0→15→58. Verify txs `0x0671…0857` (n=15), `0x0445…14d3` (n=43).
+- **Findings:** For this workload **off-chain (43) < on-chain (170)** — but they are
+  *different kinds of limits*: on-chain is the protocol gas cap (calibrated to the *production*
+  prover); off-chain (43) is the *local* Dinner stwo build's fixed trace/twiddle capacity. Same
+  prover family, far smaller local build. Raise its max log size / twiddle precompute and the
+  off-chain ceiling climbs past 170 (off-chain isn't subject to the 1.2e9 cap — next limits are
+  balance ~220, then RAM). Not a SNIP-36 limitation. strkd handled pair/create/fund/deploy/sign with **no failures**
+  (grant auto-approves own-account ops; only funding prompts). The only gap: submitting the
+  proof-carrying verify tx — `wallet_addInvokeTransaction` has no `proof`/`proof_facts` params —
+  so verify went through `sncast --proof-file/--proof-facts-file` from `playground-master` (works
+  because `verify_move_forward` has no sender check). Captured as a feature request (enrich the
+  existing method; no new endpoint).
+- **Next:** to push the off-chain ceiling higher, raise the stwo prover's max log size /
+  twiddle precompute in the Dinner build and re-run the sweep (should climb toward the ~220
+  balance limit at 30 STRK). Otherwise resume the mainnet track (frontend smoke test → review).
+- **Blockers:** none in-repo. (Beating on-chain off-chain needs a Dinner prover-config change,
+  outside this repo.)
+
+---
+
 ## 2026-06-08 — Deploy to Sepolia + wire the frontend
 - **Goal:** stand up the full contract graph on Sepolia and point the web app at it.
 - **Branch:** `chore/modernize-and-prune` (config changes; `.env.local` is gitignored)

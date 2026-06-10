@@ -16,6 +16,7 @@ assert_macros = "2.18.0"
 [[target.starknet-contract]]
 sierra = true
 casm = true
+allowed-libfuncs-list.name = "all"   # required for get_execution_info_v3_syscall (SNIP-36)
 
 [scripts]
 test = "snforge test"

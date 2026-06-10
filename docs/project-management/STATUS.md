@@ -3,9 +3,9 @@
 > Snapshot of where the project stands. Keep this short and current — rewrite it each session.
 > History lives in [LOG.md](LOG.md); the plan lives in [ROADMAP.md](ROADMAP.md).
 
-**Last updated:** 2026-06-08
+**Last updated:** 2026-06-09
 **Active branch:** `chore/modernize-and-prune` (not yet merged to `main`, not pushed)
-**Build/test:** `scarb build` ✅ · `snforge test` ✅ (23 passing) · `npm run build` ✅
+**Build/test:** `scarb build` ✅ · `snforge test` ✅ (24 passing) · `npm run build` ✅
 
 ## Done
 
@@ -45,6 +45,30 @@ is set to these (RPC: `https://api.cartridge.gg/x/starknet/sepolia`).
 
 Verified on-chain: all three `MINTER_ROLE` grants, the nutrient-address wiring, the allowance, the
 mint (owner + `LifeFormData`), the 1-NUT charge, and that `token_uri` returns the base64 JSON+SVG.
+
+## SNIP-36 proving benchmark (2026-06-09)
+
+Measured the max GoL generations advanceable in one tx, on-chain vs off-chain (full detail in
+[LOG.md](LOG.md)). Benchmark-only `GolBench` (`src/gol_bench.cairo`) is live on Sepolia at
+`0x0057ac40958e78244ba405fcbf4ba37e20af65c45ad8c305bf61d3d211a6eb99` (not part of the product).
+
+| Path | Ceiling | Bound by |
+|---|---|---|
+| On-chain (single tx, in-place) | **170 gens** | 1.2e9 L2-gas-per-tx protocol cap (~7M gas/gen; n=170 ok, n=171 over) |
+| Off-chain (SNIP-36, **local** Dinner stwo build) | **43 gens** | that prover build's trace size — `Not enough twiddles!` |
+| (off-chain balance limit @ 30 STRK) | ~220 gens | not reached — local prover caps first |
+
+Round-trip validated end-to-end at n=15 and at the n=43 ceiling (strkd sign → Dinner prove →
+on-chain `verify_move_forward`). On-chain (170) and off-chain (43) are **different kinds of
+limits**: on-chain is the protocol gas cap (calibrated to the *production* prover); off-chain
+is the *local* Dinner stwo build's fixed trace/twiddle capacity. Same prover family, much
+smaller local build — raise its max log size / twiddle precompute and the off-chain ceiling
+climbs past 170 (off-chain has no 1.2e9 cap; next limits are balance ~220, then RAM). On-chain
+ceiling measured via fee estimation (`/tmp/golbench/estimate.py`) and **confirmed by a real
+broadcast of `move_forward_in_place(170)`** — tx `0x50fd2c79…bdedc`, SUCCEEDED, `get_age` 58→228,
+actual L2 gas 1,085,322,855, fee 8.68 STRK. The earlier "97" was a wrong gas-per-gen estimate. strkd worked for every step except submitting the proof-carrying verify
+(no `proof`/`proof_facts` param) — see
+[strkd-snip36-feature-request.md](../strkd-snip36-feature-request.md); verify used `sncast`.
 
 ## Blocked
 
