@@ -113,4 +113,37 @@ mod tests {
         assert(states.len() == 6, 'should have 6 states');
         assert(*states.at(5) == 0, 'should remain empty');
     }
+
+    #[test]
+    fn bench_in_place_20_gens() {
+        let utils = deploy_utilities();
+        let glider = utils
+            .pack_grid_in_uint(grid_with(array![(0, 1), (1, 2), (2, 0), (2, 1), (2, 2)].span()));
+        let result = utils.iterate_life_several_in_place(glider, 20);
+        assert(result != 0, 'sanity');
+    }
+
+    #[test]
+    fn test_toroidal_corner_block_still_life() {
+        let utils = deploy_utilities();
+        // 2x2 block spanning the torus corner: (14,14),(14,0),(0,14),(0,0)
+        let corner_block = utils
+            .pack_grid_in_uint(
+                grid_with(array![(14, 14), (14, 0), (0, 14), (0, 0)].span()),
+            );
+        assert(utils.iterate_life_once(corner_block) == corner_block, 'corner block still life');
+    }
+
+    #[test]
+    fn test_toroidal_seam_blinker_oscillates() {
+        let utils = deploy_utilities();
+        // Vertical blinker spanning the top/bottom seam: (14,5),(0,5),(1,5)
+        let vertical = utils
+            .pack_grid_in_uint(grid_with(array![(14, 5), (0, 5), (1, 5)].span()));
+        // After one step it becomes the horizontal blinker centred at (0,5)
+        let horizontal = utils
+            .pack_grid_in_uint(grid_with(array![(0, 4), (0, 5), (0, 6)].span()));
+        assert(utils.iterate_life_once(vertical) == horizontal, 'should become horizontal');
+        assert(utils.iterate_life_once(horizontal) == vertical, 'should return to vertical');
+    }
 }

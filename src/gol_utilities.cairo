@@ -263,30 +263,36 @@ pub mod GolUtilitiesComponent {
             if row >= grid_size {
                 break;
             }
+            // Toroidal wrap as branches instead of `%`: a divmod is ~10 steps, a compare is ~2.
+            // The row wraps and the three row snapshots only depend on `row`, so they live here,
+            // outside the column loop (15x fewer computations than per-cell).
+            let row_above = if row == 0 { grid_size - 1 } else { row - 1 };
+            let row_below = if row == grid_size - 1 { 0 } else { row + 1 };
+            let above = grid.at(row_above);
+            let current = grid.at(row);
+            let below = grid.at(row_below);
             let mut single_row: Array<bool> = ArrayTrait::new();
             let mut column: usize = 0;
             loop {
                 if column >= grid_size {
                     break;
                 }
+                let col_left = if column == 0 { grid_size - 1 } else { column - 1 };
+                let col_right = if column == grid_size - 1 { 0 } else { column + 1 };
                 let mut neighbours_count = 0;
-                let row_above = ((row + grid_size - 1) % grid_size);
-                let row_below = ((row + 1) % grid_size);
-                let col_left = ((column + grid_size - 1) % grid_size);
-                let col_right = ((column + 1) % grid_size);
                 // 3 cells above
-                if *grid.at(row_above).at(col_left) { neighbours_count += 1; }
-                if *grid.at(row_above).at(column) { neighbours_count += 1; }
-                if *grid.at(row_above).at(col_right) { neighbours_count += 1; }
+                if *above.at(col_left) { neighbours_count += 1; }
+                if *above.at(column) { neighbours_count += 1; }
+                if *above.at(col_right) { neighbours_count += 1; }
                 // left and right
-                if *grid.at(row).at(col_right) { neighbours_count += 1; }
-                if *grid.at(row).at(col_left) { neighbours_count += 1; }
+                if *current.at(col_right) { neighbours_count += 1; }
+                if *current.at(col_left) { neighbours_count += 1; }
                 // 3 cells below
-                if *grid.at(row_below).at(col_left) { neighbours_count += 1; }
-                if *grid.at(row_below).at(column) { neighbours_count += 1; }
-                if *grid.at(row_below).at(col_right) { neighbours_count += 1; }
+                if *below.at(col_left) { neighbours_count += 1; }
+                if *below.at(column) { neighbours_count += 1; }
+                if *below.at(col_right) { neighbours_count += 1; }
 
-                let will_live = if *grid.at(row).at(column) {
+                let will_live = if *current.at(column) {
                     neighbours_count == 2 || neighbours_count == 3
                 } else {
                     neighbours_count == 3
