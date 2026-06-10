@@ -124,6 +124,100 @@ mod tests {
     }
 
     #[test]
+    fn bench_in_place_100_gens() {
+        let utils = deploy_utilities();
+        let glider = utils
+            .pack_grid_in_uint(grid_with(array![(0, 1), (1, 2), (2, 0), (2, 1), (2, 2)].span()));
+        let result = utils.iterate_life_several_in_place(glider, 100);
+        assert(result != glider, 'sanity');
+    }
+
+    #[test]
+    fn bench_in_place_200_gens() {
+        let utils = deploy_utilities();
+        let glider = utils
+            .pack_grid_in_uint(grid_with(array![(0, 1), (1, 2), (2, 0), (2, 1), (2, 2)].span()));
+        let result = utils.iterate_life_several_in_place(glider, 200);
+        assert(result != glider, 'sanity');
+    }
+
+    #[test]
+    fn bench_in_place_250_gens() {
+        let utils = deploy_utilities();
+        let glider = utils
+            .pack_grid_in_uint(grid_with(array![(0, 1), (1, 2), (2, 0), (2, 1), (2, 2)].span()));
+        let result = utils.iterate_life_several_in_place(glider, 250);
+        assert(result != glider, 'sanity');
+    }
+
+    #[test]
+    fn bench_in_place_270_gens() {
+        let utils = deploy_utilities();
+        let glider = utils
+            .pack_grid_in_uint(grid_with(array![(0, 1), (1, 2), (2, 0), (2, 1), (2, 2)].span()));
+        let result = utils.iterate_life_several_in_place(glider, 270);
+        assert(result != glider, 'sanity');
+    }
+
+    // ── reference-output tests ────────────────────────────────────────────────
+    // Each expected value was computed by an independent Python GoL simulation
+    // (reference: tests/test_grid_utils.cairo comment block) and is checked
+    // against the Cairo implementation to ensure exact equivalence.
+
+    #[test]
+    fn test_reference_glider_13_steps() {
+        let utils = deploy_utilities();
+        // Glider at (0,1),(1,2),(2,0),(2,1),(2,2) — 13 steps, interior cells only.
+        let start = utils
+            .pack_grid_in_uint(grid_with(array![(0, 1), (1, 2), (2, 0), (2, 1), (2, 2)].span()));
+        let expected: u256 = 0x400180028000000000000000;
+        assert(utils.iterate_life_several_in_place(start, 13) == expected, 'glider 13 mismatch');
+    }
+
+    #[test]
+    fn test_reference_glider_right_edge_5_steps() {
+        let utils = deploy_utilities();
+        // Glider near the right edge (col 12-14) — stresses col_right wrap at col 14.
+        let start = utils
+            .pack_grid_in_uint(
+                grid_with(array![(0, 13), (1, 14), (2, 12), (2, 13), (2, 14)].span()),
+            );
+        let expected: u256 = 0x4000800280040000000;
+        assert(
+            utils.iterate_life_several_in_place(start, 5) == expected, 'glider right-edge mismatch',
+        );
+    }
+
+    #[test]
+    fn test_reference_glider_bottom_edge_5_steps() {
+        let utils = deploy_utilities();
+        // Glider near the bottom edge (rows 12-14) — stresses row_below wrap at row 14.
+        let start = utils
+            .pack_grid_in_uint(
+                grid_with(array![(13, 1), (14, 2), (12, 0), (12, 1), (13, 0)].span()),
+            );
+        let expected: u256 = 0x800280030000000000000_u256 * 0x10000000000000000000000000000_u256;
+        // expected lo=0, hi=0x800280030000000000000
+        let expected: u256 = u256 { low: 0x0, high: 0x800280030000000000000 };
+        assert(
+            utils.iterate_life_several_in_place(start, 5) == expected,
+            'glider bottom-edge mismatch',
+        );
+    }
+
+    #[test]
+    fn test_reference_left_edge_blinker_2_steps() {
+        let utils = deploy_utilities();
+        // Vertical blinker at col 0, rows 6-8 — stresses col_left wrap at col 0.
+        // After 2 steps it must return to the same state (period-2 oscillator).
+        let start = utils
+            .pack_grid_in_uint(grid_with(array![(6, 0), (7, 0), (8, 0)].span()));
+        assert(utils.iterate_life_several_in_place(start, 2) == start, 'left-edge blinker mismatch');
+    }
+
+    // ── toroidal wrap tests ───────────────────────────────────────────────────
+
+    #[test]
     fn test_toroidal_corner_block_still_life() {
         let utils = deploy_utilities();
         // 2x2 block spanning the torus corner: (14,14),(14,0),(0,14),(0,0)
