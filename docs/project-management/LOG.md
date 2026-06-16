@@ -18,6 +18,49 @@
 
 ---
 
+## 2026-06-16 — Review post-06-09 work; adopt strkd-only tx tooling (retire sncast)
+- **Goal:** understand the work done since the 2026-06-09 STATUS snapshot (the step-engine perf
+  pass + the benchmark), and switch all transaction tooling from `sncast` to the strkd wallet
+  companion.
+- **Branch:** `perf/step-grid-modulo-removal` (review/docs only — no product code changed this
+  session). Reviewed commits `da2c284`, `653403c`, `4b69301`.
+- **Changed (docs only):** documented the strkd-over-sncast policy in
+  [development.md](../development.md) (new "Transaction & signing tooling" section; reframed the
+  raw-key `deploy_full.ts` deploy path as deprecated). Refreshed STATUS (date/branch/35 tests,
+  a Performance "Done" bullet, the strkd tooling line, and a caveat that the 170 ceiling predates
+  the perf work). This entry.
+- **Understood — the step-engine change (`src/gol_utilities.cairo`):**
+  - `da2c284` factored the Conway rules into one shared `step_grid` free function and added
+    `iterate_life_several_in_place(state, generations)` — unpack the u256 grid once, step in
+    place, pack once (vs re-packing every generation in a loop of `iterate_life_once`). ~3×
+    cheaper per generation. New interface method; `iterate_life_once` now delegates to `step_grid`
+    (behaviour unchanged). `src/gol_bench.cairo` (`GolBench`) is throwaway benchmark scaffolding.
+  - `653403c` replaced the four `% grid_size` wraps per cell with branch-based toroidal wraps
+    (`if x == 0 {14} else {x-1}` etc.) and hoisted `row_above`/`row_below` + the three `grid.at()`
+    row snapshots out of the column loop (they depend only on `row`). **−39.0% L2 gas** on
+    `bench_in_place_20_gens` (151,994,713 → 92,723,913).
+  - `4b69301` added four reference-output tests comparing `iterate_life_several_in_place` against
+    an independent Python GoL sim across every wrap direction (interior, right/bottom edge, left
+    seam), plus the earlier toroidal corner-block + seam-blinker tests.
+- **Verified:** `snforge test` green — **35 passed, 0 failed**. Suite includes in-place benchmarks
+  at 20/100/200/250/270 generations, all passing.
+- **Decisions:**
+  - **strkd is now the only transaction tool.** Rationale: keys never leave the wallet, every
+    sensitive action is human-approved on-screen, and the prior blocker (strkd couldn't submit a
+    proof-carrying verify tx) is fixed — `wallet_addInvokeTransaction` now takes `proof_facts`/`proof`.
+    So `sncast` and the raw-`DEPLOYER_PRIVATE_KEY` `deploy_full.ts` path are both retired.
+  - Paired strkd (client `claude-code-gol`, `reattach:true` recovered the existing client +
+    its `gol-bench` agent account `0x026d87…e70f`). Status: unlocked, SN_SEPOLIA, no grant (so
+    every own-account op prompts the human — kept as-is).
+- **Next:** (1) the 170-gen on-chain ceiling predates the −39% step_grid pass — **re-measure** via
+  strkd `move_forward_in_place` on the live `GolBench` for a current number (in-suite bench reaches
+  270). (2) Resume the mainnet track: frontend smoke test → independent security review (now
+  including the `step_grid` rewrite + the partial-path semantic change). (3) Decide whether to
+  merge `perf/step-grid-modulo-removal` → `chore/modernize-and-prune` → `main`.
+- **Blockers:** none.
+
+---
+
 ## 2026-06-09 — SNIP-36 benchmark: on-chain vs off-chain generation ceiling
 - **Goal:** measure the max GoL generations advanceable in one transaction — on-chain vs
   off-chain via SNIP-36 — using the in-place iteration.

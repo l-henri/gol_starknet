@@ -74,10 +74,49 @@ for(const [out,src] of Object.entries(map)){
 }'
 ```
 
+## Transaction & signing tooling — use strkd, not sncast
+
+**Policy (2026-06-16): every on-chain transaction — declare, deploy-account, invoke, and
+SNIP-36 proof-carrying verify — goes through the [strkd](../docs/strkd-feedback.md) wallet
+companion.** strkd holds the accounts and signs on our behalf; each sensitive action pops an
+on-screen approval the human must accept, and **private keys never leave the wallet**.
+
+Do **not** use `sncast` for transactions, and do **not** use the raw-private-key
+`scripts/deploy_full.ts` path (below). Both require a private key in the agent's reach; strkd
+exists specifically to avoid that. The one historical reason to fall back to `sncast` — the
+proof-carrying verify tx, which old strkd couldn't submit — is gone: `wallet_addInvokeTransaction`
+now accepts `proof_facts`/`proof` (the feature request in
+[strkd-snip36-feature-request.md](strkd-snip36-feature-request.md) landed).
+
+strkd is a local loopback JSON-RPC service. Learn the API with `GET /` (it returns a full usage
+doc); discover the port from `port.lock` in the app data dir. The current local instance is at
+`http://127.0.0.1:54483`. Typical flow:
+
+1. **Pair once** — `companion_requestPairing { name, kind:"agent" }` (persists across restarts;
+   re-attach with the same name + `reattach:true` to recover the client and its accounts).
+2. **Account** — `companion_createAgentAccount` (or reuse an existing one via
+   `companion_listAccounts`). New accounts are counterfactual until deployed.
+3. **Fund** — `companion_requestFunding { amount }` (fri); always prompts (it spends the user's
+   manager account).
+4. **Deploy the account** — `companion_deployAccount`.
+5. **Invoke** — `wallet_addInvokeTransaction { account_address, calls, submit:true }`, where each
+   call is `{ contract_address, entry_point_selector (name or 0x), calldata }`. Sign-only by
+   default (returns a broadcast-ready signed tx); `submit:true` broadcasts via strkd's node.
+   For SNIP-36, pass `proof_facts` (sign time) + `proof` (broadcast) and explicit `resource_bounds`.
+
+Every call needs headers `X-Companion-Client` and (after pairing) `Authorization: Bearer <token>`.
+A node must be configured in the strkd app for the active network to broadcast/estimate; without
+one strkd is sign-only and you broadcast the returned tx yourself.
+
 ## Deploying
 
-`scripts/deploy_full.ts` declares + deploys all four contracts, wires the `MINTER_ROLE`
-grants, and sets the nutrient address. Run it from the repo root with a funded account:
+> The four production contracts were deployed to Sepolia via `sncast` in 2026-06 (see
+> [STATUS](project-management/STATUS.md) for addresses). **For any future declare/deploy, use
+> strkd** (above), not the legacy paths below. `scripts/deploy_full.ts` is retained for reference
+> only and should be migrated to strkd or removed before mainnet.
+
+Legacy reference — `scripts/deploy_full.ts` declares + deploys all four contracts, wires the
+`MINTER_ROLE` grants, and sets the nutrient address:
 
 ```bash
 # set DEPLOYER_ADDRESS, DEPLOYER_PRIVATE_KEY, RPC_ENDPOINT in a root .env
@@ -87,11 +126,11 @@ npx ts-node scripts/deploy_full.ts   # prints the four addresses
 
 Then paste the addresses into `ui/game-of-life/.env.local`.
 
-⚠️ **Caveats to fix before relying on this:**
+⚠️ **Why this path is deprecated (and caveats if you ever touch it):**
+- It needs a raw `DEPLOYER_PRIVATE_KEY` in a `.env` — exactly what the strkd policy avoids.
 - `deploy_full.ts` ends with a hardcoded **test mint** (`mint_loop("1073856514", 60, …)`) —
   review/remove it for a real deploy.
-- The root `package.json` `deploy` script points at a non-existent `scripts/deploy.ts`; use
-  the `npx ts-node scripts/deploy_full.ts` command above.
+- The root `package.json` `deploy` script points at a non-existent `scripts/deploy.ts`.
 
 ## CI
 

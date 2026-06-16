@@ -3,9 +3,10 @@
 > Snapshot of where the project stands. Keep this short and current — rewrite it each session.
 > History lives in [LOG.md](LOG.md); the plan lives in [ROADMAP.md](ROADMAP.md).
 
-**Last updated:** 2026-06-09
-**Active branch:** `chore/modernize-and-prune` (not yet merged to `main`, not pushed)
-**Build/test:** `scarb build` ✅ · `snforge test` ✅ (24 passing) · `npm run build` ✅
+**Last updated:** 2026-06-16
+**Active branch:** `perf/step-grid-modulo-removal` (built on `chore/modernize-and-prune`; neither merged to `main`, not pushed)
+**Build/test:** `scarb build` ✅ · `snforge test` ✅ (35 passing) · `npm run build` ✅
+**Tx tooling:** all on-chain transactions go through the **strkd** wallet companion — **not `sncast`** (see [development.md](../development.md#transaction--signing-tooling--use-strkd-not-sncast)).
 
 ## Done
 
@@ -24,6 +25,13 @@
 - **Phase 3 (started) — movement integrity.** `move_lifeform_forward` now reverts on phantom
   (unminted) token ids (`'Lifeform not minted'`), so NUT is only earned by advancing real
   lifeforms. The NUT economy itself is intentional and unchanged.
+- **Performance — the GoL step engine.** Factored the Conway step into one shared `step_grid`
+  free function and added `iterate_life_several_in_place` (unpack the u256 grid once, step in
+  place, pack once — vs re-packing every generation; ~3× cheaper per generation). Then removed
+  the four `% grid_size` ops per cell (branch-based toroidal wraps) and hoisted the row
+  snapshots out of the column loop: **−39% L2 gas** on the 20-generation in-place benchmark
+  (152.0M → 92.7M). Added equivalence + toroidal-edge + independent-reference (Python-checked)
+  tests. ⚠️ This touches consensus-critical stepping logic — **in scope for the pre-mainnet audit.**
 
 ## In progress
 
@@ -66,9 +74,19 @@ smaller local build — raise its max log size / twiddle precompute and the off-
 climbs past 170 (off-chain has no 1.2e9 cap; next limits are balance ~220, then RAM). On-chain
 ceiling measured via fee estimation (`/tmp/golbench/estimate.py`) and **confirmed by a real
 broadcast of `move_forward_in_place(170)`** — tx `0x50fd2c79…bdedc`, SUCCEEDED, `get_age` 58→228,
-actual L2 gas 1,085,322,855, fee 8.68 STRK. The earlier "97" was a wrong gas-per-gen estimate. strkd worked for every step except submitting the proof-carrying verify
-(no `proof`/`proof_facts` param) — see
-[strkd-snip36-feature-request.md](../strkd-snip36-feature-request.md); verify used `sncast`.
+actual L2 gas 1,085,322,855, fee 8.68 STRK. The earlier "97" was a wrong gas-per-gen estimate.
+
+> ⚠️ **The 170 figure predates the perf work.** It was measured/broadcast on 2026-06-09, *before*
+> the 2026-06-10 modulo removal cut `step_grid` L2 gas ~39%. The current code costs meaningfully
+> less per generation, so the real on-chain ceiling is now **higher than 170** — the in-suite
+> benchmarks already run `iterate_life_several_in_place` cleanly to **270 generations**. Re-measure
+> via strkd (`move_forward_in_place` on the live `GolBench`) before quoting a fresh number.
+
+At the time, strkd worked for every step except submitting the proof-carrying verify (its
+`wallet_addInvokeTransaction` had no `proof`/`proof_facts` param) — see
+[strkd-snip36-feature-request.md](../strkd-snip36-feature-request.md); that verify used `sncast`.
+**That gap is now closed** — strkd's `wallet_addInvokeTransaction` accepts `proof_facts`/`proof`,
+so the whole flow (including verify) runs through strkd and `sncast` is retired.
 
 ## Blocked
 
