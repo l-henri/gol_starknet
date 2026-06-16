@@ -76,11 +76,16 @@ ceiling measured via fee estimation (`/tmp/golbench/estimate.py`) and **confirme
 broadcast of `move_forward_in_place(170)`** — tx `0x50fd2c79…bdedc`, SUCCEEDED, `get_age` 58→228,
 actual L2 gas 1,085,322,855, fee 8.68 STRK. The earlier "97" was a wrong gas-per-gen estimate.
 
-> ⚠️ **The 170 figure predates the perf work.** It was measured/broadcast on 2026-06-09, *before*
-> the 2026-06-10 modulo removal cut `step_grid` L2 gas ~39%. The current code costs meaningfully
-> less per generation, so the real on-chain ceiling is now **higher than 170** — the in-suite
-> benchmarks already run `iterate_life_several_in_place` cleanly to **270 generations**. Re-measure
-> via strkd (`move_forward_in_place` on the live `GolBench`) before quoting a fresh number.
+> ⚠️ **The 170 figure predates the perf work** (measured 2026-06-09, before the 2026-06-10 −39%
+> `step_grid` pass). **Estimated new hard ceiling ≈ 350 generations** (~2× old), with **≥270
+> directly confirmed** by the passing in-suite benchmark (270 gens = ~920M est. on-chain L2 gas,
+> under the 1.2e9 cap). *Method:* snforge gas is exactly linear in n (new marginal 3.36M/gen vs
+> old 6.32M/gen) and calibrates to on-chain at ×0.986 against the old code's real 170-gen broadcast
+> (1,085,322,855 actual L2 gas). **On-chain confirmation is still pending and currently blocked:**
+> re-declaring the optimized `GolBench` on Sepolia fails on CASM-compiler skew — strkd's RPC node
+> can't compile Sierra 1.8.0 at all, and the Cartridge node compiles it to a *different* CASM
+> (`compiled_class_hash` mismatch). Confirming the ~350 figure needs a node compatible with scarb
+> 2.18's CASM (the one sncast used for the 06-09 declares); then `move_forward_in_place` via strkd.
 
 At the time, strkd worked for every step except submitting the proof-carrying verify (its
 `wallet_addInvokeTransaction` had no `proof`/`proof_facts` param) — see

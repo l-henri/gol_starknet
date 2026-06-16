@@ -18,6 +18,40 @@
 
 ---
 
+## 2026-06-16 — Re-measure the post-perf on-chain ceiling (estimate done; on-chain confirm blocked)
+- **Goal:** get a current on-chain generation ceiling for `move_forward_in_place`, since the
+  documented 170 predates the −39% `step_grid` pass. Drive it through strkd per the new tx policy.
+- **Branch:** `perf/step-grid-modulo-removal`. No product code changed (measurement + docs only).
+- **Result — estimated new hard ceiling ≈ 350 gens** (~2× the old 170); **≥270 directly confirmed**
+  by the passing in-suite benchmark (`bench_in_place_270_gens` = 933,065,263 snforge L2 gas ≈ 920M
+  on-chain, under the 1.2e9/tx cap). *Method:* the new in-place benchmarks are exactly linear in n
+  (marginal **3,361,365** L2 gas/gen, fixed overhead ~25.5M, snforge). The modulo pass only touches
+  per-gen `step_grid`, so old marginal = new + (151,994,713 − 92,723,913)/20 = **6,324,905**/gen
+  (1.88× the new). snforge→on-chain calibrates at **×0.986** against the old code's real 170-gen
+  broadcast (1,085,322,855 actual L2 gas). Cap 1.2e9 ⇒ n ≈ **354**.
+- **Blocked — on-chain confirmation.** Could not (re)declare the optimized `GolBench` (class
+  `0x41268542…b0da`, compiled `0x7eec8e15…142d`, **Sierra 1.8.0**) on Sepolia:
+  - strkd's configured RPC node: `node error … Cannot compile Sierra version 1.8.0 with the current
+    compiler (sierra version: 1.7.0)` — its compiler is too old to declare our class at all.
+  - Cartridge node (`api.cartridge.gg/x/starknet/sepolia`, spec 0.9.0): compiles 1.8.0 but to a
+    *different* CASM → `Mismatch compiled class hash … Expected 0x581b62…` vs our `0x7eec8e15…`.
+  - Root cause = CASM-compiler skew between local scarb 2.18 and the currently-available Sepolia
+    nodes. Verified it's not a stale artifact (clean rebuild → same hashes) and not local toolchain
+    drift (installed scarb == pinned 2.18.0, emits Sierra 1.8.0). The 06-08/09 production declares
+    succeeded because sncast then used a node compatible with scarb 2.18's CASM. **Did not** force
+    it via an arbitrary public RPC or a fudged compiled hash.
+- **Verified:** strkd paired + auth OK; balance read (bench acct `0x026d87…e70f` = 36.30 STRK, so
+  funding not needed); declare correctly rejected at fee-estimation (no spend). `snforge test` = 35
+  passed. starknet.js v7.6.4 (from the frontend) used for hashing/estimation.
+- **Next / decision needed (maintainer):** to get the *confirmed* on-chain ceiling, either (a) point
+  strkd's RPC at the node used for the 06-09 declares (scarb-2.18-CASM-compatible), or tell me that
+  URL and I'll strkd-sign-only + broadcast there; or (b) accept the ~350 estimate above. **Broader
+  flag for the mainnet plan:** scarb 2.18 / Sierra 1.8.0 classes do **not** currently declare on the
+  two nodes tried — worth confirming a known-good Sepolia/mainnet RPC before the mainnet deploy.
+- **Blockers:** node/RPC compatibility for declaring Sierra 1.8.0 (a human/infra choice).
+
+---
+
 ## 2026-06-16 — Review post-06-09 work; adopt strkd-only tx tooling (retire sncast)
 - **Goal:** understand the work done since the 2026-06-09 STATUS snapshot (the step-engine perf
   pass + the benchmark), and switch all transaction tooling from `sncast` to the strkd wallet
