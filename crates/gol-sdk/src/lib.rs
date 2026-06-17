@@ -11,6 +11,7 @@
 
 pub mod client;
 pub mod config;
+pub mod datasource;
 pub mod encoding;
 pub mod error;
 pub mod events;
@@ -22,6 +23,7 @@ pub mod writes;
 
 pub use client::GolClient;
 pub use config::{deployments, ContractKey, GolAddresses, GolConfig, Network};
+pub use datasource::{DataSource, EventScanDataSource, IndexerDataSource, MoveEvent};
 pub use error::GolError;
 pub use reader::Reader;
 pub use rpc::RpcReader;

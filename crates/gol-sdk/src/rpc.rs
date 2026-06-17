@@ -94,6 +94,96 @@ impl RpcReader {
             .await?
             .expect("non-revert path always returns Some"))
     }
+
+    /// Raw `starknet_getEvents` page. Returns parsed events + the continuation token (`None` when
+    /// the scan is exhausted). `keys` is the positional key filter, e.g. `[[selector], [], [to]]`
+    /// (an empty inner vec is a wildcard for that key position).
+    pub async fn get_events(
+        &self,
+        address: Felt,
+        keys: Vec<Vec<Felt>>,
+        from_block: u64,
+        chunk_size: u64,
+        continuation: Option<String>,
+    ) -> Result<(Vec<RawEvent>, Option<String>), GolError> {
+        let keys_json: Vec<Vec<String>> = keys
+            .iter()
+            .map(|inner| inner.iter().map(felt_hex).collect())
+            .collect();
+        let mut filter = json!({
+            "address": felt_hex(&address),
+            "keys": keys_json,
+            "from_block": { "block_number": from_block },
+            "to_block": "latest",
+            "chunk_size": chunk_size,
+        });
+        if let Some(token) = continuation {
+            filter["continuation_token"] = Value::String(token);
+        }
+        let body = json!({ "jsonrpc": "2.0", "id": 1, "method": "starknet_getEvents", "params": [filter] });
+
+        let resp: Value = self
+            .http
+            .post(&self.rpc_url)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| GolError::Read(e.to_string()))?
+            .json()
+            .await
+            .map_err(|e| GolError::Read(e.to_string()))?;
+
+        if let Some(err) = resp.get("error") {
+            return Err(GolError::Read(format!("getEvents rpc error: {err}")));
+        }
+        let result = resp
+            .get("result")
+            .ok_or_else(|| GolError::Read("getEvents: missing result".into()))?;
+        let cont = result
+            .get("continuation_token")
+            .and_then(Value::as_str)
+            .map(String::from);
+        let events = result
+            .get("events")
+            .and_then(Value::as_array)
+            .ok_or_else(|| GolError::Read("getEvents: missing events array".into()))?;
+        let parsed = events.iter().map(parse_raw_event).collect::<Result<Vec<_>, _>>()?;
+        Ok((parsed, cont))
+    }
+}
+
+/// A decoded event from `starknet_getEvents`.
+#[derive(Clone, Debug)]
+pub struct RawEvent {
+    pub keys: Vec<Felt>,
+    pub data: Vec<Felt>,
+    pub block_number: u64,
+    pub tx_hash: Felt,
+}
+
+fn parse_felt_vec(v: Option<&Value>) -> Result<Vec<Felt>, GolError> {
+    let arr = v
+        .and_then(Value::as_array)
+        .ok_or_else(|| GolError::Encoding("expected felt array".into()))?;
+    arr.iter()
+        .map(|x| {
+            let s = x
+                .as_str()
+                .ok_or_else(|| GolError::Encoding("non-string felt".into()))?;
+            Felt::from_hex(s).map_err(|e| GolError::Encoding(e.to_string()))
+        })
+        .collect()
+}
+
+fn parse_raw_event(ev: &Value) -> Result<RawEvent, GolError> {
+    let keys = parse_felt_vec(ev.get("keys"))?;
+    let data = parse_felt_vec(ev.get("data"))?;
+    let block_number = ev.get("block_number").and_then(Value::as_u64).unwrap_or_default();
+    let tx_hash = match ev.get("transaction_hash").and_then(Value::as_str) {
+        Some(s) => Felt::from_hex(s).map_err(|e| GolError::Encoding(e.to_string()))?,
+        None => Felt::ZERO,
+    };
+    Ok(RawEvent { keys, data, block_number, tx_hash })
 }
 
 fn at(felts: &[Felt], i: usize) -> Result<&Felt, GolError> {

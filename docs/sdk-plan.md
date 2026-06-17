@@ -81,7 +81,14 @@ Landed: the Cargo workspace; `config` (Network + address book with live Sepolia 
 `error` (`GolError`); `types` (`Felt`/`U256`/domain structs); `encoding` (sn_keccak selectors +
 Poseidon `move_message_hash`, **fixture-tested against the frontend's starknet.js**); `RpcReader`
 (reads + NUT + engine views, live-verified); `GolWrites` call-builders (+tests); the `Submitter`
-trait.
+trait; and **both `DataSource` impls** — `EventScanDataSource` (`starknet_getEvents`, no key,
+live-verified: owner → token 98307, deduped + `owner_of`-confirmed) and `IndexerDataSource`
+(Starkscan REST, key via `STARKSCAN_API_KEY`, plumbing verified against the live API).
+
+Verified on-chain event layouts (Sepolia lifeforms): `Transfer` keys =
+`[sel, from, to, token_id.low, token_id.high]` (data empty); `NewLifeForm` data =
+`[owner, token_id.lo, token_id.hi, is_loop, is_still, is_alive, is_dead, seq_len, state.lo, state.hi, age]`;
+`NewMove` data = `[token_id.lo, token_id.hi, age]`.
 
 Divergences from the spec above (deliberate, for "cook now"):
 1. **Lean stack instead of starknet-rs + cainome.** Following the sibling `../hexposed-sdk`:
@@ -92,9 +99,14 @@ Divergences from the spec above (deliberate, for "cook now"):
 2. **Cargo target redirected to `target-rust/`** (`.cargo/config.toml`) to avoid colliding with
    scarb's `target/`.
 3. **Stubs / follow-ups:** `StrkdSubmitter::submit` returns a "not yet wired" error (the seam +
-   placeholder exist); `token_uri` ByteArray decode, the `DataSource` event-scan, the `Prover`
-   (SNIP-36) module, and the `gol-sdk-wasm` wrapper (needs `wasm32` target + `wasm-pack`) are not
-   yet built.
+   placeholder exist); `token_uri` ByteArray decode, the `Prover` (SNIP-36) module, and the
+   `gol-sdk-wasm` wrapper (needs `wasm32` target + `wasm-pack`) are not yet built.
+4. **Indexer data coverage:** Starkscan indexes mainnet (`SN_MAIN`) but **not Sepolia**
+   (`SN_SEPOLIA` status is all-null) as of 2026-06-17, so `IndexerDataSource` is plumbing-verified
+   against the live API but returns data only once GoL is on a Starkscan-indexed chain (mainnet).
+   `EventScanDataSource` (RPC) is the route that sees Sepolia data today — the operator picks per
+   network. Also: the Starkscan ERC721 `token_id` low/high split is best-effort (no ERC721 fixture
+   on an indexed chain yet); the `owner_of` confirmation guards correctness regardless.
 
 ## 3. Repository & crate layout (Cargo workspace)
 
