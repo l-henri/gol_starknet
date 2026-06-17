@@ -18,6 +18,33 @@
 
 ---
 
+## 2026-06-17 (resolved) — The "declare blocker" was a stale starknet.js hasher, not a toolchain gate
+- **Goal:** find the Cairo/scarb version matching the network's CASM (per the entry below).
+- **Resolution — there is no version to find; scarb 2.18 is correct.** The whole "compiled_class_hash
+  mismatch" was an artifact of computing the hash with the **frontend's pinned starknet.js v7.6.4**,
+  which uses the *old* `compiled_class_hash` algorithm. On the *same* scarb-2.18 CASM:
+  - starknet.js v7.6.4 → `0x7eec8e15…` (wrong)
+  - starknet.js v10.0.2 → `0x581b62…` (correct) — **matches the network exactly** (Cartridge +
+    Alchemy both expect `0x581b62…`).
+  - class_hash is unaffected (`0x41268542…` in both versions).
+- **Confirmed declarable:** `estimateFee` (SKIP_VALIDATE) of the DECLARE with the correct hash
+  `0x581b62…` via Cartridge Sepolia returns a clean fee (~5.7 STRK, l2_gas ~712M) — no mismatch.
+  So the optimized `GolBench` declares as-is. **No toolchain bump, no rebuild, no mainnet gate.**
+- **Lesson:** compute `compiled_class_hash` with starknet.js ≥ v9 (used a temp `npm i starknet@latest`
+  in /tmp). The frontend's v7.6.4 silently returns a stale-algorithm hash. The 06-17 entries below
+  (single-node lag → broader compiler/toolchain mismatch) were both wrong root causes chasing this
+  hashing artifact — superseded by this entry.
+- **Remaining real wrinkle (minor):** strkd's configured Sepolia node (`0.10.3-rc.0`) still can't
+  *compile* Sierra 1.8.0 (compiler 1.7.0), so the **declare** must route through a 1.8.0-capable node
+  (Cartridge): strkd sign-only + broadcast there. Deploys/invokes/estimates work on any node.
+- **Next:** declare (correct hash, strkd sign-only → Cartridge) → deploy `GolBench` (constructor =
+  glider) → `estimateFee` sweep `move_forward_in_place(n)` for the real on-chain ceiling (free; the
+  snforge-calibrated estimate is ~350) → optional confirmation broadcast. Est. spend: declare+deploy
+  ≈ 6 STRK (bench acct holds 36).
+- **Blockers:** none — pending the maintainer's OK to spend ~6 STRK on the declare+deploy.
+
+---
+
 ## 2026-06-17 (later) — Multi-node probe: compiler mismatch is broader; likely a toolchain gate
 - **Goal:** probe the mainnet node(s) for Sierra 1.8.0 declare support (the morning's mainnet probe
   was rate-limited), using the canonical nodes + an Alchemy mainnet fallback.

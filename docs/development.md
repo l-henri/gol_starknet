@@ -115,17 +115,16 @@ one strkd is sign-only and you broadcast the returned tx yourself.
 | Sepolia | `https://sepolia.nodes.starknet.org/rpc/v0_10` |
 | Mainnet | `https://mainnet.nodes.starknet.org/rpc/v0_10` |
 
-(`http://` 301-redirects to `https://`; follow it.) ⚠️ **Declare blocker (2026-06-17) — Sierra
-compiler mismatch, a mainnet gate.** New declares of our scarb-2.18 (Sierra 1.8.0) classes
-currently fail, two ways across nodes: strkd's Sepolia node (`0.10.3-rc.0`) is *too old* to compile
-1.8.0 (`Cannot compile Sierra version 1.8.0 with the current compiler (1.7.0)`), while Cartridge
-(`0.9.0`) and Alchemy mainnet (`0.10.3-rc.0`) compile it but both expect `compiled_class_hash`
-`0x581b62…` vs our `0x7eec8e15…`. Two nodes agreeing on a different hash ⇒ local Cairo 2.18 is out
-of step with the **current network compiler** (the live 06-09 classes prove it matched us then, so
-the network bumped since). This is **not** a strkd bug and **not** fixable by node choice alone.
-**Before any new declare / the mainnet deploy:** confirm the Cairo / `starknet-sierra-compile`
-version the current sequencer expects, bump `.tool-versions` to match, then rebuild + re-test (all
-class hashes change). Already-deployed contracts are unaffected.
+(`http://` 301-redirects to `https://`; follow it.) ⚠️ **Compute `compiled_class_hash` with
+starknet.js ≥ v9 — NOT the frontend's pinned v7.6.4.** v7.6.4 uses the old algorithm and returns a
+wrong hash (e.g. `0x7eec8e15…` for `GolBench`); v10 returns the correct `0x581b62…`, which the
+network expects. Using v7's value to declare gets rejected as a `compiled_class_hash` mismatch —
+this looks exactly like a toolchain/compiler skew but is not. scarb 2.18 is correct; with the right
+hash the declare estimates cleanly on a Sierra-1.8.0-capable node. (Use a temp `npm i starknet@latest`
+for hashing, or upgrade the frontend.) Separately, strkd's Sepolia node (`0.10.3-rc.0`) can't
+*compile* Sierra 1.8.0 (compiler 1.7.0), so route the **declare** through a 1.8.0-capable node
+(e.g. Cartridge `https://api.cartridge.gg/x/starknet/sepolia`) — sign-only via strkd then broadcast
+there; deploys/invokes are fine on any node.
 
 ## Deploying
 

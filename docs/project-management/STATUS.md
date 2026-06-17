@@ -81,21 +81,19 @@ actual L2 gas 1,085,322,855, fee 8.68 STRK. The earlier "97" was a wrong gas-per
 > directly confirmed** by the passing in-suite benchmark (270 gens = ~920M est. on-chain L2 gas,
 > under the 1.2e9 cap). *Method:* snforge gas is exactly linear in n (new marginal 3.36M/gen vs
 > old 6.32M/gen) and calibrates to on-chain at ×0.986 against the old code's real 170-gen broadcast
-> (1,085,322,855 actual L2 gas). **On-chain confirmation is pending — blocked by a Sierra-compiler
-> mismatch (NOT strkd; strkd relays faithfully).** Two distinct node failure modes (see the 06-17
-> LOG entry for the probe):
-> 1. strkd's Sepolia node (`sepolia.nodes.starknet.org/rpc/v0_10`, `0.10.3-rc.0`) is *too old* to
->    compile Sierra 1.8.0: `Cannot compile Sierra version 1.8.0 with the current compiler (1.7.0)`.
-> 2. Cartridge (`0.9.0`) and Alchemy mainnet (`0.10.3-rc.0`) compile 1.8.0 but both expect
->    `compiled_class_hash 0x581b62…`, while our scarb 2.18 produces `0x7eec8e15…` — i.e. local CASM
->    is out of step with the current network compiler.
->
-> The live classes (declared 06-09 with scarb 2.18) prove the network compiler *did* match us then,
-> so a network compiler bump since has likely left pinned Cairo 2.18 behind. **This is a mainnet
-> gate, not just a benchmark snag:** declaring *any* contract needs the local Cairo/scarb version
-> realigned to the network's current compiler. Already-deployed contracts are unaffected. **Next:
-> maintainer confirms the Cairo/compiler version the current Sepolia/mainnet sequencer expects, bumps
-> `.tool-versions` if needed, rebuilds + re-tests; then retry the declare + `move_forward_in_place`.**
+> (1,085,322,855 actual L2 gas). **On-chain confirmation is unblocked — the earlier "declare
+> blocker" was a stale-hasher bug in our diagnostic, NOT a toolchain/compiler problem and NOT a
+> mainnet gate.** Root cause: the `compiled_class_hash` was computed with the frontend's pinned
+> starknet.js **v7.6.4**, which uses the *old* algorithm and returns `0x7eec8e15…`; starknet.js
+> **v10** returns `0x581b62…`, which matches what the network expects *exactly* (Cartridge + Alchemy
+> independently agree). With the correct hash, the `GolBench` declare **estimates cleanly** on a
+> Sierra-1.8.0-capable node (confirmed via Cartridge Sepolia, ~5.7 STRK). **scarb 2.18 is correct —
+> no toolchain bump, no rebuild, no class-hash churn.** ⚠️ Always compute `compiled_class_hash` with
+> starknet.js ≥ v9 (the frontend's v7 is wrong for current CASM). The only remaining wrinkle: strkd's
+> configured Sepolia node (`0.10.3-rc.0`) can't *compile* Sierra 1.8.0 (its compiler is 1.7.0), so
+> the **declare** must route through a 1.8.0-capable node (Cartridge) — strkd sign-only + external
+> broadcast, or point strkd there; deploys/invokes work on any node. **Next: declare (correct hash) →
+> deploy `GolBench` → `estimateFee` sweep for the real ceiling (then optional confirm broadcast).**
 
 At the time, strkd worked for every step except submitting the proof-carrying verify (its
 `wallet_addInvokeTransaction` had no `proof`/`proof_facts` param) — see
