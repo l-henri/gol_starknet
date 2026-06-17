@@ -226,6 +226,7 @@ name = "gol-sdk"
 version = "0.0.0"
 dependencies = [
  "async-trait",
+ "base64",
  "hex",
  "reqwest",
  "serde",
