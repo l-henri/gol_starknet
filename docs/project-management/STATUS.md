@@ -81,16 +81,21 @@ actual L2 gas 1,085,322,855, fee 8.68 STRK. The earlier "97" was a wrong gas-per
 > directly confirmed** by the passing in-suite benchmark (270 gens = ~920M est. on-chain L2 gas,
 > under the 1.2e9 cap). *Method:* snforge gas is exactly linear in n (new marginal 3.36M/gen vs
 > old 6.32M/gen) and calibrates to on-chain at ×0.986 against the old code's real 170-gen broadcast
-> (1,085,322,855 actual L2 gas). **On-chain confirmation is pending — blocked on a node-side issue
-> (not strkd, not our toolchain):** the canonical Sepolia RPC node strkd uses
-> (`sepolia.nodes.starknet.org/rpc/v0_10`, spec `0.10.3-rc.0`) rejects the declare with
-> `Cannot compile Sierra version 1.8.0 with the current compiler (sierra version: 1.7.0)`. The same
-> error reproduces hitting the node directly (so strkd is faithful), and the live classes are
-> already Sierra 1.8.0 (so scarb 2.18 is fine) — the node's bundled Sierra→CASM compiler is simply
-> lagging at 1.7.0, likely because it's an RC deployment. Already-deployed contracts are unaffected;
-> only *new* declares are blocked. **Retry the declare (then `move_forward_in_place` via strkd) once
-> the node's compiler is ≥1.8.0.** (An earlier note here blamed CASM skew vs the Cartridge node —
-> that was a wrong-node red herring; corrected.)
+> (1,085,322,855 actual L2 gas). **On-chain confirmation is pending — blocked by a Sierra-compiler
+> mismatch (NOT strkd; strkd relays faithfully).** Two distinct node failure modes (see the 06-17
+> LOG entry for the probe):
+> 1. strkd's Sepolia node (`sepolia.nodes.starknet.org/rpc/v0_10`, `0.10.3-rc.0`) is *too old* to
+>    compile Sierra 1.8.0: `Cannot compile Sierra version 1.8.0 with the current compiler (1.7.0)`.
+> 2. Cartridge (`0.9.0`) and Alchemy mainnet (`0.10.3-rc.0`) compile 1.8.0 but both expect
+>    `compiled_class_hash 0x581b62…`, while our scarb 2.18 produces `0x7eec8e15…` — i.e. local CASM
+>    is out of step with the current network compiler.
+>
+> The live classes (declared 06-09 with scarb 2.18) prove the network compiler *did* match us then,
+> so a network compiler bump since has likely left pinned Cairo 2.18 behind. **This is a mainnet
+> gate, not just a benchmark snag:** declaring *any* contract needs the local Cairo/scarb version
+> realigned to the network's current compiler. Already-deployed contracts are unaffected. **Next:
+> maintainer confirms the Cairo/compiler version the current Sepolia/mainnet sequencer expects, bumps
+> `.tool-versions` if needed, rebuilds + re-tests; then retry the declare + `move_forward_in_place`.**
 
 At the time, strkd worked for every step except submitting the proof-carrying verify (its
 `wallet_addInvokeTransaction` had no `proof`/`proof_facts` param) — see

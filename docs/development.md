@@ -115,13 +115,17 @@ one strkd is sign-only and you broadcast the returned tx yourself.
 | Sepolia | `https://sepolia.nodes.starknet.org/rpc/v0_10` |
 | Mainnet | `https://mainnet.nodes.starknet.org/rpc/v0_10` |
 
-(`http://` 301-redirects to `https://`; follow it.) ⚠️ **Known transient issue (2026-06-17):** the
-Sepolia node (serving spec `0.10.3-rc.0`) currently rejects *new* declares of Sierra 1.8.0 classes —
-`Cannot compile Sierra version 1.8.0 with the current compiler (sierra version: 1.7.0)` — because its
-bundled Sierra→CASM compiler is behind. scarb 2.18 emits Sierra 1.8.0, and the live classes are
-already 1.8.0, so this is a node-side lag (likely clears when the RC promotes to stable). Existing
-contracts are unaffected; only new declares are blocked. Confirm the mainnet node can compile
-Sierra 1.8.0 before the mainnet deploy.
+(`http://` 301-redirects to `https://`; follow it.) ⚠️ **Declare blocker (2026-06-17) — Sierra
+compiler mismatch, a mainnet gate.** New declares of our scarb-2.18 (Sierra 1.8.0) classes
+currently fail, two ways across nodes: strkd's Sepolia node (`0.10.3-rc.0`) is *too old* to compile
+1.8.0 (`Cannot compile Sierra version 1.8.0 with the current compiler (1.7.0)`), while Cartridge
+(`0.9.0`) and Alchemy mainnet (`0.10.3-rc.0`) compile it but both expect `compiled_class_hash`
+`0x581b62…` vs our `0x7eec8e15…`. Two nodes agreeing on a different hash ⇒ local Cairo 2.18 is out
+of step with the **current network compiler** (the live 06-09 classes prove it matched us then, so
+the network bumped since). This is **not** a strkd bug and **not** fixable by node choice alone.
+**Before any new declare / the mainnet deploy:** confirm the Cairo / `starknet-sierra-compile`
+version the current sequencer expects, bump `.tool-versions` to match, then rebuild + re-test (all
+class hashes change). Already-deployed contracts are unaffected.
 
 ## Deploying
 

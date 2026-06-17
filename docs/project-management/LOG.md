@@ -18,6 +18,36 @@
 
 ---
 
+## 2026-06-17 (later) — Multi-node probe: compiler mismatch is broader; likely a toolchain gate
+- **Goal:** probe the mainnet node(s) for Sierra 1.8.0 declare support (the morning's mainnet probe
+  was rate-limited), using the canonical nodes + an Alchemy mainnet fallback.
+- **Findings (supersede the "transient single-node lag" read in the entry below):**
+  - **Alchemy mainnet** (`0.10.3-rc.0`): compiles Sierra 1.8.0, but expects `compiled_class_hash`
+    **`0x581b62…`** while our scarb 2.18 build is **`0x7eec8e15…`** → mismatch.
+  - **Cartridge Sepolia** (`0.9.0`, probed earlier) expects the **same `0x581b62…`**. Two
+    independent nodes converging on the same non-scarb-2.18 hash ⇒ our local CASM is out of step
+    with the **current network compiler**, not just one lagging node.
+  - **strkd's Sepolia node** (`0.10.3-rc.0`) is the *opposite* problem — its compiler is too old to
+    compile 1.8.0 at all (1.7.0). So the node fleet is in a mixed/transitional compiler state.
+  - The live classes (declared 06-09 with scarb 2.18) matched the network compiler **then**, so a
+    network compiler bump since has likely left pinned Cairo 2.18 behind.
+  - Official mainnet node (`mainnet.nodes.starknet.org/rpc/v0_10`) still rate-limited (-32005) —
+    couldn't confirm whether it matches Alchemy; assume it does pending a clean probe.
+- **Revised conclusion:** the declare blocker is a **Sierra/CASM compiler-version mismatch between
+  local scarb 2.18 and the current network**, surfaced two ways across nodes. **Not** a strkd bug
+  (faithful relay) and **not** fixable by node choice alone — a node update would still mismatch our
+  CASM. **This is a mainnet gate:** declaring any contract needs the local Cairo/scarb realigned to
+  the network's current compiler.
+- **Verified:** Alchemy mainnet Actual `0x7eec8e15…` / Expected `0x581b62…`; Cartridge Expected
+  identical `0x581b62…`. Read-only `estimateFee` + `SKIP_VALIDATE`; no spend.
+- **Next (maintainer):** identify the Cairo/`starknet-sierra-compile` version the current
+  Sepolia/mainnet sequencer expects; bump `.tool-versions` to match; `scarb build` + `snforge test`
+  (all class hashes will change); then retry the declare + on-chain ceiling measurement via strkd.
+  Until then the **~350-gen estimate stands**.
+- **Blockers:** toolchain↔network compiler alignment (maintainer/infra decision).
+
+---
+
 ## 2026-06-17 — Correct the declare-blocker diagnosis (node Sierra compiler, not CASM skew)
 - **Goal:** with the canonical node URLs in hand (`sepolia.nodes.starknet.org/rpc/v0_10`,
   `mainnet.nodes.starknet.org/rpc/v0_10` — the nodes strkd uses), pin down whether the
