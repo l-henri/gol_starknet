@@ -1,0 +1,22 @@
+[package]
+name = "gol-sdk"
+version = "0.0.0"
+edition = "2021"
+description = "Rust SDK for the gol_starknet contracts: reads, call-building, and SNIP-36 proving choreography"
+license = "MIT"
+
+# Lean, dependency-thin stack (mirrors the sibling ../hexposed-sdk): Felt + Poseidon from
+# starknet-types-core, sn_keccak selectors from tiny-keccak, JSON-RPC over reqwest. No heavy
+# starknet-rs account machinery and (yet) no cainome codegen — see docs/sdk-plan.md as-built note.
+[dependencies]
+async-trait = "0.1"
+thiserror = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+tiny-keccak = { version = "2", features = ["keccak"] }
+starknet-types-core = { version = "0.2", features = ["hash"] }
+hex = "0.4"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

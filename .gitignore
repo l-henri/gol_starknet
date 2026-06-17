@@ -1,4 +1,5 @@
 target
+target-rust
 .snfoundry_cache/
 .DS*
 account.json
