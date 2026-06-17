@@ -8,7 +8,7 @@ use crate::config::{ContractKey, GolAddresses};
 use crate::encoding::selector;
 use crate::error::GolError;
 use crate::reader::Reader;
-use crate::types::{felt_hex, felt_to_bool, felt_to_u128, Felt, LifeformData, LoopCheck, OwnedLifeform, U256};
+use crate::types::{felt_hex, felt_to_bool, felt_to_u128, Felt, LifeformData, LoopCheck, OwnedLifeform, TokenUri, U256};
 
 /// JSON-RPC `CONTRACT_ERROR` — a call that reverted (e.g. `owner_of` on an unminted token).
 const CONTRACT_ERROR: i64 = 40;
@@ -269,6 +269,23 @@ impl Reader for RpcReader {
             )
             .await?;
         Ok(U256::from_felts(at(&r, 0)?, at(&r, 1)?))
+    }
+
+    async fn token_uri(&self, token_id: U256) -> Result<Option<TokenUri>, GolError> {
+        let r = self
+            .call_inner(
+                self.addr(ContractKey::Lifeforms)?,
+                selector("token_uri"),
+                &token_id.to_calldata(),
+                true,
+            )
+            .await?;
+        match r {
+            None => Ok(None),
+            Some(felts) => Ok(Some(crate::metadata::parse_token_uri(
+                crate::metadata::decode_byte_array(&felts)?,
+            ))),
+        }
     }
 
     async fn iterate_once(&self, state: U256) -> Result<U256, GolError> {

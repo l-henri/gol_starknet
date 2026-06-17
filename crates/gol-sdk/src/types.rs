@@ -90,6 +90,24 @@ pub struct LoopCheck {
     pub sequence: Vec<U256>,
 }
 
+/// An ERC721 metadata attribute (`trait_type` + display `value`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TokenAttribute {
+    pub trait_type: String,
+    pub value: String,
+}
+
+/// Decoded `token_uri`: the raw `data:` URI plus the parsed ERC721 metadata (`image` is itself a
+/// `data:image/svg+xml;base64,…` URI — use [`TokenUri::svg`] to get the markup).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TokenUri {
+    pub raw: String,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub image: Option<String>,
+    pub attributes: Vec<TokenAttribute>,
+}
+
 /// The proven result of advancing `start_state` by `generations` steps — the SNIP-36 `MoveMessage`
 /// emitted as the single L2->L1 message of `prove_move_forward_n` (benchmark contract).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

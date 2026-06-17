@@ -5,7 +5,7 @@ use async_trait::async_trait;
 
 use crate::config::ContractKey;
 use crate::error::GolError;
-use crate::types::{Felt, LifeformData, LoopCheck, OwnedLifeform, U256};
+use crate::types::{Felt, LifeformData, LoopCheck, OwnedLifeform, TokenUri, U256};
 
 #[async_trait]
 pub trait Reader: Send + Sync {
@@ -26,6 +26,9 @@ pub trait Reader: Send + Sync {
 
     /// NUT allowance (`allowance`).
     async fn nut_allowance(&self, owner: Felt, spender: Felt) -> Result<U256, GolError>;
+
+    /// Decoded `token_uri` (ERC721 metadata + grid SVG), or `None` if the token isn't minted.
+    async fn token_uri(&self, token_id: U256) -> Result<Option<TokenUri>, GolError>;
 
     // on-chain GoL engine views (off-chain discovery stays in the app):
     async fn iterate_once(&self, state: U256) -> Result<U256, GolError>;

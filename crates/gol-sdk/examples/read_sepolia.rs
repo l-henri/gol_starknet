@@ -35,5 +35,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("iterate_once(state) = {}", next.to_hex());
     }
 
+    // Decoded token_uri (ERC721 metadata + grid SVG).
+    if let Some(uri) = gol.reads().token_uri(tid).await? {
+        println!("token_uri: name={:?}, {} attributes", uri.name, uri.attributes.len());
+        for a in &uri.attributes {
+            println!("    - {}: {}", a.trait_type, a.value);
+        }
+        if let Some(svg) = uri.svg() {
+            println!("  svg: {} bytes, starts {:?}", svg.len(), &svg[..svg.len().min(24)]);
+        }
+    }
+
     Ok(())
 }

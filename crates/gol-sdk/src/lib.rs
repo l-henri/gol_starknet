@@ -15,6 +15,7 @@ pub mod datasource;
 pub mod encoding;
 pub mod error;
 pub mod events;
+pub mod metadata;
 pub mod reader;
 pub mod rpc;
 pub mod submit;
@@ -29,7 +30,8 @@ pub use reader::Reader;
 pub use rpc::RpcReader;
 pub use submit::{StrkdSubmitter, SubmitOpts, SubmitResult, Submitter};
 pub use types::{
-    Call, Felt, LifeformData, LoopCheck, MoveMessage, OwnedLifeform, PartialPathData, U256,
+    Call, Felt, LifeformData, LoopCheck, MoveMessage, OwnedLifeform, PartialPathData,
+    TokenAttribute, TokenUri, U256,
 };
 pub use writes::{nut_cost_for_loop, nut_cost_for_path, GolWrites, Minter};
 
