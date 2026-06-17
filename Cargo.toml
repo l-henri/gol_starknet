@@ -2,4 +2,4 @@
 # redirected to `target-rust/` via .cargo/config.toml so it never collides with scarb's `target/`.
 [workspace]
 resolver = "2"
-members = ["crates/gol-sdk"]
+members = ["crates/*"]

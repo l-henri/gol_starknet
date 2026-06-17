@@ -1,5 +1,6 @@
 target
 target-rust
+crates/gol-sdk-wasm/pkg
 .snfoundry_cache/
 .DS*
 account.json

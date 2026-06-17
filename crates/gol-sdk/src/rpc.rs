@@ -204,7 +204,7 @@ fn decode_lifeform(f: &[Felt]) -> Result<LifeformData, GolError> {
     })
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl Reader for RpcReader {
     async fn grid_size(&self) -> Result<u32, GolError> {
         let r = self

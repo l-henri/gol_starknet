@@ -137,6 +137,29 @@ STARKSCAN_API_KEY=… GOL_CHAIN=SN_SEPOLIA \
   cargo run -p gol-sdk --example owned_indexer
 ```
 
+## Web (WASM)
+
+[`gol-sdk-wasm`](../gol-sdk-wasm) wraps the SDK for the browser via `wasm-bindgen` — **reads +
+call-building**; signing stays in JS (the wallet via get-starknet). Build the npm package:
+
+```bash
+rustup target add wasm32-unknown-unknown            # once
+cargo install wasm-pack                              # once
+wasm-pack build crates/gol-sdk-wasm --target web     # -> crates/gol-sdk-wasm/pkg/
+```
+
+```ts
+import init, { GolSdk } from "gol-sdk-wasm";
+await init();
+const sdk = new GolSdk("sepolia");
+const lf = await sdk.lifeform("98307");                    // { token_id, owner, is_loop, … } | null
+const calls = sdk.mintLoopCalls("0x18003", 4, recipient);  // [{ contractAddress, entrypoint, calldata }]
+await walletAccount.execute(calls);                        // wallet signs + sends
+```
+
+Felts/u256 cross the boundary as hex strings (no bigint precision loss). See
+[`crates/gol-sdk-wasm/README.md`](../gol-sdk-wasm/README.md).
+
 ## Errors
 
 A single `GolError` with a handful of categories (`Config | Input | Encoding | Read | Submission |
@@ -156,7 +179,7 @@ Tracked in [`docs/sdk-plan.md`](../../docs/sdk-plan.md):
   `wallet_addInvokeTransaction`, headers, `proof_facts`) isn't wired. Native-only.
 - **`Prover` / SNIP-36** — the move-forward-N proving flow (targets the benchmark `GolBench` until
   the product NFT gains a verify entrypoint). Native-only; depends on `StrkdSubmitter`.
-- **`gol-sdk-wasm`** — the `wasm-bindgen` wrapper that lets the Next.js frontend import the SDK
-  (reads + call-building; signing stays in JS). Needs `wasm32-unknown-unknown` + `wasm-pack`.
 - **cainome typed bindings** — the current encoding is hand-rolled and fixture-verified; codegen is
   a hardening step.
+
+(The `gol-sdk-wasm` wrapper for the browser is built — see [Web (WASM)](#web-wasm).)

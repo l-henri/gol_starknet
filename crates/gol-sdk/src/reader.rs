@@ -7,8 +7,9 @@ use crate::config::ContractKey;
 use crate::error::GolError;
 use crate::types::{Felt, LifeformData, LoopCheck, OwnedLifeform, TokenUri, U256};
 
-#[async_trait]
-pub trait Reader: Send + Sync {
+#[async_trait(?Send)]
+// `?Send` so the same trait compiles on wasm32, where reqwest's fetch-backed futures are !Send.
+pub trait Reader {
     /// Grid edge length (`get_grid_size`).
     async fn grid_size(&self) -> Result<u32, GolError>;
 

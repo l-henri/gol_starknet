@@ -55,7 +55,7 @@ impl EventScanDataSource {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl DataSource for EventScanDataSource {
     async fn owned_lifeforms(&self, owner: Felt) -> Result<Vec<OwnedLifeform>, GolError> {
         // Transfers INTO `owner`: filter keys = [Transfer, <any from>, owner].

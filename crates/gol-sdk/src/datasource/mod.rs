@@ -29,8 +29,8 @@ pub struct MoveEvent {
     pub tx_hash: Felt,
 }
 
-#[async_trait]
-pub trait DataSource: Send + Sync {
+#[async_trait(?Send)]
+pub trait DataSource {
     /// Lifeforms currently owned by `owner`.
     async fn owned_lifeforms(&self, owner: Felt) -> Result<Vec<OwnedLifeform>, GolError>;
     /// A single lifeform (owner + current state), or `None` if unminted.

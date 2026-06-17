@@ -23,8 +23,8 @@ pub struct SubmitResult {
     pub transaction_hash: Felt,
 }
 
-#[async_trait]
-pub trait Submitter: Send + Sync {
+#[async_trait(?Send)]
+pub trait Submitter {
     async fn submit(&self, calls: &[Call], opts: SubmitOpts) -> Result<SubmitResult, GolError>;
 }
 
@@ -44,7 +44,7 @@ impl StrkdSubmitter {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl Submitter for StrkdSubmitter {
     async fn submit(&self, _calls: &[Call], _opts: SubmitOpts) -> Result<SubmitResult, GolError> {
         Err(GolError::Submission(

@@ -118,7 +118,7 @@ impl IndexerDataSource {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl DataSource for IndexerDataSource {
     async fn owned_lifeforms(&self, owner: Felt) -> Result<Vec<OwnedLifeform>, GolError> {
         // Transfers INTO `owner`: topic0=Transfer, topic2=to.

@@ -14,11 +14,19 @@ async-trait = "0.1"
 thiserror = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 tiny-keccak = { version = "2", features = ["keccak"] }
 starknet-types-core = { version = "0.2", features = ["hash"] }
 hex = "0.4"
 base64 = "0.22"
+
+# reqwest is split by target: native uses rustls; wasm uses the browser fetch backend (no TLS
+# crate). getrandom needs its `js` backend to compile for wasm32-unknown-unknown.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
+getrandom = { version = "0.2", features = ["js"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

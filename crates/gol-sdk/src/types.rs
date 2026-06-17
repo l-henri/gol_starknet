@@ -50,6 +50,28 @@ impl U256 {
             format!("0x{trimmed}")
         }
     }
+
+    /// Parse from a decimal or `0x` hex string (the JS / CLI boundary). Decimal is limited to
+    /// `u128`; hex accepts the full 256 bits.
+    pub fn parse(s: &str) -> Option<U256> {
+        let s = s.trim();
+        if let Some(h) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
+            if h.is_empty() || h.len() > 64 {
+                return None;
+            }
+            let bytes = hex::decode(format!("{h:0>64}")).ok()?;
+            let mut hi = [0u8; 16];
+            let mut lo = [0u8; 16];
+            hi.copy_from_slice(&bytes[0..16]);
+            lo.copy_from_slice(&bytes[16..32]);
+            Some(U256 {
+                high: u128::from_be_bytes(hi),
+                low: u128::from_be_bytes(lo),
+            })
+        } else {
+            s.parse::<u128>().ok().map(U256::from_u128)
+        }
+    }
 }
 
 /// `LifeFormData` from `get_lifeform_data`.
@@ -162,6 +184,9 @@ mod tests {
         assert_eq!(U256::from_felts(&cd[0], &cd[1]), v);
         assert_eq!(U256::from_u128(0).to_hex(), "0x0");
         assert_eq!(U256::from_u128(0x98307).to_hex(), "0x98307");
+        assert_eq!(U256::parse("98307"), Some(U256::from_u128(98307)));
+        assert_eq!(U256::parse("0x18003"), Some(U256::from_u128(0x18003)));
+        assert_eq!(U256::parse("0xZZ"), None);
     }
 
     #[test]

@@ -91,6 +91,12 @@ Verified on-chain event layouts (Sepolia lifeforms): `Transfer` keys =
 `[owner, token_id.lo, token_id.hi, is_loop, is_still, is_alive, is_dead, seq_len, state.lo, state.hi, age]`;
 `NewMove` data = `[token_id.lo, token_id.hi, age]`.
 
+The **`gol-sdk-wasm`** wrapper (wasm-bindgen) builds to an npm package via `wasm-pack build
+--target web` — reads + call-building exposed to JS (`GolSdk`: `lifeform`/`tokenUri`/`nutBalance`/
+`ownedLifeforms`/`gridSize` + `mintLoopCalls`/`breatheLifeCall`), signing left to the browser
+wallet. `gol-sdk` was made wasm-compatible (target-split reqwest, `getrandom` js, `?Send` async
+traits). Smoke-tested in node: call-builders emit the exact `account.execute` shape.
+
 Divergences from the spec above (deliberate, for "cook now"):
 1. **Lean stack instead of starknet-rs + cainome.** Following the sibling `../hexposed-sdk`:
    `starknet-types-core` (Felt + Poseidon) + `tiny-keccak` (selectors) + hand-rolled JSON-RPC /
@@ -100,8 +106,8 @@ Divergences from the spec above (deliberate, for "cook now"):
 2. **Cargo target redirected to `target-rust/`** (`.cargo/config.toml`) to avoid colliding with
    scarb's `target/`.
 3. **Stubs / follow-ups:** `StrkdSubmitter::submit` returns a "not yet wired" error (the seam +
-   placeholder exist); `token_uri` ByteArray decode, the `Prover` (SNIP-36) module, and the
-   `gol-sdk-wasm` wrapper (needs `wasm32` target + `wasm-pack`) are not yet built.
+   placeholder exist); the `Prover` (SNIP-36) module is not yet built. (`token_uri` decode and the
+   `gol-sdk-wasm` wrapper are now built.)
 4. **Indexer data coverage:** Starkscan indexes mainnet (`SN_MAIN`) but **not Sepolia**
    (`SN_SEPOLIA` status is all-null) as of 2026-06-17, so `IndexerDataSource` is plumbing-verified
    against the live API but returns data only once GoL is on a Starkscan-indexed chain (mainnet).
