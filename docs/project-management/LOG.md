@@ -18,6 +18,33 @@
 
 ---
 
+## 2026-06-17 — Correct the declare-blocker diagnosis (node Sierra compiler, not CASM skew)
+- **Goal:** with the canonical node URLs in hand (`sepolia.nodes.starknet.org/rpc/v0_10`,
+  `mainnet.nodes.starknet.org/rpc/v0_10` — the nodes strkd uses), pin down whether the
+  06-16 declare failure was strkd, the RPC, or our toolchain.
+- **Finding — it is the node's Sierra→CASM compiler, lagging at 1.7.0.** Hitting the *same* node
+  strkd uses, directly (starknet.js `estimateFee` + `SKIP_VALIDATE` on the DECLARE), reproduces the
+  exact strkd error: `Cannot compile Sierra version 1.8.0 with the current compiler (sierra version:
+  1.7.0)`. So: **not strkd** (faithful relay), and **not our toolchain** — the deployed GolBench
+  (06-09) and GolLifeforms (06-08) classes are already **Sierra 1.8.0** on-chain (confirmed via
+  `getClassAt`), and scarb 2.18 (pinned == installed) emits 1.8.0. The node is on spec
+  `0.10.3-rc.0`; its bundled `starknet-sierra-compile` is simply behind (1.7.0), so it rejects *new*
+  1.8.0 declares at the RPC layer even though the sequencer accepted 1.8.0 eight days ago.
+- **Correction:** the 2026-06-16 entry below blamed "CASM-compiler skew" + a Cartridge
+  `compiled_class_hash` mismatch. That was a **red herring** — I had tested against the Cartridge
+  node (`api.cartridge.gg`, spec 0.9.0), which is NOT the node strkd uses. Discard that root cause;
+  the real cause is the node's outdated Sierra compiler. The ~350-gen estimate is unaffected.
+- **Verified:** sepolia v0_10 node spec = 0.10.3-rc.0; declare estimate there → 1.7.0-compiler
+  error; `getClassAt` on both live contracts → Sierra 1.8.0. Mainnet v0_10 probe was rate-limited
+  (-32005), not completed.
+- **Next:** (1) retry the declare + on-chain ceiling measurement once the node's compiler is ≥1.8.0
+  (likely after the RC promotes to stable) — no code change needed. (2) **Before mainnet**, confirm
+  `mainnet.nodes.starknet.org/rpc/v0_10` can compile Sierra 1.8.0 (the rate-limited probe left this
+  open) — if it's also at 1.7.0, the mainnet declare/deploy is gated on the same node update.
+- **Blockers:** node-side Sierra compiler version (operator/infra; expected transient).
+
+---
+
 ## 2026-06-16 — Re-measure the post-perf on-chain ceiling (estimate done; on-chain confirm blocked)
 - **Goal:** get a current on-chain generation ceiling for `move_forward_in_place`, since the
   documented 170 predates the −39% `step_grid` pass. Drive it through strkd per the new tx policy.

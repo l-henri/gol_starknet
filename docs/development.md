@@ -108,6 +108,21 @@ Every call needs headers `X-Companion-Client` and (after pairing) `Authorization
 A node must be configured in the strkd app for the active network to broadcast/estimate; without
 one strkd is sign-only and you broadcast the returned tx yourself.
 
+**Canonical RPC nodes** (the ones strkd uses — use the *same* for any direct estimate/broadcast):
+
+| Network | URL |
+|---|---|
+| Sepolia | `https://sepolia.nodes.starknet.org/rpc/v0_10` |
+| Mainnet | `https://mainnet.nodes.starknet.org/rpc/v0_10` |
+
+(`http://` 301-redirects to `https://`; follow it.) ⚠️ **Known transient issue (2026-06-17):** the
+Sepolia node (serving spec `0.10.3-rc.0`) currently rejects *new* declares of Sierra 1.8.0 classes —
+`Cannot compile Sierra version 1.8.0 with the current compiler (sierra version: 1.7.0)` — because its
+bundled Sierra→CASM compiler is behind. scarb 2.18 emits Sierra 1.8.0, and the live classes are
+already 1.8.0, so this is a node-side lag (likely clears when the RC promotes to stable). Existing
+contracts are unaffected; only new declares are blocked. Confirm the mainnet node can compile
+Sierra 1.8.0 before the mainnet deploy.
+
 ## Deploying
 
 > The four production contracts were deployed to Sepolia via `sncast` in 2026-06 (see

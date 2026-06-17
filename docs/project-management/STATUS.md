@@ -81,11 +81,16 @@ actual L2 gas 1,085,322,855, fee 8.68 STRK. The earlier "97" was a wrong gas-per
 > directly confirmed** by the passing in-suite benchmark (270 gens = ~920M est. on-chain L2 gas,
 > under the 1.2e9 cap). *Method:* snforge gas is exactly linear in n (new marginal 3.36M/gen vs
 > old 6.32M/gen) and calibrates to on-chain at ×0.986 against the old code's real 170-gen broadcast
-> (1,085,322,855 actual L2 gas). **On-chain confirmation is still pending and currently blocked:**
-> re-declaring the optimized `GolBench` on Sepolia fails on CASM-compiler skew — strkd's RPC node
-> can't compile Sierra 1.8.0 at all, and the Cartridge node compiles it to a *different* CASM
-> (`compiled_class_hash` mismatch). Confirming the ~350 figure needs a node compatible with scarb
-> 2.18's CASM (the one sncast used for the 06-09 declares); then `move_forward_in_place` via strkd.
+> (1,085,322,855 actual L2 gas). **On-chain confirmation is pending — blocked on a node-side issue
+> (not strkd, not our toolchain):** the canonical Sepolia RPC node strkd uses
+> (`sepolia.nodes.starknet.org/rpc/v0_10`, spec `0.10.3-rc.0`) rejects the declare with
+> `Cannot compile Sierra version 1.8.0 with the current compiler (sierra version: 1.7.0)`. The same
+> error reproduces hitting the node directly (so strkd is faithful), and the live classes are
+> already Sierra 1.8.0 (so scarb 2.18 is fine) — the node's bundled Sierra→CASM compiler is simply
+> lagging at 1.7.0, likely because it's an RC deployment. Already-deployed contracts are unaffected;
+> only *new* declares are blocked. **Retry the declare (then `move_forward_in_place` via strkd) once
+> the node's compiler is ≥1.8.0.** (An earlier note here blamed CASM skew vs the Cartridge node —
+> that was a wrong-node red herring; corrected.)
 
 At the time, strkd worked for every step except submitting the proof-carrying verify (its
 `wallet_addInvokeTransaction` had no `proof`/`proof_facts` param) — see
