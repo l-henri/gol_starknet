@@ -74,8 +74,9 @@
 
 ## As-built status (2026-06-17)
 
-First cut landed in `crates/gol-sdk` — **`cargo build` ✓, `cargo test` ✓ (8 unit tests), live
-`read_sepolia` example ✓** (grid_size=15, token 98307 decoded, `iterate_once` still-life confirmed).
+First cut landed in `crates/gol-sdk` (**usage docs: [crates/gol-sdk/README.md](../crates/gol-sdk/README.md)**)
+— **`cargo build` ✓, `cargo test` ✓ (11 unit tests), live `read_sepolia` example ✓** (grid_size=15,
+token 98307 decoded incl. `token_uri`, `iterate_once` still-life confirmed).
 
 Landed: the Cargo workspace; `config` (Network + address book with live Sepolia addresses);
 `error` (`GolError`); `types` (`Felt`/`U256`/domain structs); `encoding` (sn_keccak selectors +

@@ -4,6 +4,7 @@ version = "0.0.0"
 edition = "2021"
 description = "Rust SDK for the gol_starknet contracts: reads, call-building, and SNIP-36 proving choreography"
 license = "MIT"
+readme = "README.md"
 
 # Lean, dependency-thin stack (mirrors the sibling ../hexposed-sdk): Felt + Poseidon from
 # starknet-types-core, sn_keccak selectors from tiny-keccak, JSON-RPC over reqwest. No heavy
