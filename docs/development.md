@@ -115,16 +115,18 @@ one strkd is sign-only and you broadcast the returned tx yourself.
 | Sepolia | `https://sepolia.nodes.starknet.org/rpc/v0_10` |
 | Mainnet | `https://mainnet.nodes.starknet.org/rpc/v0_10` |
 
-(`http://` 301-redirects to `https://`; follow it.) ⚠️ **Compute `compiled_class_hash` with
-starknet.js ≥ v9 — NOT the frontend's pinned v7.6.4.** v7.6.4 uses the old algorithm and returns a
-wrong hash (e.g. `0x7eec8e15…` for `GolBench`); v10 returns the correct `0x581b62…`, which the
-network expects. Using v7's value to declare gets rejected as a `compiled_class_hash` mismatch —
-this looks exactly like a toolchain/compiler skew but is not. scarb 2.18 is correct; with the right
-hash the declare estimates cleanly on a Sierra-1.8.0-capable node. (Use a temp `npm i starknet@latest`
-for hashing, or upgrade the frontend.) Separately, strkd's Sepolia node (`0.10.3-rc.0`) can't
-*compile* Sierra 1.8.0 (compiler 1.7.0), so route the **declare** through a 1.8.0-capable node
-(e.g. Cartridge `https://api.cartridge.gg/x/starknet/sepolia`) — sign-only via strkd then broadcast
-there; deploys/invokes are fine on any node.
+(`http://` 301-redirects to `https://`; follow it.) **Declaring Sierra 1.8.0 (Cairo 2.18) on these
+nodes works** — the gotchas that made it *look* broken (all client-side):
+- **Compute `compiled_class_hash` with starknet.js ≥ v9**, NOT the frontend's pinned v7.6.4. v7
+  returns the old-algorithm hash (`0x7eec8e15…` for `GolBench`); v10 returns the correct `0x581b62…`
+  the network expects. A wrong value is rejected as a `compiled_class_hash` mismatch that looks like
+  toolchain skew but isn't. (Use a temp `npm i starknet@latest` for hashing, or upgrade the frontend.)
+- **Build the broadcast `contract_class.abi` with the canonical serialization** (starknet.js's
+  `formatSpaces`/`json.stringify`), not plain `JSON.stringify` — else the node derives a different
+  class_hash and the signed declare fails `__validate__` with "invalid signature".
+- **SNF nodes rate-limit heavy proof/state fetches.** Front them with a local loopback reverse proxy
+  that injects an `X-SNF-Nodes-Key` header (key in a chmod-600 file, never logged/committed); point
+  dinner + strkd RPC at the proxy. See the 2026-06-17 LOG entry.
 
 ## Deploying
 

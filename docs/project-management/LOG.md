@@ -18,6 +18,40 @@
 
 ---
 
+## 2026-06-17 (DONE) — Both ceilings re-measured live on Sepolia: on-chain 321, off-chain 89
+- **Goal:** get the *real* on-chain and off-chain (SNIP-36) generation ceilings for the optimized
+  `step_grid`, on testnet, via strkd (signing) + dinner (proving) — no sncast, no self-run prover.
+- **Results:**
+  - **On-chain: 321 gens** (old 170; **1.89×**). `estimateFee` binary search → n=321 @1.198e9 L2
+    gas (cap 1.2e9), n=322 over. **Confirmed by real broadcast** `move_forward_in_place(321)` — tx
+    `0x5307febe27d888a3da21e52caafa3f7e505c119deacd43ba2af54aab8262c87`, SUCCEEDED, **actual L2 gas
+    1,089,490,115**, 8.72 STRK, `get_age` 0→321. (Old 170 used 1.085e9 gas → ~same gas, ~1.9× gens.)
+  - **Off-chain (SNIP-36, local dinner/stwo): 89 gens** (old 43; **2.07×**). Binary search via dinner
+    `POST /v1/prove`: n=89 proves (~406 KB proof, proof_facts len 9), **n=90 → `Not enough twiddles!`**
+    (the build's trace/twiddle cap). Both ceilings ~2× — matches the ~47%-cheaper-per-gen step.
+- **Contract:** optimized `GolBench` class `0x41268542f2ed071e93bd85f25c9008fcf772086674690781a46974cda74b0da`
+  (Sierra 1.8.0) was already declared; deployed a fresh instance at
+  `0x05f62daf5d63c1c6c310247d2155dcc52fa4328ff7bd8ec4ace6f40f8fa3ec5` (glider seed) via UDC through strkd.
+- **Tooling:** strkd signed everything (sign-only for the virtual prove txs; submit:true for deploy +
+  the 321 broadcast); **dinner** (local proving companion, `:9909`, native backend) produced the
+  proofs. RPC went through a **local reverse proxy** (`127.0.0.1:8651`→sepolia, `:8652`→mainnet) that
+  injects the `X-SNF-Nodes-Key` bypass header (the SNF nodes rate-limit heavy proof state-fetches);
+  key kept in a `/tmp` chmod-600 file, never logged/committed. dinner + strkd point their RPC at it.
+- **The "declare blocker" was self-inflicted (3 wrong theories, all wrong), root-caused to:**
+  (a) `compiled_class_hash` computed with the frontend's stale starknet.js **v7.6.4** (wrong algo →
+  `0x7eec8e15…`; v10 → correct `0x581b62…`); (b) class hash needs the **canonical abi serialization**
+  (`formatSpaces`, not `JSON.stringify`) or the node derives a different class_hash → "invalid
+  signature". **Sierra 1.8.0 / Cairo 2.18 declares fine on the SNF nodes** — no toolchain change.
+- **Verified:** strkd sign+submit works on the current network (test 0-STRK self-transfer
+  `0x7d7f2e6c…` succeeded); proxy forwards both networks with the key (logs method/path/status only).
+- **Next:** tear down the temp proxy + revert dinner/strkd RPC when done; resume the mainnet track
+  (frontend smoke test → security review incl. the `step_grid` rewrite + partial-path change). The
+  off-chain 89 < on-chain 321 is the *local* prover's trace cap, not a SNIP-36 limit — a bigger
+  prover build raises it.
+- **Blockers:** none.
+
+---
+
 ## 2026-06-17 (resolved) — The "declare blocker" was a stale starknet.js hasher, not a toolchain gate
 - **Goal:** find the Cairo/scarb version matching the network's CASM (per the entry below).
 - **Resolution — there is no version to find; scarb 2.18 is correct.** The whole "compiled_class_hash

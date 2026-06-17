@@ -54,17 +54,23 @@ is set to these (RPC: `https://api.cartridge.gg/x/starknet/sepolia`).
 Verified on-chain: all three `MINTER_ROLE` grants, the nutrient-address wiring, the allowance, the
 mint (owner + `LifeFormData`), the 1-NUT charge, and that `token_uri` returns the base64 JSON+SVG.
 
-## SNIP-36 proving benchmark (2026-06-09)
+## SNIP-36 proving benchmark — RE-MEASURED with the optimized step_grid (2026-06-17)
 
-Measured the max GoL generations advanceable in one tx, on-chain vs off-chain (full detail in
-[LOG.md](LOG.md)). Benchmark-only `GolBench` (`src/gol_bench.cairo`) is live on Sepolia at
-`0x0057ac40958e78244ba405fcbf4ba37e20af65c45ad8c305bf61d3d211a6eb99` (not part of the product).
+Max GoL generations advanceable in one tx, on-chain vs off-chain, **re-measured live on Sepolia with
+the optimized (`perf/step-grid-modulo-removal`) code** (full detail in [LOG.md](LOG.md)). The
+optimized `GolBench` (class `0x41268542…b0da`, Sierra 1.8.0) is deployed at
+`0x05f62daf5d63c1c6c310247d2155dcc52fa4328ff7bd8ec4ace6f40f8fa3ec5`; the pre-optimization instance
+(`0x0057ac40…eb99`) stays for reference. Not part of the product.
 
-| Path | Ceiling | Bound by |
-|---|---|---|
-| On-chain (single tx, in-place) | **170 gens** | 1.2e9 L2-gas-per-tx protocol cap (~7M gas/gen; n=170 ok, n=171 over) |
-| Off-chain (SNIP-36, **local** Dinner stwo build) | **43 gens** | that prover build's trace size — `Not enough twiddles!` |
-| (off-chain balance limit @ 30 STRK) | ~220 gens | not reached — local prover caps first |
+| Path | Old code | **Optimized** | Bound by |
+|---|---|---|---|
+| On-chain (single tx, in-place) | 170 | **321 gens** | 1.2e9 L2-gas-per-tx protocol cap (n=321 ok, 322 over) |
+| Off-chain (SNIP-36, **local** dinner/stwo build) | 43 | **89 gens** | that build's trace/twiddle cap — `Not enough twiddles!` at n=90 |
+
+Both ~2× the old code (1.89× on-chain, 2.07× off-chain) — matching the ~47%-cheaper-per-generation
+`step_grid`. On-chain confirmed by real broadcast `move_forward_in_place(321)` (tx `0x5307febe…`,
+**actual 1,089,490,115 L2 gas**, 8.72 STRK, `get_age` 0→321). Off-chain pinned via **dinner** (the
+local proving companion): n=89 proves (~406 KB proof), n=90 trace-caps.
 
 Round-trip validated end-to-end at n=15 and at the n=43 ceiling (strkd sign → Dinner prove →
 on-chain `verify_move_forward`). On-chain (170) and off-chain (43) are **different kinds of
@@ -76,24 +82,17 @@ ceiling measured via fee estimation (`/tmp/golbench/estimate.py`) and **confirme
 broadcast of `move_forward_in_place(170)`** — tx `0x50fd2c79…bdedc`, SUCCEEDED, `get_age` 58→228,
 actual L2 gas 1,085,322,855, fee 8.68 STRK. The earlier "97" was a wrong gas-per-gen estimate.
 
-> ⚠️ **The 170 figure predates the perf work** (measured 2026-06-09, before the 2026-06-10 −39%
-> `step_grid` pass). **Estimated new hard ceiling ≈ 350 generations** (~2× old), with **≥270
-> directly confirmed** by the passing in-suite benchmark (270 gens = ~920M est. on-chain L2 gas,
-> under the 1.2e9 cap). *Method:* snforge gas is exactly linear in n (new marginal 3.36M/gen vs
-> old 6.32M/gen) and calibrates to on-chain at ×0.986 against the old code's real 170-gen broadcast
-> (1,085,322,855 actual L2 gas). **On-chain confirmation is unblocked — the earlier "declare
-> blocker" was a stale-hasher bug in our diagnostic, NOT a toolchain/compiler problem and NOT a
-> mainnet gate.** Root cause: the `compiled_class_hash` was computed with the frontend's pinned
-> starknet.js **v7.6.4**, which uses the *old* algorithm and returns `0x7eec8e15…`; starknet.js
-> **v10** returns `0x581b62…`, which matches what the network expects *exactly* (Cartridge + Alchemy
-> independently agree). With the correct hash, the `GolBench` declare **estimates cleanly** on a
-> Sierra-1.8.0-capable node (confirmed via Cartridge Sepolia, ~5.7 STRK). **scarb 2.18 is correct —
-> no toolchain bump, no rebuild, no class-hash churn.** ⚠️ Always compute `compiled_class_hash` with
-> starknet.js ≥ v9 (the frontend's v7 is wrong for current CASM). The only remaining wrinkle: strkd's
-> configured Sepolia node (`0.10.3-rc.0`) can't *compile* Sierra 1.8.0 (its compiler is 1.7.0), so
-> the **declare** must route through a 1.8.0-capable node (Cartridge) — strkd sign-only + external
-> broadcast, or point strkd there; deploys/invokes work on any node. **Next: declare (correct hash) →
-> deploy `GolBench` → `estimateFee` sweep for the real ceiling (then optional confirm broadcast).**
+> **Lessons from getting these numbers (the "declare blocker" was self-inflicted, not infra):**
+> 1. **`compiled_class_hash` must be computed with starknet.js ≥ v9.** The frontend's pinned
+>    **v7.6.4** uses the old algorithm (returned `0x7eec8e15…`); **v10** returns the correct
+>    `0x581b62…` the network expects. A wrong hash is rejected as a `compiled_class_hash` mismatch
+>    that *looks* like toolchain/compiler skew but isn't. scarb 2.18 / Sierra 1.8.0 declares fine.
+> 2. **Class hash needs the canonical abi serialization** (`formatSpaces`, not plain
+>    `JSON.stringify`) or the node derives a different class_hash → "invalid signature" on declare.
+> 3. **The SNF nodes rate-limit heavy proof state-fetches.** Solved with a local loopback reverse
+>    proxy injecting the `X-SNF-Nodes-Key` header (key in a `/tmp` chmod-600 file, never logged/
+>    committed); dinner + strkd point their RPC URL at it. Earlier "Sierra 1.7 / mainnet gate" worry
+>    was a red herring — Cairo 2.18 (Sierra 1.8.0) is the supported network version.
 
 At the time, strkd worked for every step except submitting the proof-carrying verify (its
 `wallet_addInvokeTransaction` had no `proof`/`proof_facts` param) — see
