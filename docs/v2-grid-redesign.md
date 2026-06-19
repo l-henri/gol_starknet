@@ -3,6 +3,13 @@
 **Status:** Draft for review · **Branch:** `docs/v2-grid-redesign` · **Date:** 2026-06-19
 **Author:** henri (with Claude) · **Sensitivity:** Internal (AMBER) — roadmap / unpublished design
 
+> **Implementation update (2026-06-19).** Final parameters: **41×41** (not 38×38), stored as
+> **7 row-aligned `felt252` words** (6 whole rows per felt, 41-bit rows; 41 is the max square in 7
+> such felts). `src/gol_grid_v2.cairo` is now the authoritative source for the grid core — the
+> bitboard stepper, `lt` canonicalization, `token_id` (Poseidon), and the `GridState` storage form,
+> all tested. **References to "38×38" and "6 words" elsewhere in this doc predate this — read them
+> as 41×41 / 7 words.** Phase 1 (grid core) is done; remaining phases per §7.
+
 ---
 
 ## 1. Summary
@@ -26,7 +33,7 @@ scheme, stepping algorithm, and cost envelope.
 
 | Area | Decision |
 |---|---|
-| Grid | **38×38**, toroidal, **fixed at compile time** (const) |
+| Grid | **41×41**, toroidal, **fixed at compile time** (const) |
 | State layout | **Row-per-word bitboard** for compute; dense-packed **6× `felt252`** for storage |
 | Equivalence | **Time-cycle only** (v1 semantics) — translated/rotated copies are distinct tokens |
 | Canonical representative | **Lexicographically smallest** state in the loop (big-endian over packed words) |
@@ -335,12 +342,12 @@ with the bigger grid.
 
 | Quantity | v1 | v2 |
 |---|---|---|
-| Grid | 15×15 (225 cells) | 38×38 (1,444 cells) |
+| Grid | 15×15 (225 cells) | 41×41 (1,681 cells) |
 | Topology | toroidal | toroidal |
-| State | 1 × `u256` (256 bits) | 6 × `felt252` (storage) / 38 × row-mask (compute) |
+| State | 1 × `u256` (256 bits) | 7 × `felt252` (storage, row-aligned) / 41 × row-mask (compute) |
 | Single-`u256` ceiling | — | 16×16 (256 bits) is the max for the v1 model |
-| Gun threshold (Gosper 36×9) | not reachable | cleared (38 ≥ 36) |
+| Gun threshold (Gosper 36×9) | not reachable | cleared (41 ≥ 36, +5 col margin) |
 | Token id | = state (`u256`) | `Poseidon(canonical state)` |
 | Ordering key | `u256 <` | lexicographic over 6 words |
-| Gas/gen (optimized) | ≈3.39M @ 15×15 (on-chain) | ≈2.52M @ 38×38 (bitboard, spike) |
+| Gas/gen (optimized) | ≈3.39M @ 15×15 (on-chain) | ≈2.52M @ 38×38 (spike); ~2.9M @ 41×41 (×1.16, re-measure) |
 | Max gens/tx | 321 | ≈476 pure compute (bitboard); naive ≈2; chunked via partial paths |
