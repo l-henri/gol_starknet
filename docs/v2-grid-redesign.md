@@ -182,14 +182,34 @@ element happens *inside that same pass*, costing one comparison per step already
 ### 6.2 Per-generation & per-transaction budget
 
 Reference: v1 optimized stepping ≈ **3.39M L2 gas/generation** at 15×15 (225 cells), giving a
-**321-generation** ceiling under the 1.2e9 gas-per-tx cap.
+**321-generation** ceiling under the 1.2e9 gas-per-tx cap (measured on-chain).
 
-- **Naive (cell-by-cell) at 38×38:** ≈6.4× the cells → ≈22M gas/gen → ≈**50 generations/tx**.
-- **Bitwise (§4.3) at 38×38:** O(n) word ops instead of O(n²) cell ops should cut this
-  substantially; target is to bring per-tx generations back up toward (and likely past) the ~100
-  range. *Must be measured — see §10.*
+> **Spike results (2026-06-19, `spike/v2_stepper/`).** Standalone Cairo 2.18 implementation of
+> the §4.3 bitboard stepper, validated for correctness against a cell-by-cell oracle (12
+> generations on a busy grid + blinker/block/empty), gas measured under snforge via linear
+> regression (cost of N generations differenced across N = 1 / 101 / 201; per-gen cost constant to
+> within ~230 gas/100 gens):
+>
+> | Stepper @ 38×38 | L2 gas / generation | Gens per tx (1.2e9, pure compute) |
+> |---|---|---|
+> | Naive cell-by-cell | ~628M | ~2 |
+> | **Bitboard (§4.3)** | **~2.52M** | **~476** |
+>
+> **The bitboard is ~250× cheaper than naive, and ~26% cheaper per generation than v1's 15×15
+> cell-by-cell stepper — despite 6.4× the cells.** The O(n) word-parallel algorithm more than
+> compensates for the larger grid; per-tx throughput goes *up* vs v1, not down. The earlier
+> estimates in this section (naive ≈22M, bitboard "~100 gens/tx") were both wrong — the real
+> algorithm gap is far larger. **The algorithm choice, not the grid size, is the cost driver.**
+>
+> Caveats: snforge `l2_gas` is a *compute* estimate. Real on-chain cost adds per-tx overhead
+> (6-felt calldata, one storage write, account validation, events) and the v1 benchmark found
+> actual gas ≈1.7× the SKIP_VALIDATE `estimateFee`. So treat ~476 as optimistic; even halved
+> (~240) it is in the same ballpark as v1's 321 and comfortably usable. The spike
+> measured the *step* only; storage felt↔bitboard pack/unpack and Poseidon canonicalization are
+> O(n) one-time per tx, negligible against hundreds of steps. **Confirm with an on-chain
+> `estimateFee` / receipt before finalizing** (same methodology as the v1 benchmark).
 
-Either way, **per-tx generation count drops vs v1** — expected and handled by chaining:
+Either way, **per-tx generation count is healthy** — and long loops are handled by chaining:
 
 ### 6.3 Why spatial canonicalization is deferred (not chosen)
 
@@ -322,5 +342,5 @@ with the bigger grid.
 | Gun threshold (Gosper 36×9) | not reachable | cleared (38 ≥ 36) |
 | Token id | = state (`u256`) | `Poseidon(canonical state)` |
 | Ordering key | `u256 <` | lexicographic over 6 words |
-| Gas/gen (optimized) | ≈3.39M @ 15×15 | TBM — naive ≈22M; bitwise target lower |
-| Max gens/tx | 321 | TBM — naive ≈50; bitwise target higher; chunked via partial paths |
+| Gas/gen (optimized) | ≈3.39M @ 15×15 (on-chain) | ≈2.52M @ 38×38 (bitboard, spike) |
+| Max gens/tx | 321 | ≈476 pure compute (bitboard); naive ≈2; chunked via partial paths |

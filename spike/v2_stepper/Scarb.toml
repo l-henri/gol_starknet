@@ -1,0 +1,16 @@
+[package]
+name = "v2_stepper"
+version = "0.1.0"
+edition = "2024_07"
+
+# Throwaway feasibility spike for the v2 bigger-grid redesign.
+# Standalone so it builds without the main package's hdp_cairo dep.
+
+[dependencies]
+starknet = "2.9.2"
+
+[dev-dependencies]
+snforge_std = "0.60.0"
+
+[scripts]
+test = "snforge test"
