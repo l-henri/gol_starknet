@@ -8,3 +8,4 @@ pub mod base64;
 pub mod gol_metadata;
 pub mod gol_bench;
 pub mod gol_grid_v2;
+pub mod gol_utilities_v2;

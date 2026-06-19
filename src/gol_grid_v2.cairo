@@ -120,16 +120,21 @@ pub fn lt(a: @Array<u64>, b: @Array<u64>) -> bool {
     result
 }
 
-/// ERC-721 token id / uniqueness key: Poseidon over the row words.
-pub fn token_id(rows: @Array<u64>) -> u256 {
+/// Poseidon over the row words — the canonical identity of a grid (used as the loop/path id and
+/// the equality key for the hash-stored partial-path fields).
+pub fn token_hash(rows: @Array<u64>) -> felt252 {
     let mut felts: Array<felt252> = ArrayTrait::new();
     let mut i: usize = 0;
     while i < rows.len() {
         felts.append((*rows[i]).into());
         i += 1;
     };
-    let h: felt252 = poseidon_hash_span(felts.span());
-    h.into()
+    poseidon_hash_span(felts.span())
+}
+
+/// ERC-721 token id / uniqueness key: the `token_hash` widened to `u256`.
+pub fn token_id(rows: @Array<u64>) -> u256 {
+    token_hash(rows).into()
 }
 
 // ---------------------------------------------------------------------------
@@ -201,6 +206,12 @@ pub fn unpack(gs: @GridState) -> Array<u64> {
     unpack_felt(*gs.w5, 6, ref rows);
     unpack_felt(*gs.w6, 5, ref rows);
     rows
+}
+
+/// Identity hash of a stored grid. `grid_hash(pack(rows)) == token_hash(rows)` since `unpack`
+/// inverts `pack`, so a stored state and a freshly computed one hash identically.
+pub fn grid_hash(gs: @GridState) -> felt252 {
+    token_hash(@unpack(gs))
 }
 
 // ---------------------------------------------------------------------------
