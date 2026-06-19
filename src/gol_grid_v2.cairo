@@ -15,9 +15,13 @@
 
 use core::poseidon::poseidon_hash_span;
 
-pub const N: usize = 38; // grid edge length
-pub const MASK: u64 = 0x3fffffffff; // 2^38 - 1  (low 38 bits)
-pub const TOPBIT: u64 = 0x2000000000; // 2^37     (bit 37 = column N-1)
+pub const N: usize = 41; // grid edge length
+pub const MASK: u64 = 0x1ffffffffff; // 2^41 - 1  (low 41 bits)
+pub const TOPBIT: u64 = 0x10000000000; // 2^40    (bit 40 = column N-1)
+
+// Storage packing (row-aligned): each felt252 holds 6 whole rows (6*41 = 246 <= 251 bits), so the
+// 41 rows fit in 7 felts (rows 0..35 in w0..w5, rows 36..40 in w6). No cross-felt bit straddling.
+pub const POW_ROW: felt252 = 0x20000000000; // 2^41 — row stride within a packed felt
 
 // ---------------------------------------------------------------------------
 // Bitboard stepper (proven in spike/v2_stepper)
@@ -126,6 +130,77 @@ pub fn token_id(rows: @Array<u64>) -> u256 {
     };
     let h: felt252 = poseidon_hash_span(felts.span());
     h.into()
+}
+
+// ---------------------------------------------------------------------------
+// Storage form: row-aligned packing into 7 felt252 words (6 rows/felt, 41-bit rows)
+// ---------------------------------------------------------------------------
+
+/// The `Store`/`Serde`-able grid state: 41 bitboard rows packed into 7 felts (see `POW_ROW`).
+/// Compute always happens on the unpacked `Array<u64>` rows; this is purely the stored form.
+#[derive(Drop, Copy, Serde, PartialEq, starknet::Store)]
+pub struct GridState {
+    pub w0: felt252,
+    pub w1: felt252,
+    pub w2: felt252,
+    pub w3: felt252,
+    pub w4: felt252,
+    pub w5: felt252,
+    pub w6: felt252,
+}
+
+/// Pack `count` rows starting at `start` into a single felt: row j at bit offset 41*j.
+fn pack_felt(rows: @Array<u64>, start: usize, count: usize) -> felt252 {
+    let mut acc: felt252 = 0;
+    let mut p: felt252 = 1;
+    let mut j: usize = 0;
+    while j < count {
+        let rv: felt252 = (*rows[start + j]).into();
+        acc = acc + rv * p;
+        p = p * POW_ROW;
+        j += 1;
+    };
+    acc
+}
+
+/// Pack the N bitboard rows into the 7-felt storage form.
+pub fn pack(rows: @Array<u64>) -> GridState {
+    GridState {
+        w0: pack_felt(rows, 0, 6),
+        w1: pack_felt(rows, 6, 6),
+        w2: pack_felt(rows, 12, 6),
+        w3: pack_felt(rows, 18, 6),
+        w4: pack_felt(rows, 24, 6),
+        w5: pack_felt(rows, 30, 6),
+        w6: pack_felt(rows, 36, 5) // rows 36..40
+    }
+}
+
+/// Unpack `count` rows out of one felt (low row first), appending to `rows`.
+fn unpack_felt(word: felt252, count: usize, ref rows: Array<u64>) {
+    let mask_row: u256 = 0x1ffffffffff; // 2^41 - 1
+    let pow: u256 = 0x20000000000; // 2^41
+    let mut u: u256 = word.into();
+    let mut j: usize = 0;
+    while j < count {
+        let row: u256 = u & mask_row;
+        rows.append(row.try_into().unwrap());
+        u = u / pow;
+        j += 1;
+    };
+}
+
+/// Unpack the 7-felt storage form back into the N bitboard rows.
+pub fn unpack(gs: @GridState) -> Array<u64> {
+    let mut rows: Array<u64> = ArrayTrait::new();
+    unpack_felt(*gs.w0, 6, ref rows);
+    unpack_felt(*gs.w1, 6, ref rows);
+    unpack_felt(*gs.w2, 6, ref rows);
+    unpack_felt(*gs.w3, 6, ref rows);
+    unpack_felt(*gs.w4, 6, ref rows);
+    unpack_felt(*gs.w5, 6, ref rows);
+    unpack_felt(*gs.w6, 5, ref rows);
+    rows
 }
 
 // ---------------------------------------------------------------------------
@@ -295,7 +370,7 @@ pub fn eq(a: @Array<u64>, b: @Array<u64>) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{step, step_naive, lt, token_id, grid_with, eq, N};
+    use super::{step, step_naive, lt, token_id, grid_with, eq, pack, unpack, N};
 
     fn seed() -> Array<u64> {
         grid_with(
@@ -366,6 +441,23 @@ mod tests {
         let c = grid_with(@array![(0_usize, 1_u64), (5_usize, 0xfff_u64)]);
         let d = grid_with(@array![(0_usize, 2_u64)]);
         assert(lt(@c, @d), 'row0 dominates');
+    }
+
+    #[test]
+    fn pack_unpack_roundtrips() {
+        // a representative grid
+        assert(eq(@unpack(@pack(@seed())), @seed()), 'seed roundtrip');
+        // edge bits: full first/last rows + top bit (40) and bottom bit (0) in a middle row
+        let edge = grid_with(
+            @array![
+                (0_usize, 0x1ffffffffff_u64),
+                (40_usize, 0x1ffffffffff_u64),
+                (20_usize, 0x10000000001_u64),
+            ],
+        );
+        assert(eq(@unpack(@pack(@edge)), @edge), 'edge roundtrip');
+        // packing is faithful enough that token_id is invariant across a storage round-trip
+        assert(token_id(@unpack(@pack(@seed()))) == token_id(@seed()), 'id survives storage');
     }
 
     #[test]
