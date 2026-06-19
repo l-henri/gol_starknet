@@ -27,6 +27,11 @@ pub struct GolAddresses {
     pub path_minter: Felt,
     /// Benchmark contract — only where a `GolBench` is deployed (proofs).
     pub bench: Option<Felt>,
+    /// Block at/before which this deployment first emitted events. Event scans start here instead
+    /// of genesis — critical because some RPC nodes paginate `getEvents` by fixed block windows
+    /// (~82k), so a from-genesis scan on a mature chain is hundreds of empty round-trips. `0` = scan
+    /// from genesis (unknown deploy block).
+    pub deploy_block: u64,
 }
 
 impl GolAddresses {
@@ -56,6 +61,8 @@ pub fn deployments(net: Network) -> Option<GolAddresses> {
             bench: Some(felt(
                 "0x05f62daf5d63c1c6c310247d2155dcc52fa4328ff7bd8ec4ace6f40f8fa3ec5",
             )),
+            // First lifeform mint (token 98307) landed at block 10_594_566; start just before.
+            deploy_block: 10_590_000,
         }),
         Network::Mainnet => None,
     }

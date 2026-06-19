@@ -120,6 +120,19 @@ impl GolSdk {
         to_js(&js)
     }
 
+    /// Every minted lifeform (newest first), capped at `limit` (0 = unlimited), via the RPC event
+    /// scan. The global gallery feed on Sepolia. Each is confirmed live (current owner + state).
+    #[wasm_bindgen(js_name = recentLifeforms)]
+    pub async fn recent_lifeforms(&self, limit: u32) -> Result<JsValue, JsValue> {
+        let ds = EventScanDataSource::new(
+            self.client.config.rpc_url.clone(),
+            self.client.config.addresses.clone(),
+        );
+        let recent = ds.recent_lifeforms(limit).await.map_err(err)?;
+        let js: Vec<JsLifeform> = recent.iter().map(JsLifeform::of).collect();
+        to_js(&js)
+    }
+
     /// `[approve, mint_loop]` calls for the wallet to sign + send.
     #[wasm_bindgen(js_name = mintLoopCalls)]
     pub fn mint_loop_calls(

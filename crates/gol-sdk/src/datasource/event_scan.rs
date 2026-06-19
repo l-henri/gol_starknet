@@ -23,10 +23,13 @@ pub struct EventScanDataSource {
 impl EventScanDataSource {
     pub fn new(rpc_url: impl Into<String>, addresses: GolAddresses) -> Self {
         let rpc_url = rpc_url.into();
+        // Default scans to the deployment block: nodes that window `getEvents` by ~82k blocks turn a
+        // from-genesis scan into hundreds of empty round-trips on a mature chain.
+        let from_block = addresses.deploy_block;
         Self {
             reader: RpcReader::new(rpc_url, addresses.clone()),
             addresses,
-            from_block: 0,
+            from_block,
         }
     }
 
@@ -34,6 +37,31 @@ impl EventScanDataSource {
     pub fn from_deploy_block(mut self, block: u64) -> Self {
         self.from_block = block;
         self
+    }
+
+    /// Every minted lifeform (mints = `Transfer` from the zero address), most-recent first, capped
+    /// at `limit` (0 = unlimited). Each is confirmed live via the RPC reader, so the owner/state are
+    /// current even after later transfers. The route the global gallery reads from on Sepolia.
+    pub async fn recent_lifeforms(&self, limit: u32) -> Result<Vec<OwnedLifeform>, GolError> {
+        use crate::reader::Reader;
+        // Transfers FROM the zero address = mints: keys = [Transfer, 0, <any to>].
+        let keys = vec![vec![selector("Transfer")], vec![Felt::ZERO], vec![]];
+        let events = self.scan_all(self.addresses.lifeforms, keys).await?;
+        let mut ids = dedupe(events.iter().filter_map(|ev| {
+            // keys = [selector, from, to, token_id.low, token_id.high]
+            (ev.keys.len() >= 5).then(|| U256::from_felts(&ev.keys[3], &ev.keys[4]))
+        }));
+        ids.reverse(); // getEvents returns ascending; newest mint first
+        if limit > 0 {
+            ids.truncate(limit as usize);
+        }
+        let mut out = Vec::with_capacity(ids.len());
+        for tid in ids {
+            if let Some(lf) = self.reader.lifeform(tid).await? {
+                out.push(lf);
+            }
+        }
+        Ok(out)
     }
 
     /// Page through every matching event, following the continuation token.
