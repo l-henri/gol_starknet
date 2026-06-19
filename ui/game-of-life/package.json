@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "wasm": "wasm-pack build ../../crates/gol-sdk-wasm --target web && mkdir -p public && cp ../../crates/gol-sdk-wasm/pkg/gol_sdk_wasm.js ../../crates/gol-sdk-wasm/pkg/gol_sdk_wasm_bg.wasm public/",
+    "predev": "npm run wasm",
+    "dev": "next dev",
+    "prebuild": "npm run wasm",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -13,6 +16,9 @@
     "next": "15.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "next": "15.1.6",
+    "gol-sdk-wasm": "file:../../crates/gol-sdk-wasm/pkg",
+    "@starknet-io/get-starknet": "^4.0.0",
     "starknet": "^7.6.4"
   },
   "devDependencies": {
