@@ -375,6 +375,19 @@ pub fn eq(a: @Array<u64>, b: @Array<u64>) -> bool {
     ok
 }
 
+/// True iff every cell is dead (the empty/"dead" grid).
+pub fn is_empty(rows: @Array<u64>) -> bool {
+    let mut i: usize = 0;
+    let mut empty = true;
+    while i < rows.len() {
+        if *rows[i] != 0 {
+            empty = false;
+        }
+        i += 1;
+    };
+    empty
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

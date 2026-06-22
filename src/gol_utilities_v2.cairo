@@ -94,15 +94,19 @@ pub fn combine_partial_path(p1: PartialPathData, p2: PartialPathData) -> Partial
 }
 
 /// Verify `initial` begins a single loop of exactly `generations` states. Panics if it isn't
-/// (returns to `initial` early, or fails to close). Returns `(true, smallest_state_in_loop)`.
-pub fn is_single_loop(initial: @Array<u64>, generations: usize) -> (bool, Array<u64>) {
+/// (returns to `initial` early, or fails to close). Returns
+/// `(true, smallest_state_in_loop, second_to_last_state)` — the third is the loop's predecessor of
+/// `initial` (needed by the path minter to check a path enters the loop from outside).
+pub fn is_single_loop(
+    initial: @Array<u64>, generations: usize,
+) -> (bool, Array<u64>, Array<u64>) {
     assert(generations > 0, 'No loop is smaller than 1');
     // trigger = initial: hitting it before the last step means a shorter loop -> reject.
     let (triggered, smallest, second_to_last) = run(initial, initial, generations - 1);
     assert(!triggered, 'triggered in ISLFIS');
     let last = step(@second_to_last);
     assert(eq(@last, initial), 'no loop in ISLFIS');
-    (true, smallest)
+    (true, smallest, second_to_last)
 }
 
 /// True iff `initial` is a single loop of `generations` AND is that loop's canonical (smallest)
@@ -110,8 +114,22 @@ pub fn is_single_loop(initial: @Array<u64>, generations: usize) -> (bool, Array<
 pub fn is_single_loop_and_entrypoint_is_smallest(
     initial: @Array<u64>, generations: usize,
 ) -> bool {
-    let (is_loop, smallest) = is_single_loop(initial, generations);
+    let (is_loop, smallest, _) = is_single_loop(initial, generations);
     is_loop && eq(@smallest, initial)
+}
+
+/// Step `n` times from `initial` (`n >= 1`); return `(state after n-1 steps, state after n steps)`.
+/// The path minter uses this to get the loop entrypoint and the path's predecessor of it.
+pub fn step_to(initial: @Array<u64>, n: usize) -> (Array<u64>, Array<u64>) {
+    assert(n > 0, 'step_to needs n>=1');
+    let mut prev = clone_rows(initial);
+    let mut i: usize = 0;
+    while i < n - 1 {
+        prev = step(@prev);
+        i += 1;
+    };
+    let last = step(@prev);
+    (prev, last)
 }
 
 #[cfg(test)]
@@ -135,7 +153,7 @@ mod tests {
     #[test]
     fn single_loop_blinker() {
         // A is period-2; A is lexicographically smaller than B (differ first at row 4: 0 < 4).
-        let (is_loop, smallest) = is_single_loop(@blinker_a(), 2);
+        let (is_loop, smallest, _) = is_single_loop(@blinker_a(), 2);
         assert(is_loop, 'A is a loop');
         assert(eq(@smallest, @blinker_a()), 'A is the smallest');
     }
@@ -150,7 +168,7 @@ mod tests {
     #[test]
     fn still_life_is_a_loop_of_one() {
         let block = grid_with(@array![(10_usize, 0b110_u64), (11_usize, 0b110_u64)]);
-        let (is_loop, smallest) = is_single_loop(@block, 1);
+        let (is_loop, smallest, _) = is_single_loop(@block, 1);
         assert(is_loop, 'block is still');
         assert(eq(@smallest, @block), 'block smallest is self');
     }

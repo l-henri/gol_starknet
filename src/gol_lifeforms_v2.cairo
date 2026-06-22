@@ -1,0 +1,197 @@
+//! v2 GolLifeforms ERC-721. Same shape as v1, but `LifeFormData.current_state` is a `GridState`,
+//! the per-generation step uses the `gol_grid_v2` bitboard library directly (no utilities
+//! component / cross-contract call), and the token_id is the Poseidon hash of the canonical state
+//! (computed by the minters and passed in). `token_uri` is stubbed pending Phase 4 (41x41 SVG).
+
+#[starknet::contract]
+pub mod GolLifeformsV2 {
+    use openzeppelin::introspection::src5::SRC5Component;
+    use openzeppelin::token::erc721::{ERC721Component, ERC721HooksEmptyImpl};
+    use openzeppelin::interfaces::erc721::{IERC721Metadata, IERC721MetadataCamelOnly};
+    use openzeppelin::interfaces::erc20::{IERC20Dispatcher, IERC20DispatcherTrait};
+    use openzeppelin::access::accesscontrol::AccessControlComponent;
+    use openzeppelin::access::accesscontrol::DEFAULT_ADMIN_ROLE;
+    use openzeppelin::upgrades::UpgradeableComponent;
+    use openzeppelin::interfaces::upgrades::IUpgradeable;
+    use starknet::ClassHash;
+    use starknet::{ContractAddress, get_caller_address, get_contract_address};
+    use starknet::storage::{Map, StorageMapReadAccess, StorageMapWriteAccess};
+    use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
+    use core::num::traits::Zero;
+    use gol_starknet::gol_grid_v2;
+    use gol_starknet::interfaces_v2::{IGolLifeFormsV2, LifeFormData};
+    use gol_starknet::interfaces::{
+        IGolNutrientTokenDispatcher, IGolNutrientTokenDispatcherTrait,
+    };
+
+    component!(path: ERC721Component, storage: erc721, event: ERC721Event);
+    component!(path: SRC5Component, storage: src5, event: SRC5Event);
+    component!(path: AccessControlComponent, storage: accesscontrol, event: AccessControlEvent);
+    component!(path: UpgradeableComponent, storage: upgradeable, event: UpgradeableEvent);
+
+    const MINTER_ROLE: felt252 = selector!("MINTER_ROLE");
+    const NUT_DECIMALS: u256 = 1000000000000000000; // 1e18
+
+    // ERC721 core + SRC5 embedded individually (token_uri is overridden below).
+    #[abi(embed_v0)]
+    impl ERC721Impl = ERC721Component::ERC721Impl<ContractState>;
+    #[abi(embed_v0)]
+    impl ERC721CamelOnlyImpl = ERC721Component::ERC721CamelOnlyImpl<ContractState>;
+    #[abi(embed_v0)]
+    impl SRC5Impl = SRC5Component::SRC5Impl<ContractState>;
+    impl ERC721InternalImpl = ERC721Component::InternalImpl<ContractState>;
+    #[abi(embed_v0)]
+    impl AccessControlImpl = AccessControlComponent::AccessControlImpl<ContractState>;
+    impl AccessControlInternalImpl = AccessControlComponent::InternalImpl<ContractState>;
+    impl UpgradeableInternalImpl = UpgradeableComponent::InternalImpl<ContractState>;
+
+    // Phase-4 stub: returns an empty URI. Phase 4 renders the 41x41 grid as an on-chain SVG.
+    #[abi(embed_v0)]
+    impl ERC721MetadataImpl of IERC721Metadata<ContractState> {
+        fn name(self: @ContractState) -> ByteArray {
+            self.erc721.ERC721_name.read()
+        }
+        fn symbol(self: @ContractState) -> ByteArray {
+            self.erc721.ERC721_symbol.read()
+        }
+        fn token_uri(self: @ContractState, token_id: u256) -> ByteArray {
+            ""
+        }
+    }
+    #[abi(embed_v0)]
+    impl ERC721MetadataCamelImpl of IERC721MetadataCamelOnly<ContractState> {
+        fn tokenURI(self: @ContractState, tokenId: u256) -> ByteArray {
+            ""
+        }
+    }
+
+    #[storage]
+    struct Storage {
+        #[substorage(v0)]
+        erc721: ERC721Component::Storage,
+        #[substorage(v0)]
+        src5: SRC5Component::Storage,
+        #[substorage(v0)]
+        accesscontrol: AccessControlComponent::Storage,
+        #[substorage(v0)]
+        upgradeable: UpgradeableComponent::Storage,
+        pub lifeform_data: Map<u256, LifeFormData>,
+        pub total_supply: u256,
+        pub nutrient_token_contract: ContractAddress,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct NewLifeFormEvent {
+        owner: ContractAddress,
+        token_id: u256,
+        lifeform_data: LifeFormData,
+    }
+    #[derive(Drop, starknet::Event)]
+    struct NewMoveEvent {
+        token_id: u256,
+        age: u32,
+    }
+    #[derive(Drop, starknet::Event)]
+    struct NutrientContractUpdatedEvent {
+        nutrient_contract_address: ContractAddress,
+    }
+    #[event]
+    #[derive(Drop, starknet::Event)]
+    enum Event {
+        #[flat]
+        ERC721Event: ERC721Component::Event,
+        #[flat]
+        SRC5Event: SRC5Component::Event,
+        #[flat]
+        AccessControlEvent: AccessControlComponent::Event,
+        #[flat]
+        UpgradeableEvent: UpgradeableComponent::Event,
+        NewLifeForm: NewLifeFormEvent,
+        NewMove: NewMoveEvent,
+        NutrientContractUpdated: NutrientContractUpdatedEvent,
+    }
+
+    #[constructor]
+    fn constructor(ref self: ContractState, creator: ContractAddress) {
+        assert!(!creator.is_zero(), "creator_zero");
+        self.erc721.initializer("Digital bacterias v2", "BACT2", "");
+        self.accesscontrol.initializer();
+        self.accesscontrol._grant_role(DEFAULT_ADMIN_ROLE, creator);
+    }
+
+    #[abi(embed_v0)]
+    impl GolLifeFormsImpl of IGolLifeFormsV2<ContractState> {
+        fn mint(
+            ref self: ContractState,
+            recipient: ContractAddress,
+            minter: ContractAddress,
+            token_id: u256,
+            lifeform_data: LifeFormData,
+        ) {
+            // Guarded: only the minter contracts (MINTER_ROLE) may mint.
+            self.accesscontrol.assert_only_role(MINTER_ROLE);
+            self.erc721.mint(recipient, token_id);
+            let sequence_length = lifeform_data.sequence_length;
+            self.lifeform_data.write(token_id, lifeform_data);
+            self.emit(Event::NewLifeForm(NewLifeFormEvent { owner: recipient, token_id, lifeform_data }));
+            self.total_supply.write(self.total_supply.read() + 1);
+            // Charge the minter `sequence_length` NUT.
+            let nutrient_token = IERC20Dispatcher {
+                contract_address: self.nutrient_token_contract.read(),
+            };
+            nutrient_token
+                .transfer_from(minter, get_contract_address(), sequence_length.into() * NUT_DECIMALS);
+        }
+
+        fn get_lifeform_data(self: @ContractState, token_id: u256) -> LifeFormData {
+            self.lifeform_data.read(token_id)
+        }
+
+        fn move_lifeform_forward(ref self: ContractState, token_id: u256) {
+            // Intentionally PUBLIC: advancing a real, minted lifeform is the (free-but-effortful)
+            // way to earn NUT. Phantom/unminted ids are not "movement", so they are rejected.
+            assert(self.erc721.exists(token_id), 'Lifeform not minted');
+            let mut lifeform_data = self.lifeform_data.read(token_id);
+            let rows = gol_grid_v2::unpack(@lifeform_data.current_state);
+            let next = gol_grid_v2::step(@rows);
+            lifeform_data.current_state = gol_grid_v2::pack(@next);
+            lifeform_data.age += 1;
+            self.lifeform_data.write(token_id, lifeform_data);
+            self.emit(Event::NewMove(NewMoveEvent { token_id, age: lifeform_data.age }));
+            // Mint 1 NUT to the caller.
+            let nutrient_token = IGolNutrientTokenDispatcher {
+                contract_address: self.nutrient_token_contract.read(),
+            };
+            nutrient_token.mint(get_caller_address(), NUT_DECIMALS);
+        }
+
+        fn get_grid_size(self: @ContractState) -> u32 {
+            gol_grid_v2::N
+        }
+    }
+
+    #[abi(embed_v0)]
+    impl UpgradeableImpl of IUpgradeable<ContractState> {
+        fn upgrade(ref self: ContractState, new_class_hash: ClassHash) {
+            self.accesscontrol.assert_only_role(DEFAULT_ADMIN_ROLE);
+            assert!(!new_class_hash.is_zero(), "class_hash_zero");
+            self.upgradeable.upgrade(new_class_hash);
+        }
+    }
+
+    // Guarded: only DEFAULT_ADMIN_ROLE may repoint the nutrient token.
+    #[external(v0)]
+    fn update_nutrient_contract_address(
+        ref self: ContractState, nutrient_contract_address: ContractAddress,
+    ) {
+        self.accesscontrol.assert_only_role(DEFAULT_ADMIN_ROLE);
+        assert!(!nutrient_contract_address.is_zero(), "nutrient_zero");
+        self.nutrient_token_contract.write(nutrient_contract_address);
+        self
+            .emit(
+                Event::NutrientContractUpdated(
+                    NutrientContractUpdatedEvent { nutrient_contract_address },
+                ),
+            );
+    }
+}
