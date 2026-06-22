@@ -496,4 +496,38 @@ mod tests {
         let blinker_b = grid_with(@array![(6_usize, 0b1110_u64)]);
         assert(token_id(@blinker_a) != token_id(@blinker_b), 'shift is distinct');
     }
+
+    // P5 gas probes: per-generation step cost at 41x41 = (gas(bench_step_101) - gas(bench_step_1))
+    // / 100. Read l2_gas via `snforge test bench_step`.
+    fn run_n(gens: usize) -> u64 {
+        let mut cur = seed();
+        let mut g: usize = 0;
+        while g < gens {
+            cur = step(@cur);
+            g += 1;
+        };
+        // force full evaluation
+        let mut s: u64 = 0;
+        let mut i: usize = 0;
+        while i < N {
+            s = s ^ *cur[i];
+            i += 1;
+        };
+        s
+    }
+
+    // #[ignore]d so the default suite stays fast/green; run with
+    // `snforge test bench_step --ignored`. Per-gen = (bench_step_101 - bench_step_1)/100
+    // ~= 2.64M L2 gas/generation at 41x41 (measured 2026-06-22).
+    #[test]
+    #[ignore]
+    fn bench_step_1() {
+        assert(run_n(1) != 0xdeadbeef, 'x');
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_step_101() {
+        assert(run_n(101) != 0xdeadbeef, 'x');
+    }
 }

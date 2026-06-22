@@ -87,3 +87,27 @@ pub fn token_uri(token_id: u256, data: LifeFormData) -> ByteArray {
     uri.append(@base64::encode(json));
     uri
 }
+
+#[cfg(test)]
+mod tests {
+    use super::render_svg;
+    use gol_starknet::gol_grid_v2::{grid_with, pack, MASK, N};
+
+    // P5 worst case: every one of the N*N cells alive -> N*N <rect>s. Bounds token_uri's heaviest
+    // render. #[ignore]d (step-heavy); run with `snforge test bench_render_dense --ignored
+    // --max-n-steps 4000000000`. render_svg alone ~= 252M L2 gas at full density (measured
+    // 2026-06-22); real (sparse) creatures are far cheaper (~80M for a blinker token_uri).
+    #[test]
+    #[ignore]
+    fn bench_render_dense() {
+        let mut rowvals: Array<(usize, u64)> = ArrayTrait::new();
+        let mut r: usize = 0;
+        while r < N {
+            rowvals.append((r, MASK));
+            r += 1;
+        };
+        let full = pack(@grid_with(@rowvals));
+        let svg = render_svg(full);
+        assert(svg.len() > 1000, 'dense svg renders');
+    }
+}

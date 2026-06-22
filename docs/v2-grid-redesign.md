@@ -15,8 +15,14 @@
 > (forged-witness path mint) was a false positive, refuted with a committed PoC test (the registry
 > keying invariant binds the witness to the landing state). Fixes applied: canonical-state storage,
 > nutrient-in-constructor, registry-read-under-caller. NUT-sink and upgrade-timelock are documented
-> PoC decisions; mint front-running deferred to v3. **Remaining:** P5 re-benchmark gas at 41×41 +
-> external audit + governance hardening before mainnet.
+> PoC decisions; mint front-running deferred to v3. **P5 done:** ~2.64M L2 gas/generation at 41×41
+> (O(n), barely above 38×38), ~450 generations/tx; `token_uri` dense-render flagged (~252M for a
+> full grid — fine for sparse real creatures, mitigate before mainnet). **Remaining before
+> mainnet:** external/formal audit + governance hardening + `token_uri` dense-render mitigation.
+>
+> **Deferred check (TODO):** visually verify a minted lifeform's `token_uri` SVG renders correctly
+> in a browser (decode the base64 data URI). The renderer is a faithful port of v1's but has not
+> been eyeballed at 41×41.
 
 ---
 
@@ -357,5 +363,5 @@ with the bigger grid.
 | Gun threshold (Gosper 36×9) | not reachable | cleared (41 ≥ 36, +5 col margin) |
 | Token id | = state (`u256`) | `Poseidon(canonical state)` |
 | Ordering key | `u256 <` | lexicographic over 6 words |
-| Gas/gen (optimized) | ≈3.39M @ 15×15 (on-chain) | ≈2.52M @ 38×38 (spike); ~2.9M @ 41×41 (×1.16, re-measure) |
-| Max gens/tx | 321 | ≈476 pure compute (bitboard); naive ≈2; chunked via partial paths |
+| Gas/gen (bitboard) | ≈3.39M @ 15×15 (on-chain) | **≈2.64M @ 41×41** (P5 snforge; O(n) rows, not O(n²) — barely above 38×38's 2.52M) |
+| Max gens/tx | 321 | **≈450 pure compute** (1.2e9 ÷ 2.64M); chunked via partial paths for longer |
