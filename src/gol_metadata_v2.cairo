@@ -104,7 +104,7 @@ pub fn build_metadata_json(
     } else {
         "Path"
     };
-    let mut json: ByteArray = "{\"name\":\"Lifeform #";
+    let mut json: ByteArray = "{\"name\":\"Lifeform ";
     json.append(@u256_to_decimal(token_id));
     json
         .append(
@@ -123,21 +123,64 @@ pub fn build_metadata_json(
     json
 }
 
-/// The full token_uri: base64 `data:application/json` embedding a base64 `data:text/html` renderer.
+/// The full token_uri: a raw `data:application/json` URI whose `animation_url` is a base64
+/// `data:text/html` renderer.
+///
+/// The JSON is returned RAW (not base64) — base64-encoding the ~2.4KB JSON on-chain was the single
+/// largest cost in token_uri (~54M gas) and pushed a node view-call over its gas budget. The JSON
+/// contains no URI-reserved chars that break a `data:` payload (no `#`/`%`; the name omits `#`), so
+/// a consumer reads everything after the first comma and `JSON.parse`s it directly. The HTML stays
+/// base64 (it has CSS `#` colors and spaces that a raw `data:text/html` URI can't carry safely).
 pub fn token_uri(token_id: u256, data: LifeFormData, rp: RenderParams) -> ByteArray {
     let mut animation_url: ByteArray = "data:text/html;base64,";
     animation_url.append(@base64::encode(render_html(data.current_state, rp.bg, rp.cell, rp.speed)));
     let json = build_metadata_json(token_id, data, animation_url);
-    let mut uri: ByteArray = "data:application/json;base64,";
-    uri.append(@base64::encode(json));
+    let mut uri: ByteArray = "data:application/json,";
+    uri.append(@json);
     uri
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{render_html, derive_params};
+    use super::{render_html, derive_params, token_uri};
+    use gol_starknet::base64;
     use gol_starknet::gol_grid_v2::{grid_with, pack, MASK, N};
-    use gol_starknet::interfaces_v2::SPEED_MAX;
+    use gol_starknet::interfaces_v2::{SPEED_MAX, LifeFormData, RenderParams};
+
+    // ---- gas benches (run: `snforge test bench_uri --ignored`) ----------------------------------
+    // Pinpoint where token_uri's gas goes: render_html (string build) vs inner base64 vs the full
+    // path (json build + outer base64). Subtract to attribute cost.
+    #[test]
+    #[ignore]
+    fn bench_uri_render_html() {
+        let s = pack(@grid_with(@array![(5_usize, 0b1110_u64)]));
+        let h = render_html(s, 0x810da8, 0xd9416, 105);
+        assert(h.len() > 100, 'html');
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_uri_inner_base64() {
+        let s = pack(@grid_with(@array![(5_usize, 0b1110_u64)]));
+        let b = base64::encode(render_html(s, 0x810da8, 0xd9416, 105));
+        assert(b.len() > 100, 'b64');
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_uri_full() {
+        let s = pack(@grid_with(@array![(5_usize, 0b1110_u64)]));
+        let lf = LifeFormData {
+            is_loop: true, is_still: false, is_alive: true, is_dead: false,
+            sequence_length: 2, current_state: s, age: 5,
+        };
+        let u = token_uri(
+            0x743d91e948cc844ef3e08dc46ede35fe5ea085981a0176d3203810da80d9416_u256,
+            lf,
+            RenderParams { bg: 0x810da8, cell: 0xd9416, speed: 105 },
+        );
+        assert(u.len() > 100, 'uri');
+    }
 
     // The renderer's size is independent of grid density: a full 41x41 grid and a 3-cell blinker
     // produce HTML of comparable, small size (fixed template + 41 row numbers). Contrast the old
