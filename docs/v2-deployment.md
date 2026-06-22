@@ -30,14 +30,23 @@ Fresh v2 collection (separate from v1). NUT is a **fresh** token (1,000,000 NUT 
   The A-heuristic ran at mint.
 - `token_id` = `0x743d91e948cc844ef3e08dc46ede35fe5ea085981a0176d3203810da80d9416` (matches off-chain Poseidon).
 
-### ⚠️ FINDING: `token_uri` reverts `Out of gas` on a node view call
-`token_uri(token_id)` reverts with `Out of gas` (`0x4f7574206f6620676173`) on the SNF node's
-`starknet_call`. The on-chain HTML + double-base64 render (~162M gas in snforge, with a raised step
-limit) exceeds the node's view-call gas budget — so wallets/marketplaces calling `tokenURI` will
-fail. This is the live form of the P5 token_uri-cost concern; the JS rework made the payload
-density-independent but it's still too heavy to execute as a view here. **Must fix before the NFT
-is viewable.** Options: skip the outer JSON base64 (return `data:application/json,<urlencoded>`),
-trim/precompute the HTML template, or split the render. Needs design — not deployed-around.
+### ✅ RESOLVED: `token_uri` `Out of gas` (fixed 2026-06-22 via in-place upgrade)
+Originally `token_uri` reverted `Out of gas` (`0x4f7574206f6620676173`) on the node's
+`starknet_call` — the on-chain render (~162M gas) exceeded the view-call budget. Fixed by cutting
+render gas **3.3× (metadata 128.8M → 38.6M)**:
+- base64 encoder maps 6-bit → char arithmetically (no per-char `ByteArray.at`); byte-identical output.
+- `token_uri` returns the metadata JSON **raw** (`data:application/json,<json>`) instead of
+  base64-ing it (the ~2.4KB outer base64 was ~54M). HTML stays base64. Name drops `#` (URI-safe).
+
+**Upgraded the live contract in place** (it's Upgradeable): new class `0x4f44c35b137527a46ebcf80e6d62703c354c30aff549cc0f72804390ee27ff3`
+(declare `0x7731f8b1eaa81a11ae7d8df6ce6301fe3821b3b0c70975edfff0a86ef648bd2`, upgrade
+`0x7fc29631d897aaea74ecdfc4f270eb9bbb0c72f1394e02ccfcafe978b81e6c`). Old class
+`0x8b32…ded9` stays declared (revertible). Verified on the node: `token_uri(seeded)` now returns
+2183 chars of valid `data:application/json,…` (name + attributes + base64 HTML `animation_url`).
+
+Format note (marketplace-facing): `token_uri` is now raw JSON (not base64). Standard parsers read
+after the first comma and `JSON.parse`. The `name` is `Lifeform <decimal token_id>` (77-digit) —
+cosmetic, could shorten later.
 
 ## Notes / gotchas hit during deploy
 - Declare requires the contract-class `abi` as the **canonical `formatSpaces` string** (decimal/raw array → node error `invalid type: sequence, expected a string`).
