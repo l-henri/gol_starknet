@@ -20,7 +20,10 @@
 > Art Blocks-style interactive renderer: `token_uri` → JSON whose `animation_url` is a
 > `data:text/html;base64` page that reconstructs and animates the grid in-browser from injected row
 > masks + traits. Payload is density-independent (~162M gas flat), which **resolves the P5
-> dense-render concern**. **Remaining before mainnet:** external/formal audit + governance hardening.
+> dense-render concern**. **Per-token render params** (A: derived at mint from token_id; C:
+> owner-customizable bg/cell/speed, SPEED_MAX=200) added and **re-audited clean** (deep, scoped) —
+> the only fixes were two incidental pre-existing items (token_uri existence check, mint
+> sequence_length>0). **Remaining before mainnet:** external/formal audit + governance hardening.
 >
 > **Deferred check (TODO):** open a minted lifeform's `animation_url` (decoded `data:text/html`) in
 > a real browser to confirm the canvas render + animation look right. The grid/Conway logic is
