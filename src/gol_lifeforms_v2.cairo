@@ -56,6 +56,9 @@ pub mod GolLifeformsV2 {
             self.erc721.ERC721_symbol.read()
         }
         fn token_uri(self: @ContractState, token_id: u256) -> ByteArray {
+            // Re-audit: EIP-721 says token_uri SHOULD revert for non-existent tokens (the custom
+            // metadata override otherwise renders valid-looking metadata for phantom ids).
+            assert(self.erc721.exists(token_id), 'ERC721: invalid token ID');
             gol_metadata_v2::token_uri(
                 token_id, self.lifeform_data.read(token_id), self.resolve_params(token_id),
             )
@@ -64,6 +67,7 @@ pub mod GolLifeformsV2 {
     #[abi(embed_v0)]
     impl ERC721MetadataCamelImpl of IERC721MetadataCamelOnly<ContractState> {
         fn tokenURI(self: @ContractState, tokenId: u256) -> ByteArray {
+            assert(self.erc721.exists(tokenId), 'ERC721: invalid token ID');
             gol_metadata_v2::token_uri(
                 tokenId, self.lifeform_data.read(tokenId), self.resolve_params(tokenId),
             )
@@ -152,6 +156,9 @@ pub mod GolLifeformsV2 {
         ) {
             // Guarded: only the minter contracts (MINTER_ROLE) may mint.
             self.accesscontrol.assert_only_role(MINTER_ROLE);
+            // Re-audit: defense-in-depth — a 0 sequence_length would charge 0 NUT. The v2 minters
+            // never pass 0 (they assert length > 0), but enforce it here too.
+            assert(lifeform_data.sequence_length > 0, 'sequence_length_zero');
             self.erc721.mint(recipient, token_id);
             let sequence_length = lifeform_data.sequence_length;
             self.lifeform_data.write(token_id, lifeform_data);

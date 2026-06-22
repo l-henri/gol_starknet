@@ -15,7 +15,7 @@ mod tests {
     use gol_starknet::interfaces_v2::{
         IGolLifeFormsV2Dispatcher, IGolLifeFormsV2DispatcherTrait, IGolLoopMinterV2Dispatcher,
         IGolLoopMinterV2DispatcherTrait, IGolPathMinterV2Dispatcher,
-        IGolPathMinterV2DispatcherTrait,
+        IGolPathMinterV2DispatcherTrait, LifeFormData,
     };
 
     const MINTER_ROLE: felt252 = selector!("MINTER_ROLE");
@@ -310,6 +310,35 @@ mod tests {
         start_cheat_caller_address(d.lifeforms, other);
         IGolLifeFormsV2Dispatcher { contract_address: d.lifeforms }
             .set_render_params(id, 0x1, 0x2, 30);
+        stop_cheat_caller_address(d.lifeforms);
+    }
+
+    // Re-audit fix: token_uri reverts for a token that was never minted.
+    #[test]
+    #[should_panic(expected: 'ERC721: invalid token ID')]
+    fn token_uri_reverts_for_phantom() {
+        let d = deploy_all();
+        IERC721MetadataDispatcher { contract_address: d.lifeforms }.token_uri(999999);
+    }
+
+    // Re-audit fix: mint rejects sequence_length == 0 (would charge 0 NUT).
+    #[test]
+    #[should_panic(expected: 'sequence_length_zero')]
+    fn mint_rejects_zero_sequence_length() {
+        let d = deploy_all();
+        // grant MINTER_ROLE to creator so we can call mint() directly with a crafted record
+        start_cheat_caller_address(d.lifeforms, d.creator);
+        IAccessControlDispatcher { contract_address: d.lifeforms }
+            .grant_role(MINTER_ROLE, d.creator);
+        stop_cheat_caller_address(d.lifeforms);
+        let (loop_state, _r) = blinker_canonical();
+        let lf = LifeFormData {
+            is_loop: true, is_still: false, is_alive: true, is_dead: false,
+            sequence_length: 0, current_state: loop_state, age: 0,
+        };
+        start_cheat_caller_address(d.lifeforms, d.creator);
+        IGolLifeFormsV2Dispatcher { contract_address: d.lifeforms }
+            .mint(d.creator, d.creator, 123, lf);
         stop_cheat_caller_address(d.lifeforms);
     }
 
