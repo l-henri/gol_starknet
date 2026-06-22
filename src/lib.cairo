@@ -13,3 +13,4 @@ pub mod interfaces_v2;
 pub mod gol_lifeforms_v2;
 pub mod gol_loop_minter_v2;
 pub mod gol_path_minter_v2;
+pub mod gol_metadata_v2;

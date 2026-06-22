@@ -19,6 +19,7 @@ pub mod GolLifeformsV2 {
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
     use core::num::traits::Zero;
     use gol_starknet::gol_grid_v2;
+    use gol_starknet::gol_metadata_v2;
     use gol_starknet::interfaces_v2::{IGolLifeFormsV2, LifeFormData};
     use gol_starknet::interfaces::{
         IGolNutrientTokenDispatcher, IGolNutrientTokenDispatcherTrait,
@@ -45,7 +46,7 @@ pub mod GolLifeformsV2 {
     impl AccessControlInternalImpl = AccessControlComponent::InternalImpl<ContractState>;
     impl UpgradeableInternalImpl = UpgradeableComponent::InternalImpl<ContractState>;
 
-    // Phase-4 stub: returns an empty URI. Phase 4 renders the 41x41 grid as an on-chain SVG.
+    // token_uri renders the lifeform's current 41x41 state as an on-chain SVG (see gol_metadata_v2).
     #[abi(embed_v0)]
     impl ERC721MetadataImpl of IERC721Metadata<ContractState> {
         fn name(self: @ContractState) -> ByteArray {
@@ -55,13 +56,13 @@ pub mod GolLifeformsV2 {
             self.erc721.ERC721_symbol.read()
         }
         fn token_uri(self: @ContractState, token_id: u256) -> ByteArray {
-            ""
+            gol_metadata_v2::token_uri(token_id, self.lifeform_data.read(token_id))
         }
     }
     #[abi(embed_v0)]
     impl ERC721MetadataCamelImpl of IERC721MetadataCamelOnly<ContractState> {
         fn tokenURI(self: @ContractState, tokenId: u256) -> ByteArray {
-            ""
+            gol_metadata_v2::token_uri(tokenId, self.lifeform_data.read(tokenId))
         }
     }
 

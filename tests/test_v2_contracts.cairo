@@ -10,6 +10,7 @@ mod tests {
         IAccessControlDispatcher, IAccessControlDispatcherTrait,
     };
     use openzeppelin::interfaces::erc20::{IERC20Dispatcher, IERC20DispatcherTrait};
+    use openzeppelin::interfaces::erc721::{IERC721MetadataDispatcher, IERC721MetadataDispatcherTrait};
     use gol_starknet::gol_grid_v2::{GridState, grid_with, step, lt, pack, token_id};
     use gol_starknet::interfaces_v2::{
         IGolLifeFormsV2Dispatcher, IGolLifeFormsV2DispatcherTrait, IGolLoopMinterV2Dispatcher,
@@ -230,6 +231,21 @@ mod tests {
         let data = IGolLifeFormsV2Dispatcher { contract_address: d.lifeforms }
             .get_lifeform_data(id);
         assert(data.is_loop, 'minted to other recipient');
+    }
+
+    // Phase 4: token_uri renders the 41x41 grid on-chain as a base64 data URI.
+    #[test]
+    fn token_uri_renders() {
+        let d = deploy_all();
+        let (loop_state, rows) = blinker_canonical();
+        let id = token_id(@rows);
+        start_cheat_caller_address(d.loop_minter, d.creator);
+        IGolLoopMinterV2Dispatcher { contract_address: d.loop_minter }
+            .mint_loop(loop_state, 2, d.creator);
+        stop_cheat_caller_address(d.loop_minter);
+
+        let uri = IERC721MetadataDispatcher { contract_address: d.lifeforms }.token_uri(id);
+        assert(uri.len() > 100, 'token_uri renders');
     }
 
     #[test]
