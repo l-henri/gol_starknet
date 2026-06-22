@@ -79,7 +79,7 @@ pub mod GolPathMinterV2 {
                 is_alive: !empty,
                 is_dead: empty,
                 sequence_length: length_to_loop_entrypoint,
-                current_state: path_start,
+                current_state: gol_grid_v2::pack(@path_rows), // audit #1: store canonical, not raw
                 age: 0,
             };
             let lifeforms = IGolLifeFormsV2Dispatcher {
@@ -135,14 +135,16 @@ pub mod GolPathMinterV2 {
         ) {
             let path_rows = gol_grid_v2::unpack(@path_start);
             let path_id = gol_grid_v2::token_hash(@path_rows);
-            let main_path = self.partial_path_registry.entry(recipient).entry(path_id).read();
+            // Audit #4: read segments under the CALLER (where they were written), not recipient.
+            let caller = get_caller_address();
+            let main_path = self.partial_path_registry.entry(caller).entry(path_id).read();
             // Loop entrypoint = the step after the path's exitpoint.
             let main_exit_rows = gol_grid_v2::unpack(@main_path.exitpoint);
             let loop_entry = gol_grid_v2::step(@main_exit_rows);
             let loop_entry_id = gol_grid_v2::token_hash(@loop_entry);
             let loop_partial = self
                 .partial_path_registry
-                .entry(recipient)
+                .entry(caller)
                 .entry(loop_entry_id)
                 .read();
             assert(loop_partial.trigger_id == loop_entry_id, 'Not the right loop');
@@ -162,13 +164,13 @@ pub mod GolPathMinterV2 {
                 is_alive: !empty,
                 is_dead: empty,
                 sequence_length: main_path.length,
-                current_state: path_start,
+                current_state: gol_grid_v2::pack(@path_rows), // audit #1: store canonical, not raw
                 age: 0,
             };
             let lifeforms = IGolLifeFormsV2Dispatcher {
                 contract_address: self.gol_lifeforms_nft.read(),
             };
-            lifeforms.mint(recipient, get_caller_address(), path_id.into(), lifeform);
+            lifeforms.mint(recipient, caller, path_id.into(), lifeform);
         }
     }
 }

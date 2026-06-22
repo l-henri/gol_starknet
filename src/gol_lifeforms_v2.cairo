@@ -112,11 +112,18 @@ pub mod GolLifeformsV2 {
     }
 
     #[constructor]
-    fn constructor(ref self: ContractState, creator: ContractAddress) {
+    fn constructor(
+        ref self: ContractState, creator: ContractAddress, nutrient_token: ContractAddress,
+    ) {
+        // Audit #2: take the nutrient token at construction (non-zero) so the contract is never
+        // deployed in a state where mint/move dispatch to the zero address. Still repointable by
+        // admin via update_nutrient_contract_address.
         assert!(!creator.is_zero(), "creator_zero");
+        assert!(!nutrient_token.is_zero(), "nutrient_zero");
         self.erc721.initializer("Digital bacterias v2", "BACT2", "");
         self.accesscontrol.initializer();
         self.accesscontrol._grant_role(DEFAULT_ADMIN_ROLE, creator);
+        self.nutrient_token_contract.write(nutrient_token);
     }
 
     #[abi(embed_v0)]
@@ -135,7 +142,11 @@ pub mod GolLifeformsV2 {
             self.lifeform_data.write(token_id, lifeform_data);
             self.emit(Event::NewLifeForm(NewLifeFormEvent { owner: recipient, token_id, lifeform_data }));
             self.total_supply.write(self.total_supply.read() + 1);
-            // Charge the minter `sequence_length` NUT.
+            // Charge the minter `sequence_length` NUT. (Audit #5) The charged NUT accumulates in
+            // this contract as an INTENTIONAL sink — a counterweight to the free move-forward
+            // faucet. There is deliberately no withdrawal in this proof-of-concept; NUT is
+            // faucet-minted, so no user principal is locked here. Revisit (burn vs. treasury sweep)
+            // before mainnet.
             let nutrient_token = IERC20Dispatcher {
                 contract_address: self.nutrient_token_contract.read(),
             };
@@ -175,6 +186,9 @@ pub mod GolLifeformsV2 {
         fn upgrade(ref self: ContractState, new_class_hash: ClassHash) {
             self.accesscontrol.assert_only_role(DEFAULT_ADMIN_ROLE);
             assert!(!new_class_hash.is_zero(), "class_hash_zero");
+            // (Audit #6) No timelock / version-floor / multi-admin guard — accepted for this
+            // proof-of-concept. Add a delay + downgrade protection (and consider a 2-admin
+            // bootstrap to avoid sole-admin self-revocation lockout) before mainnet.
             self.upgradeable.upgrade(new_class_hash);
         }
     }

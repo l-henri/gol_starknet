@@ -70,7 +70,7 @@ pub mod GolLoopMinterV2 {
                 is_alive: !empty,
                 is_dead: empty,
                 sequence_length: loop_length,
-                current_state: loop_state,
+                current_state: gol_grid_v2::pack(@rows), // audit #1: store canonical, not raw input
                 age: 0,
             };
             let lifeforms = IGolLifeFormsV2Dispatcher {
@@ -125,7 +125,11 @@ pub mod GolLoopMinterV2 {
         ) {
             let rows = gol_grid_v2::unpack(@loop_state);
             let loop_id = gol_grid_v2::token_hash(@rows);
-            let main_path = self.partial_path_registry.entry(recipient).entry(loop_id).read();
+            // Audit #4: read the segment under the CALLER (where mint_partial_path/combine wrote it),
+            // not the recipient. Lets a caller mint to any recipient using their own registered
+            // segments; for the common recipient==caller case behaviour is unchanged.
+            let caller = get_caller_address();
+            let main_path = self.partial_path_registry.entry(caller).entry(loop_id).read();
             // The segment was registered for this loop and is canonical.
             assert(loop_id == main_path.trigger_id, 'Not the right loop');
             assert(main_path.length > 1, 'Not usable for short loops');
@@ -141,13 +145,13 @@ pub mod GolLoopMinterV2 {
                 is_alive: !empty,
                 is_dead: empty,
                 sequence_length: main_path.length,
-                current_state: loop_state,
+                current_state: gol_grid_v2::pack(@rows), // audit #1: store canonical, not raw input
                 age: 0,
             };
             let lifeforms = IGolLifeFormsV2Dispatcher {
                 contract_address: self.gol_lifeforms_nft.read(),
             };
-            lifeforms.mint(recipient, get_caller_address(), loop_id.into(), lifeform);
+            lifeforms.mint(recipient, caller, loop_id.into(), lifeform);
         }
     }
 }

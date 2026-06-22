@@ -20,14 +20,6 @@ mod tests {
     const MINTER_ROLE: felt252 = selector!("MINTER_ROLE");
     const ONE_NUT: u256 = 1000000000000000000;
 
-    // update_nutrient_contract_address is an #[external] not in IGolLifeFormsV2.
-    #[starknet::interface]
-    trait IGolLifeformsV2Admin<TContractState> {
-        fn update_nutrient_contract_address(
-            ref self: TContractState, nutrient_contract_address: ContractAddress,
-        );
-    }
-
     #[derive(Drop, Copy)]
     struct Deployment {
         creator: ContractAddress,
@@ -50,6 +42,7 @@ mod tests {
         let lifeforms_class = declare("GolLifeformsV2").unwrap().contract_class();
         let mut lifeforms_cd: Array<felt252> = ArrayTrait::new();
         creator.serialize(ref lifeforms_cd);
+        nutrient.serialize(ref lifeforms_cd); // audit #2: nutrient set at construction
         let (lifeforms, _) = lifeforms_class.deploy(@lifeforms_cd).unwrap();
 
         let loop_class = declare("GolLoopMinterV2").unwrap().contract_class();
@@ -72,8 +65,6 @@ mod tests {
         let ac = IAccessControlDispatcher { contract_address: lifeforms };
         ac.grant_role(MINTER_ROLE, loop_minter);
         ac.grant_role(MINTER_ROLE, path_minter);
-        IGolLifeformsV2AdminDispatcher { contract_address: lifeforms }
-            .update_nutrient_contract_address(nutrient);
         stop_cheat_caller_address(lifeforms);
 
         // creator funds minting
@@ -219,6 +210,26 @@ mod tests {
         pm.mint_partial_path(blinker, 2, block_state); // witness at hash(blinker), NOT hash(block)
         pm.mint_path_from_partial_paths(l_state, d.creator); // reads hash(block) -> empty -> revert
         stop_cheat_caller_address(d.path_minter);
+    }
+
+    // Audit #4 fix: caller registers segments under themselves and can finalize a mint to a
+    // DIFFERENT recipient. Before the fix this reverted (read used the recipient namespace).
+    #[test]
+    fn mint_loop_from_partial_paths_to_other_recipient() {
+        let d = deploy_all();
+        let (loop_state, rows) = blinker_canonical();
+        let id = token_id(@rows);
+        let other: ContractAddress = 0x2.try_into().unwrap();
+        let lm = IGolLoopMinterV2Dispatcher { contract_address: d.loop_minter };
+
+        start_cheat_caller_address(d.loop_minter, d.creator);
+        lm.mint_partial_path(loop_state, 2, loop_state); // registered under creator (caller)
+        lm.mint_loop_from_partial_paths(loop_state, other); // creator pays, `other` receives
+        stop_cheat_caller_address(d.loop_minter);
+
+        let data = IGolLifeFormsV2Dispatcher { contract_address: d.lifeforms }
+            .get_lifeform_data(id);
+        assert(data.is_loop, 'minted to other recipient');
     }
 
     #[test]
