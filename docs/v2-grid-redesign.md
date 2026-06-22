@@ -16,13 +16,15 @@
 > keying invariant binds the witness to the landing state). Fixes applied: canonical-state storage,
 > nutrient-in-constructor, registry-read-under-caller. NUT-sink and upgrade-timelock are documented
 > PoC decisions; mint front-running deferred to v3. **P5 done:** ~2.64M L2 gas/generation at 41×41
-> (O(n), barely above 38×38), ~450 generations/tx; `token_uri` dense-render flagged (~252M for a
-> full grid — fine for sparse real creatures, mitigate before mainnet). **Remaining before
-> mainnet:** external/formal audit + governance hardening + `token_uri` dense-render mitigation.
+> (O(n), barely above 38×38), ~450 generations/tx. **Token render reworked** from SVG to an
+> Art Blocks-style interactive renderer: `token_uri` → JSON whose `animation_url` is a
+> `data:text/html;base64` page that reconstructs and animates the grid in-browser from injected row
+> masks + traits. Payload is density-independent (~162M gas flat), which **resolves the P5
+> dense-render concern**. **Remaining before mainnet:** external/formal audit + governance hardening.
 >
-> **Deferred check (TODO):** visually verify a minted lifeform's `token_uri` SVG renders correctly
-> in a browser (decode the base64 data URI). The renderer is a faithful port of v1's but has not
-> been eyeballed at 41×41.
+> **Deferred check (TODO):** open a minted lifeform's `animation_url` (decoded `data:text/html`) in
+> a real browser to confirm the canvas render + animation look right. The grid/Conway logic is
+> node-verified (bit convention, blinker period-2, toroidal wrap); the visual hasn't been eyeballed.
 
 ---
 
