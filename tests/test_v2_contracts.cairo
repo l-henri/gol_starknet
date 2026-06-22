@@ -175,6 +175,52 @@ mod tests {
         assert(data.current_state == loop_state, 'canonical stored');
     }
 
+    // Legitimate path-from-partial-paths: L-tromino -> block (still-life loop). The loop witness
+    // MUST be registered under the landing state's key (token_hash(block)) — that keying is what
+    // binds the witness to the path's landing state.
+    #[test]
+    fn mint_path_from_partial_paths_legit() {
+        let d = deploy_all();
+        let pm = IGolPathMinterV2Dispatcher { contract_address: d.path_minter };
+        let l_rows = grid_with(@array![(1_usize, 0b110_u64), (2_usize, 0b010_u64)]);
+        let l_state = pack(@l_rows);
+        let block_state = pack(@step(@l_rows));
+        let trig = pack(@grid_with(@array![(20_usize, 0b101_u64)])); // never hit on the 1-state main path
+        let id = token_id(@l_rows);
+
+        start_cheat_caller_address(d.path_minter, d.creator);
+        pm.mint_partial_path(l_state, 1, trig); // main path (exit = l_tromino)
+        pm.mint_partial_path(block_state, 1, block_state); // loop witness, keyed at hash(block)
+        pm.mint_path_from_partial_paths(l_state, d.creator);
+        stop_cheat_caller_address(d.path_minter);
+
+        let data = IGolLifeFormsV2Dispatcher { contract_address: d.lifeforms }
+            .get_lifeform_data(id);
+        assert(!data.is_loop, 'path minted');
+    }
+
+    // Adversarial (refutes the audit's P0): register an UNRELATED blinker as the witness (keyed at
+    // hash(blinker)) with trigger = block. The finalize reads registry[hash(block)], which is empty
+    // because the witness lives at hash(blinker) — so it reverts. The witness cannot be a disjoint
+    // loop; the registry keying forces witness.entrypoint == the landing state.
+    #[test]
+    #[should_panic(expected: 'Not the right loop')]
+    fn mint_path_from_partial_paths_forged_witness_reverts() {
+        let d = deploy_all();
+        let pm = IGolPathMinterV2Dispatcher { contract_address: d.path_minter };
+        let l_rows = grid_with(@array![(1_usize, 0b110_u64), (2_usize, 0b010_u64)]);
+        let l_state = pack(@l_rows);
+        let block_state = pack(@step(@l_rows));
+        let trig = pack(@grid_with(@array![(20_usize, 0b101_u64)]));
+        let blinker = pack(@grid_with(@array![(30_usize, 0b1110_u64)]));
+
+        start_cheat_caller_address(d.path_minter, d.creator);
+        pm.mint_partial_path(l_state, 1, trig); // main path
+        pm.mint_partial_path(blinker, 2, block_state); // witness at hash(blinker), NOT hash(block)
+        pm.mint_path_from_partial_paths(l_state, d.creator); // reads hash(block) -> empty -> revert
+        stop_cheat_caller_address(d.path_minter);
+    }
+
     #[test]
     fn mint_path_to_block() {
         let d = deploy_all();
