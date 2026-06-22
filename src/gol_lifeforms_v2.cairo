@@ -20,7 +20,7 @@ pub mod GolLifeformsV2 {
     use core::num::traits::Zero;
     use gol_starknet::gol_grid_v2;
     use gol_starknet::gol_metadata_v2;
-    use gol_starknet::interfaces_v2::{IGolLifeFormsV2, LifeFormData};
+    use gol_starknet::interfaces_v2::{IGolLifeFormsV2, LifeFormData, RenderParams, SPEED_MAX};
     use gol_starknet::interfaces::{
         IGolNutrientTokenDispatcher, IGolNutrientTokenDispatcherTrait,
     };
@@ -56,13 +56,17 @@ pub mod GolLifeformsV2 {
             self.erc721.ERC721_symbol.read()
         }
         fn token_uri(self: @ContractState, token_id: u256) -> ByteArray {
-            gol_metadata_v2::token_uri(token_id, self.lifeform_data.read(token_id))
+            gol_metadata_v2::token_uri(
+                token_id, self.lifeform_data.read(token_id), self.resolve_params(token_id),
+            )
         }
     }
     #[abi(embed_v0)]
     impl ERC721MetadataCamelImpl of IERC721MetadataCamelOnly<ContractState> {
         fn tokenURI(self: @ContractState, tokenId: u256) -> ByteArray {
-            gol_metadata_v2::token_uri(tokenId, self.lifeform_data.read(tokenId))
+            gol_metadata_v2::token_uri(
+                tokenId, self.lifeform_data.read(tokenId), self.resolve_params(tokenId),
+            )
         }
     }
 
@@ -79,6 +83,8 @@ pub mod GolLifeformsV2 {
         pub lifeform_data: Map<u256, LifeFormData>,
         pub total_supply: u256,
         pub nutrient_token_contract: ContractAddress,
+        // Per-token render params (A: derived at mint; C: owner-overridable). speed==0 => unset.
+        pub render_params: Map<u256, RenderParams>,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -96,6 +102,13 @@ pub mod GolLifeformsV2 {
     struct NutrientContractUpdatedEvent {
         nutrient_contract_address: ContractAddress,
     }
+    #[derive(Drop, starknet::Event)]
+    struct RenderParamsUpdatedEvent {
+        token_id: u256,
+        bg: u32,
+        cell: u32,
+        speed: u16,
+    }
     #[event]
     #[derive(Drop, starknet::Event)]
     enum Event {
@@ -110,6 +123,7 @@ pub mod GolLifeformsV2 {
         NewLifeForm: NewLifeFormEvent,
         NewMove: NewMoveEvent,
         NutrientContractUpdated: NutrientContractUpdatedEvent,
+        RenderParamsUpdated: RenderParamsUpdatedEvent,
     }
 
     #[constructor]
@@ -141,6 +155,8 @@ pub mod GolLifeformsV2 {
             self.erc721.mint(recipient, token_id);
             let sequence_length = lifeform_data.sequence_length;
             self.lifeform_data.write(token_id, lifeform_data);
+            // A: derive this token's render params from its token_id and store them.
+            self.render_params.write(token_id, gol_metadata_v2::derive_params(token_id));
             self.emit(Event::NewLifeForm(NewLifeFormEvent { owner: recipient, token_id, lifeform_data }));
             self.total_supply.write(self.total_supply.read() + 1);
             // Charge the minter `sequence_length` NUT. (Audit #5) The charged NUT accumulates in
@@ -179,6 +195,41 @@ pub mod GolLifeformsV2 {
 
         fn get_grid_size(self: @ContractState) -> u32 {
             gol_grid_v2::N
+        }
+
+        fn get_render_params(self: @ContractState, token_id: u256) -> RenderParams {
+            self.resolve_params(token_id)
+        }
+
+        // C: the token's owner may customise its render params, within the invariants.
+        fn set_render_params(
+            ref self: ContractState, token_id: u256, bg: u32, cell: u32, speed: u16,
+        ) {
+            assert(self.erc721.exists(token_id), 'Lifeform not minted');
+            assert(self.erc721._owner_of(token_id) == get_caller_address(), 'Not token owner');
+            assert(bg != cell, 'bg and cell must differ');
+            assert(speed > 0 && speed < SPEED_MAX, 'speed out of range');
+            self.render_params.write(token_id, RenderParams { bg, cell, speed });
+            self
+                .emit(
+                    Event::RenderParamsUpdated(
+                        RenderParamsUpdatedEvent { token_id, bg, cell, speed },
+                    ),
+                );
+        }
+    }
+
+    #[generate_trait]
+    impl PrivateImpl of PrivateTrait {
+        /// Stored render params, or (when unset, i.e. speed==0) the deterministic derivation from
+        /// the token_id. Used by token_uri and get_render_params.
+        fn resolve_params(self: @ContractState, token_id: u256) -> RenderParams {
+            let rp = self.render_params.read(token_id);
+            if rp.speed == 0 {
+                gol_metadata_v2::derive_params(token_id)
+            } else {
+                rp
+            }
         }
     }
 

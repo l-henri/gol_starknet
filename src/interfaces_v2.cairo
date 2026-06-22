@@ -5,6 +5,19 @@
 use starknet::ContractAddress;
 use gol_starknet::gol_grid_v2::GridState;
 
+/// Exclusive upper bound on a lifeform's display speed (generations/second): valid speed in [1,200).
+pub const SPEED_MAX: u16 = 200;
+
+/// Per-token render parameters. Colors are 24-bit 0xRRGGBB; speed is generations/second.
+/// Invariant (enforced at mint-derivation and in set_render_params): bg != cell, 0 < speed < SPEED_MAX.
+/// A stored speed of 0 is the "unset" sentinel -> the renderer falls back to derive_params(token_id).
+#[derive(Drop, Serde, Copy, starknet::Store, PartialEq)]
+pub struct RenderParams {
+    pub bg: u32,
+    pub cell: u32,
+    pub speed: u16,
+}
+
 /// Per-token lifeform record. Identical to v1 except `current_state` is now a `GridState`.
 #[derive(Drop, Serde, Copy, starknet::Store)]
 pub struct LifeFormData {
@@ -32,6 +45,12 @@ pub trait IGolLifeFormsV2<TContractState> {
     fn move_lifeform_forward(ref self: TContractState, token_id: u256);
     /// Grid edge length (for SDK/frontend; replaces v1's component getter).
     fn get_grid_size(self: @TContractState) -> u32;
+    /// Render params for a token: the stored ones, or (if unset) those derived from its token_id.
+    fn get_render_params(self: @TContractState, token_id: u256) -> RenderParams;
+    /// Owner-only: customise a token's render params. Asserts bg != cell and 0 < speed < SPEED_MAX.
+    fn set_render_params(
+        ref self: TContractState, token_id: u256, bg: u32, cell: u32, speed: u16,
+    );
 }
 
 #[starknet::interface]

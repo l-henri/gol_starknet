@@ -248,6 +248,71 @@ mod tests {
         assert(uri.len() > 100, 'token_uri renders');
     }
 
+    // mint a blinker to creator, return its token id
+    fn mint_blinker(d: Deployment) -> u256 {
+        let (loop_state, rows) = blinker_canonical();
+        start_cheat_caller_address(d.loop_minter, d.creator);
+        IGolLoopMinterV2Dispatcher { contract_address: d.loop_minter }
+            .mint_loop(loop_state, 2, d.creator);
+        stop_cheat_caller_address(d.loop_minter);
+        token_id(@rows)
+    }
+
+    #[test]
+    fn render_params_derived_at_mint() {
+        let d = deploy_all();
+        let id = mint_blinker(d);
+        let rp = IGolLifeFormsV2Dispatcher { contract_address: d.lifeforms }.get_render_params(id);
+        assert(rp.bg != rp.cell, 'derived bg!=cell');
+        assert(rp.speed > 0 && rp.speed < 200, 'derived speed in range');
+    }
+
+    #[test]
+    fn owner_can_set_render_params() {
+        let d = deploy_all();
+        let id = mint_blinker(d);
+        let lf = IGolLifeFormsV2Dispatcher { contract_address: d.lifeforms };
+        start_cheat_caller_address(d.lifeforms, d.creator);
+        lf.set_render_params(id, 0x112233, 0xddeeff, 30);
+        stop_cheat_caller_address(d.lifeforms);
+        let rp = lf.get_render_params(id);
+        assert(rp.bg == 0x112233 && rp.cell == 0xddeeff && rp.speed == 30, 'set applied');
+    }
+
+    #[test]
+    #[should_panic(expected: 'bg and cell must differ')]
+    fn set_rejects_equal_colors() {
+        let d = deploy_all();
+        let id = mint_blinker(d);
+        start_cheat_caller_address(d.lifeforms, d.creator);
+        IGolLifeFormsV2Dispatcher { contract_address: d.lifeforms }
+            .set_render_params(id, 0x111111, 0x111111, 30);
+        stop_cheat_caller_address(d.lifeforms);
+    }
+
+    #[test]
+    #[should_panic(expected: 'speed out of range')]
+    fn set_rejects_speed_at_max() {
+        let d = deploy_all();
+        let id = mint_blinker(d);
+        start_cheat_caller_address(d.lifeforms, d.creator);
+        IGolLifeFormsV2Dispatcher { contract_address: d.lifeforms }
+            .set_render_params(id, 0x1, 0x2, 200);
+        stop_cheat_caller_address(d.lifeforms);
+    }
+
+    #[test]
+    #[should_panic(expected: 'Not token owner')]
+    fn set_rejects_non_owner() {
+        let d = deploy_all();
+        let id = mint_blinker(d);
+        let other: ContractAddress = 0x2.try_into().unwrap();
+        start_cheat_caller_address(d.lifeforms, other);
+        IGolLifeFormsV2Dispatcher { contract_address: d.lifeforms }
+            .set_render_params(id, 0x1, 0x2, 30);
+        stop_cheat_caller_address(d.lifeforms);
+    }
+
     #[test]
     fn mint_path_to_block() {
         let d = deploy_all();
