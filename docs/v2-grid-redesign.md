@@ -8,7 +8,15 @@
 > such felts). `src/gol_grid_v2.cairo` is now the authoritative source for the grid core — the
 > bitboard stepper, `lt` canonicalization, `token_id` (Poseidon), and the `GridState` storage form,
 > all tested. **References to "38×38" and "6 words" elsewhere in this doc predate this — read them
-> as 41×41 / 7 words.** Phase 1 (grid core) is done; remaining phases per §7.
+> as 41×41 / 7 words.**
+>
+> **Progress:** Phases 1–3 done (grid core, utilities, contracts; full suite 56). A deep
+> `cairo-auditor` pass (4 vector + 1 adversarial) found **no exploitable safety bug**; its P0
+> (forged-witness path mint) was a false positive, refuted with a committed PoC test (the registry
+> keying invariant binds the witness to the landing state). Fixes applied: canonical-state storage,
+> nutrient-in-constructor, registry-read-under-caller. NUT-sink and upgrade-timelock are documented
+> PoC decisions; mint front-running deferred to v3. **Remaining:** P4 on-chain SVG, P5 re-benchmark
+> + external audit + governance hardening before mainnet.
 
 ---
 
