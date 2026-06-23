@@ -5,6 +5,8 @@ pub use starknet_types_core::felt::Felt;
 
 use serde::{Deserialize, Serialize};
 
+use crate::grid::GridState;
+
 /// A single contract call: entry point + flat felt calldata.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Call {
@@ -31,6 +33,19 @@ impl U256 {
         Self {
             low: felt_to_u128(low),
             high: felt_to_u128(high),
+        }
+    }
+    /// The full value of a single felt as a `u256` (felts are < 2^252, so `high` ≤ 124 bits). Used
+    /// for the v2 token id, which is a Poseidon hash rather than the state itself.
+    pub fn from_felt(f: &Felt) -> Self {
+        let b = f.to_bytes_be();
+        let mut hi = [0u8; 16];
+        let mut lo = [0u8; 16];
+        hi.copy_from_slice(&b[0..16]);
+        lo.copy_from_slice(&b[16..32]);
+        Self {
+            high: u128::from_be_bytes(hi),
+            low: u128::from_be_bytes(lo),
         }
     }
     /// Calldata limbs in Cairo order: `[low, high]`.
@@ -74,15 +89,15 @@ impl U256 {
     }
 }
 
-/// `LifeFormData` from `get_lifeform_data`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// `LifeFormData` from `get_lifeform_data` (v2: `current_state` is the multi-felt [`GridState`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LifeformData {
     pub is_loop: bool,
     pub is_still: bool,
     pub is_alive: bool,
     pub is_dead: bool,
     pub sequence_length: u32,
-    pub current_state: U256,
+    pub current_state: GridState,
     pub age: u32,
 }
 
@@ -94,22 +109,14 @@ pub struct OwnedLifeform {
     pub data: LifeformData,
 }
 
-/// `PartialPathData` from `compute_partial_path` / `combine_partial_path`.
+/// Per-token render params (`get_render_params` / `set_render_params`): `bg`/`cell` are 0xRRGGBB
+/// colours and `speed` is generations/second (`0 < speed < SPEED_MAX`). The v2 partial-path type
+/// lives in [`crate::engine`] (it carries `GridState`s); loop/path discovery is the off-chain engine.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PartialPathData {
-    pub entrypoint: U256,
-    pub exitpoint: U256,
-    pub length: u32,
-    pub trigger_state: U256,
-    pub smallest_element: U256,
-}
-
-/// Result of `is_single_loop_from_initial_state`: `(ok, smallest, sequence)`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct LoopCheck {
-    pub ok: bool,
-    pub smallest: U256,
-    pub sequence: Vec<U256>,
+pub struct RenderParams {
+    pub bg: u32,
+    pub cell: u32,
+    pub speed: u16,
 }
 
 /// An ERC721 metadata attribute (`trait_type` + display `value`).
@@ -119,14 +126,14 @@ pub struct TokenAttribute {
     pub value: String,
 }
 
-/// Decoded `token_uri`: the raw `data:` URI plus the parsed ERC721 metadata (`image` is itself a
-/// `data:image/svg+xml;base64,…` URI — use [`TokenUri::svg`] to get the markup).
+/// Decoded `token_uri`: the raw `data:` URI plus the parsed ERC721 metadata. v2 has no `image`;
+/// `animation_url` is a `data:text/html;base64,…` interactive renderer — use [`TokenUri::html`].
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TokenUri {
     pub raw: String,
     pub name: Option<String>,
     pub description: Option<String>,
-    pub image: Option<String>,
+    pub animation_url: Option<String>,
     pub attributes: Vec<TokenAttribute>,
 }
 

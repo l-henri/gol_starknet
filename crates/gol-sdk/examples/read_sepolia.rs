@@ -1,49 +1,78 @@
-//! Live read against the Sepolia deployment — proves the RpcReader decode path end-to-end.
+//! Live read against the Sepolia **v2** deployment — proves the RpcReader decode path and the
+//! off-chain engine end-to-end. Defaults to the configured Sepolia RPC; override with `GOL_RPC_URL`.
 //!
 //!   cargo run -p gol-sdk --example read_sepolia
-//!
-//! Uses a public gateway by default; override with `GOL_RPC_URL`.
 
-use gol_sdk::{felt_to_hex, GolClient, GolConfig, Network, U256};
+use gol_sdk::{engine, felt_to_hex, grid, token_id, Felt, GolClient, GolConfig, GridState, Network};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cfg = GolConfig::for_network(Network::Sepolia)?;
-    cfg.rpc_url = std::env::var("GOL_RPC_URL")
-        .unwrap_or_else(|_| "https://api.cartridge.gg/x/starknet/sepolia".to_string());
+    if let Ok(url) = std::env::var("GOL_RPC_URL") {
+        cfg.rpc_url = url;
+    }
     let gol = GolClient::new(cfg);
 
     println!("grid_size = {}", gol.reads().grid_size().await?);
 
-    // Token 98307 — the 2x2-block loop NFT minted on the live deployment (see STATUS.md).
-    let tid = U256::from_u128(98307);
+    // The seeded canonical blinker: row 5 = 0b1110. Compute its token id OFF-CHAIN (engine) — it
+    // must match the on-chain token, pinning the Rust Poseidon + packing to the deployed contract.
+    let blinker = grid::grid_with(&[(5, 0b1110)]);
+    let tid = token_id(&blinker);
+    println!("computed token_id (blinker) = {}", tid.to_hex());
+
     match gol.reads().lifeform(tid).await? {
-        Some(lf) => println!(
-            "lifeform 98307: owner={} age={} is_loop={} is_still={} state={}",
-            felt_to_hex(&lf.owner),
-            lf.data.age,
-            lf.data.is_loop,
-            lf.data.is_still,
-            lf.data.current_state.to_hex(),
-        ),
-        None => println!("lifeform 98307 not minted"),
+        Some(lf) => {
+            println!(
+                "lifeform: owner={} age={} is_loop={} is_still={} population={}",
+                felt_to_hex(&lf.owner),
+                lf.data.age,
+                lf.data.is_loop,
+                lf.data.is_still,
+                lf.data.current_state.population(),
+            );
+            // engine <-> chain: the on-chain state must hash to the id we read it by.
+            let rows = lf.data.current_state.unpack();
+            assert_eq!(token_id(&rows), tid, "engine token_id matches chain");
+            println!("  ✓ engine token_id == on-chain id");
+
+            match engine::find_loop(&rows, 16) {
+                Some((period, smallest)) => println!(
+                    "  engine: single loop, period={period}, on-chain state is canonical={}",
+                    grid::eq(&smallest, &rows)
+                ),
+                None => println!("  engine: no loop within 16 steps"),
+            }
+        }
+        None => println!("lifeform not minted at computed id (is config pointing at v2?)"),
     }
 
-    // Exercise an on-chain engine view: one Conway step of a 2x2 block (a still life).
-    if let Some(lf) = gol.reads().lifeform(tid).await? {
-        let next = gol.reads().iterate_once(lf.data.current_state).await?;
-        println!("iterate_once(state) = {}", next.to_hex());
+    if let Some(rp) = gol.reads().render_params(tid).await? {
+        println!("render_params: bg=0x{:06x} cell=0x{:06x} speed={}", rp.bg, rp.cell, rp.speed);
     }
 
-    // Decoded token_uri (ERC721 metadata + grid SVG).
     if let Some(uri) = gol.reads().token_uri(tid).await? {
         println!("token_uri: name={:?}, {} attributes", uri.name, uri.attributes.len());
         for a in &uri.attributes {
             println!("    - {}: {}", a.trait_type, a.value);
         }
-        if let Some(svg) = uri.svg() {
-            println!("  svg: {} bytes, starts {:?}", svg.len(), &svg[..svg.len().min(24)]);
+        if let Some(html) = uri.html() {
+            println!("  html: {} bytes, starts {:?}", html.len(), &html[..html.len().min(40)]);
         }
+    }
+
+    // Call-building (NOT sent — this is exactly what a wallet would sign + execute).
+    let recipient =
+        Felt::from_hex("0x26d87a881bc82eb038c4cc214fbccd16ea72b424b523a7b2b2551a2e495e70f").unwrap();
+    let calls = gol.writes().mint_loop(&GridState::pack(&blinker), 2, recipient);
+    println!("mint_loop call-building -> {} calls:", calls.len());
+    for c in &calls {
+        println!(
+            "    to={} selector={} ({} calldata felts)",
+            felt_to_hex(&c.to),
+            felt_to_hex(&c.selector),
+            c.calldata.len()
+        );
     }
 
     Ok(())

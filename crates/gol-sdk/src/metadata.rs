@@ -52,7 +52,7 @@ pub fn parse_token_uri(raw: String) -> TokenUri {
     if let Some(v) = parsed {
         uri.name = v.get("name").and_then(|x| x.as_str()).map(String::from);
         uri.description = v.get("description").and_then(|x| x.as_str()).map(String::from);
-        uri.image = v.get("image").and_then(|x| x.as_str()).map(String::from);
+        uri.animation_url = v.get("animation_url").and_then(|x| x.as_str()).map(String::from);
         if let Some(arr) = v.get("attributes").and_then(|a| a.as_array()) {
             uri.attributes = arr.iter().filter_map(parse_attribute).collect();
         }
@@ -61,9 +61,9 @@ pub fn parse_token_uri(raw: String) -> TokenUri {
 }
 
 impl TokenUri {
-    /// Decode the `image` data URI to raw SVG markup, if present and valid UTF-8.
-    pub fn svg(&self) -> Option<String> {
-        let bytes = decode_data_uri_bytes(self.image.as_deref()?)?;
+    /// Decode the `animation_url` data URI to the raw HTML renderer, if present and valid UTF-8.
+    pub fn html(&self) -> Option<String> {
+        let bytes = decode_data_uri_bytes(self.animation_url.as_deref()?)?;
         String::from_utf8(bytes).ok()
     }
 }
@@ -112,26 +112,24 @@ mod tests {
     }
 
     #[test]
-    fn parses_data_uri_json_and_svg() {
-        let svg = "<svg></svg>";
-        let img = format!(
-            "data:image/svg+xml;base64,{}",
-            base64::engine::general_purpose::STANDARD.encode(svg)
-        );
-        let json = format!(
-            r#"{{"name":"Lifeform #1","description":"d","image":"{img}","attributes":[{{"trait_type":"Status","value":"Alive"}},{{"trait_type":"Age","value":0}}]}}"#
+    fn parses_v2_raw_json_and_html() {
+        // v2: token_uri is RAW data:application/json,<json> (not base64) with an animation_url
+        // (base64 HTML) instead of an SVG image.
+        let html = "<!doctype html><script>1</script>";
+        let anim = format!(
+            "data:text/html;base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(html)
         );
         let raw = format!(
-            "data:application/json;base64,{}",
-            base64::engine::general_purpose::STANDARD.encode(&json)
+            r#"data:application/json,{{"name":"Lifeform 5","description":"d","animation_url":"{anim}","attributes":[{{"trait_type":"Status","value":"Alive"}},{{"trait_type":"Age","value":0}}]}}"#
         );
 
         let uri = parse_token_uri(raw);
-        assert_eq!(uri.name.as_deref(), Some("Lifeform #1"));
+        assert_eq!(uri.name.as_deref(), Some("Lifeform 5"));
         assert_eq!(uri.attributes.len(), 2);
         assert_eq!(uri.attributes[0].trait_type, "Status");
         assert_eq!(uri.attributes[0].value, "Alive");
         assert_eq!(uri.attributes[1].value, "0"); // number stringified
-        assert_eq!(uri.svg().as_deref(), Some("<svg></svg>"));
+        assert_eq!(uri.html().as_deref(), Some(html));
     }
 }

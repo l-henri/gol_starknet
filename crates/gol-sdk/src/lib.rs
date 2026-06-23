@@ -4,16 +4,21 @@
 //! future native TUI. Composed over three dependency-injected seams: [`Reader`] (reads), the
 //! `Submitter` (sign + broadcast), and the prover (SNIP-36). See `docs/sdk-plan.md`.
 //!
-//! v1 surface (this cut): reads + on-chain engine views ([`RpcReader`]), call builders
-//! ([`GolWrites`]), the address book ([`config`]), and the encoding primitives ([`encoding`]).
-//! The `Submitter` trait is defined with a strkd placeholder; the prover module, ByteArray
-//! `token_uri` decoding, the `DataSource`, and the WASM wrapper are follow-ups.
+//! v2 surface: targets the v2 contracts (41×41 grid; state is the 7-felt [`GridState`]; the ERC-721
+//! `token_id` is the Poseidon hash of the canonical state, computable off-chain via [`token_id`]).
+//! Includes the pure off-chain engine — [`grid`] (bitboard stepper, packing, hashing) and [`engine`]
+//! (loop/path discovery), faithful ports of the on-chain Cairo — plus reads ([`RpcReader`], decoding
+//! `GridState`/render-params and the raw-JSON `token_uri`), call builders ([`GolWrites`]), the
+//! address book ([`config`]), the [`DataSource`] (event-scan + indexer), and the WASM wrapper. The
+//! `Submitter` (sign + broadcast) stays a strkd-backed seam; the SNIP-36 prover is a follow-up.
 
 pub mod client;
 pub mod config;
 pub mod datasource;
 pub mod encoding;
+pub mod engine;
 pub mod error;
+pub mod grid;
 pub mod events;
 pub mod metadata;
 pub mod reader;
@@ -25,13 +30,18 @@ pub mod writes;
 pub use client::GolClient;
 pub use config::{deployments, ContractKey, GolAddresses, GolConfig, Network};
 pub use datasource::{DataSource, EventScanDataSource, IndexerDataSource, MoveEvent};
+pub use engine::{
+    combine_partial_path, compute_partial_path, find_loop, is_single_loop,
+    is_single_loop_and_entrypoint_is_smallest, step_to, LoopInfo, PartialPathData,
+};
 pub use error::GolError;
+pub use grid::{step, token_hash, token_id, GridState, Rows, MASK, N};
 pub use reader::Reader;
 pub use rpc::RpcReader;
 pub use submit::{StrkdSubmitter, SubmitOpts, SubmitResult, Submitter};
 pub use types::{
-    Call, Felt, LifeformData, LoopCheck, MoveMessage, OwnedLifeform, PartialPathData,
-    TokenAttribute, TokenUri, U256,
+    Call, Felt, LifeformData, MoveMessage, OwnedLifeform, RenderParams, TokenAttribute, TokenUri,
+    U256,
 };
 pub use writes::{nut_cost_for_loop, nut_cost_for_path, GolWrites, Minter};
 

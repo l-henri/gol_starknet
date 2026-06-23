@@ -53,16 +53,17 @@ impl GolAddresses {
 /// optimized `GolBench` instance used for the SNIP-36 benchmark.
 pub fn deployments(net: Network) -> Option<GolAddresses> {
     match net {
+        // v2 deployment — a fresh collection (see docs/v2-deployment.md). The `lifeforms` class was
+        // later upgraded in place (token_uri gas fix); the address is unchanged.
         Network::Sepolia => Some(GolAddresses {
-            lifeforms: felt("0x0535f6cb8e98f78de9b4dc71b78839cd8119af301b8b300d715b32872d07494e"),
-            nutrient: felt("0x060e3d6a6f181235e0d4993ddde5a7db7d8ff5275830bcc916969dfdbf3e1858"),
-            loop_minter: felt("0x021f2ee4afeb2593fb957911f500c06424bb045ec64e172bd8ee0af5aefd4ffc"),
-            path_minter: felt("0x07e46847ece8c083da4e8a3eb17bd8d3f7138b08cda3ad6a2ffa884b918d2503"),
-            bench: Some(felt(
-                "0x05f62daf5d63c1c6c310247d2155dcc52fa4328ff7bd8ec4ace6f40f8fa3ec5",
-            )),
-            // First lifeform mint (token 98307) landed at block 10_594_566; start just before.
-            deploy_block: 10_590_000,
+            lifeforms: felt("0x040380471b403f52ac0ed6e674b391de268f83a8a1778d236bb7acc090c4e633"),
+            nutrient: felt("0x060e0a0bd9aafec5fd0346e49eb4c5c47f9c7d6b7f26c705aaf21fd53a84e2c9"),
+            loop_minter: felt("0x0024564a234b1bd49aea38efbaf99a0c6d5dc1269fa7fc5ad86ef8f924ea030"),
+            path_minter: felt("0x05a3c3aff6117aa8061aa971552c14e2502429a7a9360661daa409f2d510c29f"),
+            // v2 has no benchmark contract; the SNIP-36 bench was a separate v1-era deploy.
+            bench: None,
+            // The v2 collection's first mint (the seeded blinker) landed at block 11_075_524.
+            deploy_block: 11_075_000,
         }),
         Network::Mainnet => None,
     }
@@ -116,7 +117,8 @@ mod tests {
     #[test]
     fn sepolia_address_book_loads() {
         let a = deployments(Network::Sepolia).unwrap();
-        assert!(a.bench.is_some());
+        assert!(a.bench.is_none()); // v2 has no benchmark contract
+        assert!(a.get(ContractKey::Bench).is_err());
         assert_eq!(a.get(ContractKey::Lifeforms).unwrap(), a.lifeforms);
         assert!(deployments(Network::Mainnet).is_none());
     }

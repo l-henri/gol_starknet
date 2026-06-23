@@ -8,7 +8,8 @@ use crate::config::{ContractKey, GolAddresses};
 use crate::encoding::selector;
 use crate::error::GolError;
 use crate::reader::Reader;
-use crate::types::{felt_hex, felt_to_bool, felt_to_u128, Felt, LifeformData, LoopCheck, OwnedLifeform, TokenUri, U256};
+use crate::grid::GridState;
+use crate::types::{felt_hex, felt_to_bool, felt_to_u128, Felt, LifeformData, OwnedLifeform, RenderParams, TokenUri, U256};
 
 /// JSON-RPC `CONTRACT_ERROR` — a call that reverted (e.g. `owner_of` on an unminted token).
 const CONTRACT_ERROR: i64 = 40;
@@ -193,14 +194,21 @@ fn at(felts: &[Felt], i: usize) -> Result<&Felt, GolError> {
 }
 
 fn decode_lifeform(f: &[Felt]) -> Result<LifeformData, GolError> {
+    // v2 layout: is_loop, is_still, is_alive, is_dead, sequence_length, current_state (7-felt
+    // GridState w0..w6), age — 13 felts.
+    let state = GridState::from_felts(
+        f.get(5..12)
+            .ok_or_else(|| GolError::Encoding("lifeform: result too short for GridState".into()))?,
+    )
+    .ok_or_else(|| GolError::Encoding("lifeform: bad GridState".into()))?;
     Ok(LifeformData {
         is_loop: felt_to_bool(at(f, 0)?),
         is_still: felt_to_bool(at(f, 1)?),
         is_alive: felt_to_bool(at(f, 2)?),
         is_dead: felt_to_bool(at(f, 3)?),
         sequence_length: felt_to_u128(at(f, 4)?) as u32,
-        current_state: U256::from_felts(at(f, 5)?, at(f, 6)?),
-        age: felt_to_u128(at(f, 7)?) as u32,
+        current_state: state,
+        age: felt_to_u128(at(f, 12)?) as u32,
     })
 }
 
@@ -288,53 +296,23 @@ impl Reader for RpcReader {
         }
     }
 
-    async fn iterate_once(&self, state: U256) -> Result<U256, GolError> {
+    async fn render_params(&self, token_id: U256) -> Result<Option<RenderParams>, GolError> {
         let r = self
-            .call_raw(
+            .call_inner(
                 self.addr(ContractKey::Lifeforms)?,
-                selector("iterate_life_once"),
-                &state.to_calldata(),
+                selector("get_render_params"),
+                &token_id.to_calldata(),
+                true,
             )
             .await?;
-        Ok(U256::from_felts(at(&r, 0)?, at(&r, 1)?))
-    }
-
-    async fn iterate_several(&self, state: U256, generations: u32) -> Result<Vec<U256>, GolError> {
-        let mut calldata = state.to_calldata().to_vec();
-        calldata.push(Felt::from(generations));
-        let r = self
-            .call_raw(
-                self.addr(ContractKey::Lifeforms)?,
-                selector("iterate_life_several_times"),
-                &calldata,
-            )
-            .await?;
-        let len = felt_to_u128(at(&r, 0)?) as usize;
-        let mut out = Vec::with_capacity(len);
-        for i in 0..len {
-            out.push(U256::from_felts(at(&r, 1 + 2 * i)?, at(&r, 2 + 2 * i)?));
+        match r {
+            None => Ok(None),
+            Some(v) => Ok(Some(RenderParams {
+                bg: felt_to_u128(at(&v, 0)?) as u32,
+                cell: felt_to_u128(at(&v, 1)?) as u32,
+                speed: felt_to_u128(at(&v, 2)?) as u16,
+            })),
         }
-        Ok(out)
-    }
-
-    async fn is_single_loop(&self, state: U256, generations: u32) -> Result<LoopCheck, GolError> {
-        let mut calldata = state.to_calldata().to_vec();
-        calldata.push(Felt::from(generations));
-        let r = self
-            .call_raw(
-                self.addr(ContractKey::Lifeforms)?,
-                selector("is_single_loop_from_initial_state"),
-                &calldata,
-            )
-            .await?;
-        let ok = felt_to_bool(at(&r, 0)?);
-        let smallest = U256::from_felts(at(&r, 1)?, at(&r, 2)?);
-        let len = felt_to_u128(at(&r, 3)?) as usize;
-        let mut sequence = Vec::with_capacity(len);
-        for i in 0..len {
-            sequence.push(U256::from_felts(at(&r, 4 + 2 * i)?, at(&r, 5 + 2 * i)?));
-        }
-        Ok(LoopCheck { ok, smallest, sequence })
     }
 
     async fn call(

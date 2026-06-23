@@ -8,8 +8,8 @@
 //! Build: `wasm-pack build crates/gol-sdk-wasm --target web`.
 
 use gol_sdk::{
-    felt_to_hex, Call, DataSource, EventScanDataSource, Felt, GolClient, GolConfig, Network,
-    OwnedLifeform, U256,
+    engine, felt_to_hex, step, token_id, Call, DataSource, EventScanDataSource, Felt, GolClient,
+    GolConfig, GridState, Network, OwnedLifeform, RenderParams, Rows, MASK, N, U256,
 };
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
@@ -24,7 +24,8 @@ struct JsLifeform {
     is_alive: bool,
     is_dead: bool,
     sequence_length: u32,
-    current_state: String,
+    /// The 41 grid rows as bitmasks (each < 2^41, exact as a JS number) — for the renderer.
+    current_state: Vec<f64>,
     age: u32,
 }
 
@@ -38,7 +39,7 @@ impl JsLifeform {
             is_alive: lf.data.is_alive,
             is_dead: lf.data.is_dead,
             sequence_length: lf.data.sequence_length,
-            current_state: lf.data.current_state.to_hex(),
+            current_state: lf.data.current_state.rows_f64(),
             age: lf.data.age,
         }
     }
@@ -92,7 +93,7 @@ impl GolSdk {
         }
     }
 
-    /// Decoded `token_uri` (name/description/image/attributes), or `null`.
+    /// Decoded `token_uri` (name/description/animation_url/attributes), or `null`.
     #[wasm_bindgen(js_name = tokenUri)]
     pub async fn token_uri(&self, token_id: &str) -> Result<JsValue, JsValue> {
         match self.client.reads().token_uri(parse_u256(token_id)?).await.map_err(err)? {
@@ -133,18 +134,20 @@ impl GolSdk {
         to_js(&js)
     }
 
-    /// `[approve, mint_loop]` calls for the wallet to sign + send.
+    /// `[approve, mint_loop]` calls for the wallet to sign + send. `rows` is the loop's canonical
+    /// (smallest) state as 41 row bitmasks.
     #[wasm_bindgen(js_name = mintLoopCalls)]
     pub fn mint_loop_calls(
         &self,
-        loop_id: &str,
+        rows: Vec<f64>,
         loop_length: u32,
         recipient: &str,
     ) -> Result<JsValue, JsValue> {
+        let state = GridState::pack(&rows_from_js(rows)?);
         let calls = self
             .client
             .writes()
-            .mint_loop(parse_u256(loop_id)?, loop_length, parse_felt(recipient)?);
+            .mint_loop(&state, loop_length, parse_felt(recipient)?);
         calls_to_js(&[("approve", &calls[0]), ("mint_loop", &calls[1])])
     }
 
@@ -153,6 +156,63 @@ impl GolSdk {
     pub fn breathe_life_call(&self, token_id: &str) -> Result<JsValue, JsValue> {
         let call = self.client.writes().breathe_life(parse_u256(token_id)?);
         calls_to_js(&[("move_lifeform_forward", &call)])
+    }
+
+    /// Per-token render params (`{ bg, cell, speed }`), or `null` if unminted.
+    #[wasm_bindgen(js_name = renderParams)]
+    pub async fn render_params(&self, token_id: &str) -> Result<JsValue, JsValue> {
+        match self.client.reads().render_params(parse_u256(token_id)?).await.map_err(err)? {
+            Some(rp) => to_js(&rp),
+            None => Ok(JsValue::NULL),
+        }
+    }
+
+    /// The owner-only `set_render_params` call for the wallet to sign + send.
+    #[wasm_bindgen(js_name = setRenderParamsCall)]
+    pub fn set_render_params_call(
+        &self,
+        token_id: &str,
+        bg: u32,
+        cell: u32,
+        speed: u16,
+    ) -> Result<JsValue, JsValue> {
+        let call = self
+            .client
+            .writes()
+            .set_render_params(parse_u256(token_id)?, RenderParams { bg, cell, speed });
+        calls_to_js(&[("set_render_params", &call)])
+    }
+
+    /// The token id (`0x` hex) for a grid given as 41 row bitmasks — the off-chain Poseidon identity
+    /// the contract uses; lets the frontend look up or pre-compute a token before minting.
+    #[wasm_bindgen(js_name = tokenIdForRows)]
+    pub fn token_id_for_rows(&self, rows: Vec<f64>) -> Result<JsValue, JsValue> {
+        Ok(JsValue::from_str(&token_id(&rows_from_js(rows)?).to_hex()))
+    }
+
+    /// One Conway generation (41 row bitmasks in, 41 out) — the pure off-chain engine, for
+    /// client-side preview/animation without a chain round-trip.
+    #[wasm_bindgen(js_name = stepRows)]
+    pub fn step_rows(&self, rows: Vec<f64>) -> Result<JsValue, JsValue> {
+        let next = step(&rows_from_js(rows)?);
+        to_js(&rows_to_js(&next))
+    }
+
+    /// Discover the loop reachable from `rows` within `max_period`: `{ period, smallest }` (the
+    /// canonical state to mint) or `null` if it doesn't recur in range.
+    #[wasm_bindgen(js_name = findLoop)]
+    pub fn find_loop(&self, rows: Vec<f64>, max_period: u32) -> Result<JsValue, JsValue> {
+        match engine::find_loop(&rows_from_js(rows)?, max_period) {
+            Some((period, smallest)) => {
+                #[derive(Serialize)]
+                struct FoundLoop {
+                    period: u32,
+                    smallest: Vec<f64>,
+                }
+                to_js(&FoundLoop { period, smallest: rows_to_js(&smallest) })
+            }
+            None => Ok(JsValue::NULL),
+        }
     }
 }
 
@@ -174,6 +234,25 @@ fn parse_u256(s: &str) -> Result<U256, JsValue> {
 
 fn parse_felt(s: &str) -> Result<Felt, JsValue> {
     Felt::from_hex(s).map_err(|_| js_err(format!("invalid felt/address: {s}")))
+}
+
+/// Convert 41 JS row numbers to engine `Rows`, validating count + range (each row < 2^41).
+fn rows_from_js(rows: Vec<f64>) -> Result<Rows, JsValue> {
+    if rows.len() != N {
+        return Err(js_err(format!("expected {N} rows, got {}", rows.len())));
+    }
+    let mut r = [0u64; N];
+    for (i, v) in rows.iter().enumerate() {
+        if !v.is_finite() || *v < 0.0 || *v > MASK as f64 {
+            return Err(js_err(format!("row {i} out of range: {v}")));
+        }
+        r[i] = *v as u64;
+    }
+    Ok(r)
+}
+
+fn rows_to_js(r: &Rows) -> Vec<f64> {
+    r.iter().map(|&x| x as f64).collect()
 }
 
 fn calls_to_js(named: &[(&str, &Call)]) -> Result<JsValue, JsValue> {

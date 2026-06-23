@@ -5,7 +5,7 @@ use async_trait::async_trait;
 
 use crate::config::ContractKey;
 use crate::error::GolError;
-use crate::types::{Felt, LifeformData, LoopCheck, OwnedLifeform, TokenUri, U256};
+use crate::types::{Felt, LifeformData, OwnedLifeform, RenderParams, TokenUri, U256};
 
 #[async_trait(?Send)]
 // `?Send` so the same trait compiles on wasm32, where reqwest's fetch-backed futures are !Send.
@@ -28,13 +28,14 @@ pub trait Reader {
     /// NUT allowance (`allowance`).
     async fn nut_allowance(&self, owner: Felt, spender: Felt) -> Result<U256, GolError>;
 
-    /// Decoded `token_uri` (ERC721 metadata + grid SVG), or `None` if the token isn't minted.
+    /// Decoded `token_uri` (ERC721 metadata + HTML renderer), or `None` if the token isn't minted.
     async fn token_uri(&self, token_id: U256) -> Result<Option<TokenUri>, GolError>;
 
-    // on-chain GoL engine views (off-chain discovery stays in the app):
-    async fn iterate_once(&self, state: U256) -> Result<U256, GolError>;
-    async fn iterate_several(&self, state: U256, generations: u32) -> Result<Vec<U256>, GolError>;
-    async fn is_single_loop(&self, state: U256, generations: u32) -> Result<LoopCheck, GolError>;
+    /// Per-token render params (`get_render_params`), or `None` if the token isn't minted.
+    async fn render_params(&self, token_id: U256) -> Result<Option<RenderParams>, GolError>;
+
+    // NB: v2 exposes no on-chain step/loop-check views (v1 had iterate_life_*). That logic is the
+    // pure off-chain engine in `crate::engine` (operating on `GridState`/`Rows`).
 
     /// Escape hatch for view functions not surfaced above.
     async fn call(
