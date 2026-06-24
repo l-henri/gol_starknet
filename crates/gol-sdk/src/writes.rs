@@ -261,4 +261,66 @@ mod tests {
         assert_eq!(nut_cost_for_loop(3, 18), U256::from_u128(3 * 10u128.pow(18)));
         assert_eq!(nut_cost_for_path(0, 18), U256::from_u128(0));
     }
+
+    #[test]
+    fn mint_partial_path_calldata() {
+        let addrs = deployments(Network::Sepolia).unwrap();
+        let w = GolWrites::new(&addrs, 18);
+        let start = GridState::pack(&grid_with(&[(5, 0b1110)]));
+        let trigger = GridState::pack(&grid_with(&[(20, 0b101)]));
+        let call = w.mint_partial_path(Minter::Loop, &start, 3, &trigger);
+        assert_eq!(call.to, addrs.loop_minter);
+        assert_eq!(call.selector, selector("mint_partial_path"));
+        // [path_start(7), path_length, trigger_state(7)] = 15 felts
+        assert_eq!(call.calldata.len(), 15);
+        assert_eq!(&call.calldata[0..7], &start.to_calldata()[..]);
+        assert_eq!(call.calldata[7], Felt::from(3u32));
+        assert_eq!(&call.calldata[8..15], &trigger.to_calldata()[..]);
+    }
+
+    #[test]
+    fn combine_partial_path_calldata() {
+        let addrs = deployments(Network::Sepolia).unwrap();
+        let w = GolWrites::new(&addrs, 18);
+        // Path minter this time — exercises minter_addr routing.
+        let call = w.combine_partial_path(Minter::Path, Felt::from(0x11u32), Felt::from(0x22u32));
+        assert_eq!(call.to, addrs.path_minter);
+        assert_eq!(call.selector, selector("combine_partial_path"));
+        assert_eq!(call.calldata, vec![Felt::from(0x11u32), Felt::from(0x22u32)]);
+    }
+
+    #[test]
+    fn mint_loop_from_partial_paths_calldata() {
+        let addrs = deployments(Network::Sepolia).unwrap();
+        let w = GolWrites::new(&addrs, 18);
+        let state = GridState::pack(&grid_with(&[(5, 0b1110)]));
+        let calls = w.mint_loop_from_partial_paths(&state, 2, Felt::from(0xabcu32));
+        assert_eq!(calls.len(), 2);
+        // approve sequence_length(=2) NUT to lifeforms
+        assert_eq!(calls[0].to, addrs.nutrient);
+        assert_eq!(calls[0].calldata[0], addrs.lifeforms);
+        assert_eq!(calls[0].calldata[1], Felt::from(2u128 * 10u128.pow(18)));
+        // mint: [loop_state(7), recipient] = 8 felts
+        assert_eq!(calls[1].to, addrs.loop_minter);
+        assert_eq!(calls[1].selector, selector("mint_loop_from_partial_paths"));
+        assert_eq!(calls[1].calldata.len(), 8);
+        assert_eq!(&calls[1].calldata[0..7], &state.to_calldata()[..]);
+        assert_eq!(calls[1].calldata[7], Felt::from(0xabcu32));
+    }
+
+    #[test]
+    fn mint_path_from_partial_paths_calldata() {
+        let addrs = deployments(Network::Sepolia).unwrap();
+        let w = GolWrites::new(&addrs, 18);
+        let state = GridState::pack(&grid_with(&[(5, 0b1110)]));
+        let calls = w.mint_path_from_partial_paths(&state, 5, Felt::from(0xabcu32));
+        assert_eq!(calls.len(), 2);
+        assert_eq!(calls[0].to, addrs.nutrient);
+        assert_eq!(calls[0].calldata[1], Felt::from(5u128 * 10u128.pow(18))); // 5 NUT
+        assert_eq!(calls[1].to, addrs.path_minter);
+        assert_eq!(calls[1].selector, selector("mint_path_from_partial_paths"));
+        assert_eq!(calls[1].calldata.len(), 8);
+        assert_eq!(&calls[1].calldata[0..7], &state.to_calldata()[..]);
+        assert_eq!(calls[1].calldata[7], Felt::from(0xabcu32));
+    }
 }
