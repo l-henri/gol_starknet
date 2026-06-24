@@ -7,11 +7,11 @@ import {
   ageColor,
   BREATH,
   fromCoords,
+  fromRows,
   N,
   step,
   STEP_AMBIENT,
   STEP_ENGAGED,
-  unpack,
 } from "@/lib/creatures";
 
 type Variant = "living" | "potential" | "dead";
@@ -121,15 +121,15 @@ function ensureRunning() {
 
 function initialCells(props: CreatureProps): Cells {
   if (props.cells) return props.cells.slice();
-  if (props.state) return unpack(props.state);
+  if (props.rows) return fromRows(props.rows);
   if (props.coords) return fromCoords(props.coords);
   return new Array<boolean>(N * N).fill(false);
 }
 
 export interface CreatureProps {
-  /** one of: explicit cells, a packed state hex, or live-cell coordinates */
+  /** one of: explicit cells, a v2 lifeform's row bitmasks, or live-cell coordinates */
   cells?: Cells;
-  state?: string;
+  rows?: number[];
   coords?: [number, number][];
   /** colour age 0..100 (living variant only) */
   age?: number;
@@ -149,7 +149,7 @@ export default function Creature(props: CreatureProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const instRef = useRef<Inst | null>(null);
   // re-seed when the pattern identity changes
-  const seedKey = props.state ?? (props.coords ? JSON.stringify(props.coords) : "");
+  const seedKey = props.rows ? props.rows.join(",") : props.coords ? JSON.stringify(props.coords) : "";
 
   useEffect(() => {
     const canvas = ref.current;

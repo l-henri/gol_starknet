@@ -1,8 +1,9 @@
 // The Conway engine that powers every render. Pure logic — no DOM.
-// Verified against the live chain: bit (row*N + col) of a lifeform's packed `current_state`
-// is its live cell (row-major, LSB = top-left). Token 98307 = 0x18003 = the top-left 2x2 block.
+// v2: the grid is 41x41. An on-chain lifeform's `current_state` is the 41 row bitmasks (row r,
+// bit k = the cell at row r, col k); see `fromRows`. Stepping/fate here back the bestiary previews;
+// chain identity (token id) is the SDK's Poseidon hash, not this grid's packing.
 
-export const N = 15;
+export const N = 41;
 export const STEP_AMBIENT = 1500; // ms — gallery generational step
 export const STEP_ENGAGED = 160; // ms — hovered / focused step
 export const BREATH = 3600; // ms — ambient glow sine period
@@ -16,13 +17,12 @@ export function fromCoords(coords: [number, number][]): Cells {
   return c;
 }
 
-/** Unpack a packed `u256` state (hex string) into the 15x15 grid. */
-export function unpack(stateHex: string): Cells {
-  let s = BigInt(stateHex);
-  const c = new Array<boolean>(N * N);
-  for (let i = 0; i < N * N; i++) {
-    c[i] = (s & 1n) === 1n;
-    s >>= 1n;
+/** Build the grid from a v2 lifeform's `current_state` — the 41 row bitmasks (bit k of row r). */
+export function fromRows(rows: number[]): Cells {
+  const c = new Array<boolean>(N * N).fill(false);
+  for (let r = 0; r < N; r++) {
+    const v = BigInt(rows[r] ?? 0);
+    for (let k = 0; k < N; k++) c[r * N + k] = ((v >> BigInt(k)) & 1n) === 1n;
   }
   return c;
 }

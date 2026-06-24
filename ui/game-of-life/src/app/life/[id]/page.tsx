@@ -83,16 +83,15 @@ function MintedDetail({ id }: { id: string }) {
       <div className="detail">
         <div className={`stage${busy ? " inhaling" : ""}`}>
           {view === "render" ? (
-            <Creature state={lf.current_state} age={ageToScale(lf.age)} variant={lf.is_dead ? "dead" : "living"} engaged res={540} ariaLabel={`${kind} lifeform ${decId}`} />
-          ) : uri?.image ? (
+            <Creature rows={lf.current_state} age={ageToScale(lf.age)} variant={lf.is_dead ? "dead" : "living"} engaged res={540} ariaLabel={`${kind} lifeform ${decId}`} />
+          ) : uri?.animation_url ? (
             <div className="svg-frame">
-              {/* on-chain artifact: a self-contained data: SVG */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={uri.image} alt={`On-chain SVG for lifeform ${decId}`} />
+              {/* on-chain artifact: the self-contained data: HTML renderer (animation_url) */}
+              <iframe src={uri.animation_url} title={`On-chain renderer for lifeform ${decId}`} sandbox="allow-scripts" style={{ width: "100%", height: "100%", border: 0, background: "var(--bg-dish)" }} />
             </div>
           ) : (
             <div className="svg-frame" style={{ background: "var(--bg-dish)" }}>
-              <span className="status-line">no on-chain image</span>
+              <span className="status-line">no on-chain renderer</span>
             </div>
           )}
           {reward && <span className="nut-float">+1 NUT</span>}
@@ -103,7 +102,7 @@ function MintedDetail({ id }: { id: string }) {
           <h1>{uri?.name ?? `Lifeform #${decId}`}</h1>
           <div className="meta-row">
             <span>owner {shortAddr(lf.owner)}</span>
-            <span>state <span className="mono">{lf.current_state}</span></span>
+            <span>token <span className="mono">{shortAddr(lf.token_id)}</span></span>
           </div>
 
           <div className="trait-grid">

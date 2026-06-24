@@ -27,7 +27,7 @@ function MintedCard({ lf }: { lf: JsLifeform }) {
     >
       <div className="dish">
         <Creature
-          state={lf.current_state}
+          rows={lf.current_state}
           age={ageToScale(lf.age)}
           variant={lf.is_dead ? "dead" : "living"}
           engaged={engaged}
