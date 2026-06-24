@@ -1,0 +1,3 @@
+# Keep Cargo artifacts out of scarb's `target/` (both tools default to `target/`).
+[build]
+target-dir = "target-rust"

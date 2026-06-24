@@ -1,0 +1,5 @@
+# Rust workspace for the GoL SDK. Coexists with Scarb.toml (Cairo); Cargo's build output is
+# redirected to `target-rust/` via .cargo/config.toml so it never collides with scarb's `target/`.
+[workspace]
+resolver = "2"
+members = ["crates/*"]
