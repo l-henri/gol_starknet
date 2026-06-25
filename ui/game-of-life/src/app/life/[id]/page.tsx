@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 import Creature from "@/components/Creature";
 import { useGolSdk } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
 import { useBreathe } from "@/lib/useBreathe";
+import { useMint } from "@/lib/useMint";
 import { findBeast } from "@/lib/bestiary";
-import { detectFate, fromCoords, ageToScale } from "@/lib/creatures";
+import { ageToScale, rowsFromCoords } from "@/lib/creatures";
 import { lifeformKind, shortAddr, tokenIdDecimal } from "@/lib/format";
 import { explorerTxUrl } from "@/lib/config";
 import type { JsLifeform, JsTokenUri } from "@/lib/types";
@@ -158,17 +159,56 @@ function MintedDetail({ id }: { id: string }) {
 }
 
 /* ---------- a not-yet-minted pattern from the bestiary ---------- */
+type BeastInfo =
+  | { kind: "loading" }
+  | { kind: "toolarge" }
+  | { kind: "ready"; period: number; smallest: number[]; tokenId: string; minted: boolean };
+
 function BeastDetail() {
   const params = useParams<{ id: string }>();
   const beast = findBeast(params.id)!;
-  const { address, connect } = useWallet();
-  const fate = useMemo(() => detectFate(fromCoords(beast.coords)), [beast]);
-  const nutCost = fate.loopLength > 0 ? fate.loopLength : 1;
+  const router = useRouter();
+  const { sdk } = useGolSdk();
+  const { address, connect, onSepolia } = useWallet();
+  const { status, txHash, error, mint, reset } = useMint();
+  const [info, setInfo] = useState<BeastInfo>({ kind: "loading" });
+
+  // v2 identity, off-chain via the SDK: the loop's period + canonical (smallest) state, its token
+  // id, and whether it's already minted. findLoop/tokenIdForRows are synchronous wasm calls.
+  useEffect(() => {
+    if (!sdk) return;
+    let cancelled = false;
+    const rows = rowsFromCoords(beast.coords);
+    const loop = sdk.findLoop(new Float64Array(rows), 32) as { period: number; smallest: number[] } | null;
+    if (!loop) {
+      setInfo({ kind: "toolarge" });
+      return;
+    }
+    const tokenId = sdk.tokenIdForRows(new Float64Array(loop.smallest)) as string;
+    sdk.lifeform(tokenId).then((lf) => {
+      if (!cancelled) setInfo({ kind: "ready", period: loop.period, smallest: loop.smallest, tokenId, minted: !!lf });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [sdk, beast]);
+
+  // on a confirmed mint, send the visitor to their newly-born creature
+  useEffect(() => {
+    if (status === "confirmed" && info.kind === "ready") {
+      const t = setTimeout(() => router.push(`/life/${BigInt(info.tokenId).toString()}`), 1200);
+      return () => clearTimeout(t);
+    }
+  }, [status, info, router]);
+
+  const ready = info.kind === "ready" ? info : null;
+  const period = ready?.period;
+  const busy = status === "signing" || status === "pending";
 
   return (
     <Shell>
       <div className="detail">
-        <div className="stage">
+        <div className={`stage${busy ? " inhaling" : ""}`}>
           <Creature coords={beast.coords} variant="potential" engaged res={540} ariaLabel={`${beast.name} pattern`} />
         </div>
         <div>
@@ -182,23 +222,56 @@ function BeastDetail() {
 
           <div className="trait-grid">
             <Trait t="Kind" v={beast.kind} />
-            <Trait t="Fate" v={fate.alive ? "Alive (a loop)" : "Dies out"} />
-            <Trait t="Loop length" v={fate.loopLength > 0 ? String(fate.loopLength) : "—"} />
-            <Trait t="Mint cost" v={`${nutCost} NUT`} />
+            <Trait t="Fate" v={info.kind === "toolarge" ? "Travels forever" : "Alive · a loop"} />
+            <Trait t="Loop length" v={period ? String(period) : info.kind === "toolarge" ? "large" : "…"} />
+            <Trait t="Mint cost" v={period ? `${period} NUT` : "—"} />
           </div>
 
-          <div className="callout">
-            <b>Smallest loop id</b> <span className="mono">{fate.smallestHex}</span> — the canonical id
-            this creature would mint under. Discovery &amp; minting arrive in the next phase; for now,
-            meet the creature and watch it live.
-          </div>
+          {info.kind === "toolarge" && (
+            <div className="callout">
+              This traveller never settles into a small loop on the 41×41 torus — its period is too
+              large to mint cheaply. Meet it and watch it live.
+            </div>
+          )}
+          {ready?.minted && (
+            <div className="callout">
+              Already discovered — this creature lives on Starknet.{" "}
+              <Link className="tx-link" href={`/life/${BigInt(ready.tokenId).toString()}`}>meet it ↗</Link>
+            </div>
+          )}
 
           <div style={{ marginTop: 18 }}>
-            {address ? (
-              <button className="btn primary" disabled title="Discovery & mint land next">Set it free (soon)</button>
+            {info.kind === "loading" ? (
+              <button className="btn" disabled><span className="spinner" /> reading the chain…</button>
+            ) : info.kind === "toolarge" ? (
+              <button className="btn" disabled title="Loop too large to mint cheaply">Can&rsquo;t be set free yet</button>
+            ) : ready?.minted ? (
+              <Link className="btn primary" href={`/life/${BigInt(ready.tokenId).toString()}`}>Meet this creature →</Link>
+            ) : !address ? (
+              <button className="btn" onClick={connect}>Connect to set it free</button>
+            ) : !onSepolia ? (
+              <button className="btn" disabled>Switch to Sepolia to mint</button>
             ) : (
-              <button className="btn" onClick={connect}>Connect a wallet</button>
+              <button
+                className="btn primary breathe-btn"
+                onClick={() => (status === "error" ? reset() : ready && mint(ready.smallest, ready.period))}
+                disabled={busy}
+              >
+                {status === "signing"
+                  ? "Confirm in your wallet…"
+                  : status === "pending"
+                    ? "Setting it free… (tx pending)"
+                    : status === "confirmed"
+                      ? "✓ Born — taking you there…"
+                      : status === "error"
+                        ? "Try again"
+                        : `Set it free · ${period} NUT`}
+              </button>
             )}
+            {txHash && (status === "pending" || status === "confirmed") && (
+              <a className="tx-link" href={explorerTxUrl(txHash)} target="_blank" rel="noreferrer" style={{ marginLeft: 12 }}>view tx ↗</a>
+            )}
+            {status === "error" && error && <p className="breathe-err">{error}</p>}
           </div>
         </div>
       </div>

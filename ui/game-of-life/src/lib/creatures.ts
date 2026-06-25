@@ -17,6 +17,14 @@ export function fromCoords(coords: [number, number][]): Cells {
   return c;
 }
 
+/** Coords -> the 41 row bitmasks (row r, bit k), to feed the SDK (findLoop / tokenIdForRows /
+ *  mintLoopCalls expect a Float64Array of these). Each row < 2^41, exact in a JS number. */
+export function rowsFromCoords(coords: [number, number][]): number[] {
+  const rows = new Array<number>(N).fill(0);
+  for (const [r, k] of coords) rows[r] += 2 ** k;
+  return rows;
+}
+
 /** Build the grid from a v2 lifeform's `current_state` — the 41 row bitmasks (bit k of row r). */
 export function fromRows(rows: number[]): Cells {
   const c = new Array<boolean>(N * N).fill(false);
