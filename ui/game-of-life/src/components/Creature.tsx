@@ -21,6 +21,7 @@ interface Inst {
   ctx: CanvasRenderingContext2D;
   cells: Cells;
   rgb: RGB;
+  bgCss: string;
   variant: Variant;
   animate: boolean;
   interval: number;
@@ -34,6 +35,10 @@ interface Inst {
 // ---- shared render bus: one rAF drives every creature on the page ----
 const POTENTIAL: RGB = [90, 209, 255]; // accent blue — a latent, not-yet-born glow
 const DEAD: RGB = [58, 65, 80];
+
+// 0xRRGGBB -> rgb / css (for a token's on-chain RenderParams)
+const intToRgb = (n: number): RGB => [(n >>> 16) & 255, (n >>> 8) & 255, n & 255];
+const intToCss = (n: number): string => "#" + (n & 0xffffff).toString(16).padStart(6, "0");
 
 const insts = new Set<Inst>();
 let running = false;
@@ -50,7 +55,7 @@ function draw(inst: Inst, now: number) {
   const W = canvas.width;
   const cell = W / N;
   ctx.clearRect(0, 0, W, W);
-  ctx.fillStyle = "#0a0e14";
+  ctx.fillStyle = inst.bgCss;
   ctx.fillRect(0, 0, W, W);
 
   const [r, g, b] = inst.rgb;
@@ -131,8 +136,12 @@ export interface CreatureProps {
   cells?: Cells;
   rows?: number[];
   coords?: [number, number][];
-  /** colour age 0..100 (living variant only) */
+  /** colour age 0..100 (living variant only; ignored when `cell` is given) */
   age?: number;
+  /** on-chain RenderParams: bg/cell are 0xRRGGBB, speed is generations/second */
+  bg?: number;
+  cell?: number;
+  speed?: number;
   variant?: Variant;
   /** accelerate the simulation (hover / focus / detail) */
   engaged?: boolean;
@@ -157,17 +166,23 @@ export default function Creature(props: CreatureProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const rgb: RGB = variant === "potential" ? POTENTIAL : variant === "dead" ? DEAD : ageColor(age);
-    const base = STEP_AMBIENT;
+    // living creatures use their on-chain cell colour when given, else the age gradient.
+    const livingRgb: RGB = props.cell != null ? intToRgb(props.cell) : ageColor(age);
+    const rgb: RGB = variant === "potential" ? POTENTIAL : variant === "dead" ? DEAD : livingRgb;
+    const bgCss = props.bg != null && variant === "living" ? intToCss(props.bg) : "#0a0e14";
+    // honour the token's on-chain speed (generations/second) as the step cadence.
+    const base =
+      variant === "living" && props.speed && props.speed > 0 ? 1000 / props.speed : STEP_AMBIENT;
     const inst: Inst = {
       canvas,
       ctx,
       cells: initialCells(props),
       rgb,
+      bgCss,
       variant,
       animate,
       interval: base,
-      target: engaged ? STEP_ENGAGED : base,
+      target: engaged ? Math.min(STEP_ENGAGED, base) : base,
       baseAmbient: base,
       lastStep: 0,
       phase: Math.random() * Math.PI * 2,
@@ -192,12 +207,12 @@ export default function Creature(props: CreatureProps) {
       instRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seedKey, variant, age, res]);
+  }, [seedKey, variant, age, res, props.bg, props.cell, props.speed]);
 
-  // engage / disengage without re-seeding
+  // engage / disengage without re-seeding (never slower than the creature's own cadence)
   useEffect(() => {
     const inst = instRef.current;
-    if (inst) inst.target = engaged ? STEP_ENGAGED : inst.baseAmbient;
+    if (inst) inst.target = engaged ? Math.min(STEP_ENGAGED, inst.baseAmbient) : inst.baseAmbient;
   }, [engaged]);
 
   useEffect(() => {

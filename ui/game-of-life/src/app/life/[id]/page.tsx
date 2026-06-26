@@ -9,10 +9,11 @@ import { useWallet } from "@/lib/wallet";
 import { useBreathe } from "@/lib/useBreathe";
 import { useMint } from "@/lib/useMint";
 import { findBeast } from "@/lib/bestiary";
-import { ageToScale, rowsFromCoords } from "@/lib/creatures";
+import { rowsFromCoords } from "@/lib/creatures";
 import { lifeformKind, shortAddr, tokenIdDecimal } from "@/lib/format";
 import { explorerTxUrl } from "@/lib/config";
-import type { JsLifeform, JsTokenUri } from "@/lib/types";
+import type { JsLifeform } from "@/lib/types";
+import { onchainHtml, LIFEFORM_DESCRIPTION } from "@/lib/onchainRender";
 
 export default function LifePage() {
   const params = useParams<{ id: string }>();
@@ -29,22 +30,23 @@ function MintedDetail({ id }: { id: string }) {
   const { onSepolia } = useWallet();
   const { status, txHash, error: breatheError, breathe, reset, connected } = useBreathe();
   const [lf, setLf] = useState<JsLifeform | null>(null);
-  const [uri, setUri] = useState<JsTokenUri | null>(null);
+  const [rp, setRp] = useState<{ bg: number; cell: number; speed: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [view, setView] = useState<"render" | "onchain">("render");
   const [reward, setReward] = useState(false);
 
   const load = useCallback(async () => {
     if (!sdk) return;
     try {
-      const [l, u] = await Promise.all([sdk.lifeform(id), sdk.tokenUri(id)]);
+      // No token_uri fetch: the on-chain artifact is rebuilt locally from these cheap reads + the
+      // cached template (see onchainRender). lifeform() already covers owner + current_state.
+      const [l, p] = await Promise.all([sdk.lifeform(id), sdk.renderParams(id)]);
       if (!l) {
         setNotFound(true);
         return;
       }
       setLf(l as JsLifeform);
-      setUri((u as JsTokenUri) ?? null);
+      setRp((p as { bg: number; cell: number; speed: number } | null) ?? null);
     } catch {
       setNotFound(true);
     } finally {
@@ -83,16 +85,15 @@ function MintedDetail({ id }: { id: string }) {
     <Shell>
       <div className="detail">
         <div className={`stage${busy ? " inhaling" : ""}`}>
-          {view === "render" ? (
-            <Creature rows={lf.current_state} age={ageToScale(lf.age)} variant={lf.is_dead ? "dead" : "living"} engaged res={540} ariaLabel={`${kind} lifeform ${decId}`} />
-          ) : uri?.animation_url ? (
+          {/* the exact on-chain render: the contract's renderer, rebuilt locally from the cached
+              template + this token's rows/bg/cell/speed (no token_uri fetch). */}
+          {rp ? (
             <div className="svg-frame">
-              {/* on-chain artifact: the self-contained data: HTML renderer (animation_url) */}
-              <iframe src={uri.animation_url} title={`On-chain renderer for lifeform ${decId}`} sandbox="allow-scripts" style={{ width: "100%", height: "100%", border: 0, background: "var(--bg-dish)" }} />
+              <iframe srcDoc={onchainHtml(lf.current_state, rp.bg, rp.cell, rp.speed)} title={`On-chain renderer for lifeform ${decId}`} sandbox="allow-scripts" style={{ width: "100%", height: "100%", border: 0, background: "var(--bg-dish)" }} />
             </div>
           ) : (
             <div className="svg-frame" style={{ background: "var(--bg-dish)" }}>
-              <span className="status-line">no on-chain renderer</span>
+              <span className="status-line">reading render params…</span>
             </div>
           )}
           {reward && <span className="nut-float">+1 NUT</span>}
@@ -100,7 +101,7 @@ function MintedDetail({ id }: { id: string }) {
 
         <div>
           <span className="kicker">{lf.is_alive ? "alive" : "dormant"} · living on Starknet</span>
-          <h1>{uri?.name ?? `Lifeform #${decId}`}</h1>
+          <h1>Lifeform #{decId}</h1>
           <div className="meta-row">
             <span>owner {shortAddr(lf.owner)}</span>
             <span>token <span className="mono">{shortAddr(lf.token_id)}</span></span>
@@ -113,12 +114,7 @@ function MintedDetail({ id }: { id: string }) {
             <Trait t="Age" v={`${lf.age} ${lf.age === 1 ? "breath" : "breaths"}`} />
           </div>
 
-          {uri?.description && <p className="dim" style={{ maxWidth: "46ch" }}>{uri.description}</p>}
-
-          <div className="toggle-row">
-            <button className={`btn ${view === "render" ? "active" : ""}`} onClick={() => setView("render")}>Living render</button>
-            <button className={`btn ${view === "onchain" ? "active" : ""}`} onClick={() => setView("onchain")}>On-chain artifact</button>
-          </div>
+          <p className="dim" style={{ maxWidth: "46ch" }}>{LIFEFORM_DESCRIPTION}</p>
 
           {!lf.is_dead && (
             <div className="breathe-block">
@@ -196,7 +192,7 @@ function BeastDetail() {
   // on a confirmed mint, send the visitor to their newly-born creature
   useEffect(() => {
     if (status === "confirmed" && info.kind === "ready") {
-      const t = setTimeout(() => router.push(`/life/${BigInt(info.tokenId).toString()}`), 1200);
+      const t = setTimeout(() => router.push(`/life/${info.tokenId}`), 1200);
       return () => clearTimeout(t);
     }
   }, [status, info, router]);
@@ -236,7 +232,7 @@ function BeastDetail() {
           {ready?.minted && (
             <div className="callout">
               Already discovered — this creature lives on Starknet.{" "}
-              <Link className="tx-link" href={`/life/${BigInt(ready.tokenId).toString()}`}>meet it ↗</Link>
+              <Link className="tx-link" href={`/life/${ready.tokenId}`}>meet it ↗</Link>
             </div>
           )}
 
@@ -246,7 +242,7 @@ function BeastDetail() {
             ) : info.kind === "toolarge" ? (
               <button className="btn" disabled title="Loop too large to mint cheaply">Can&rsquo;t be set free yet</button>
             ) : ready?.minted ? (
-              <Link className="btn primary" href={`/life/${BigInt(ready.tokenId).toString()}`}>Meet this creature →</Link>
+              <Link className="btn primary" href={`/life/${ready.tokenId}`}>Meet this creature →</Link>
             ) : !address ? (
               <button className="btn" onClick={connect}>Connect to set it free</button>
             ) : !onSepolia ? (

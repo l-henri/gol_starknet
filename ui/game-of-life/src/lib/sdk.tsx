@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { GolSdk } from "gol-sdk-wasm";
 import { NETWORK, RPC_URL } from "./config";
+import { adoptTemplateFromHtml, REF_TOKEN_ID } from "./onchainRender";
 
 interface SdkCtx {
   sdk: GolSdk | null;
@@ -35,6 +36,19 @@ export function GolSdkProvider({ children }: { children: ReactNode }) {
         await mod.default("/gol_sdk_wasm_bg.wasm");
         const instance = new mod.GolSdk(NETWORK, RPC_URL);
         if (!cancelled) setSdk(instance);
+        // Refresh the on-chain renderer template from a live token, once per app start, so the
+        // local artifact tracks the deployed contract. Fire-and-forget; the bundled template serves
+        // until (and if) this resolves.
+        instance
+          .tokenUri(REF_TOKEN_ID)
+          .then((uri: { animation_url?: string } | null) => {
+            const au = uri?.animation_url ?? "";
+            const i = au.indexOf("base64,");
+            if (i >= 0) adoptTemplateFromHtml(atob(au.slice(i + 7)));
+          })
+          .catch(() => {
+            /* keep the bundled template */
+          });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         if (!cancelled) setError(msg);
