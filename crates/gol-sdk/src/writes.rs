@@ -148,12 +148,15 @@ impl<'a> GolWrites<'a> {
         ]
     }
 
-    /// `lifeforms.move_lifeform_forward(token_id)` — advance one generation, earn 1 NUT. Public.
-    pub fn breathe_life(&self, token_id: U256) -> Call {
+    /// `lifeforms.move_lifeform_forward_n(token_id, n)` — advance `n` generations and mint `n` NUT to
+    /// the caller in a single call (a cheap batch of move_lifeform_forward). Public.
+    pub fn breathe_life(&self, token_id: U256, n: u32) -> Call {
+        let mut calldata = token_id.to_calldata().to_vec();
+        calldata.push(Felt::from(n));
         Call {
             to: self.addresses.lifeforms,
-            selector: selector("move_lifeform_forward"),
-            calldata: token_id.to_calldata().to_vec(),
+            selector: selector("move_lifeform_forward_n"),
+            calldata,
         }
     }
 
