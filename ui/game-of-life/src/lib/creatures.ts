@@ -76,6 +76,20 @@ export function population(cells: Cells): number {
   return p;
 }
 
+/** Live-cell count straight from the 41 row bitmasks (popcount, no Cells allocation). Each row is
+ *  a <=41-bit integer held exactly in a JS number, so `% 2` / `/ 2` bit-walking is safe. */
+export function liveCountRows(rows: number[]): number {
+  let p = 0;
+  for (let r = 0; r < rows.length; r++) {
+    let v = Math.trunc(rows[r]);
+    while (v > 0) {
+      p += v % 2;
+      v = Math.floor(v / 2);
+    }
+  }
+  return p;
+}
+
 // colour: age 0..100 -> teal -> green -> amber (hue encodes age)
 const hexToRgb = (h: string): RGB => {
   h = h.replace("#", "");

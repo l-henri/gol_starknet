@@ -101,6 +101,19 @@ h3 { font-size: 1.25rem; font-weight: 600; margin: 0; }
 .btn.primary { background: rgba(90, 209, 255, 0.1); border-color: rgba(90, 209, 255, 0.4); color: var(--accent); }
 .btn.primary:hover { background: rgba(90, 209, 255, 0.16); }
 
+/* language switch ------------------------------------------ */
+.lang-toggle {
+  display: inline-flex; border: 1px solid var(--line); border-radius: 999px;
+  overflow: hidden; background: rgba(255, 255, 255, 0.012);
+}
+.lang-toggle button {
+  font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.06em; font-weight: 500;
+  padding: 0.42em 0.72em; border: 0; background: transparent; color: var(--ink-dim); cursor: pointer;
+  transition: color var(--dur) var(--ease-quiet), background var(--dur) var(--ease-quiet);
+}
+.lang-toggle button.on { color: var(--accent); background: rgba(90, 209, 255, 0.12); }
+.lang-toggle button:hover:not(.on) { color: var(--ink); }
+
 /* creature card -------------------------------------------- */
 .creature-card {
   display: block; background: var(--bg-dish); border: 1px solid var(--line);
@@ -196,6 +209,53 @@ canvas.creature { display: block; width: 100%; height: 100%; }
 .tx-link { font-family: var(--mono); font-size: 0.78rem; color: var(--accent); }
 .breathe-err { color: var(--danger); font-size: 0.86rem; margin: 0; }
 .breathe-hint { color: var(--ink-dim); font-size: 0.86rem; max-width: 42ch; margin: 0; }
+
+/* slot-machine score (the /create destiny board) ----------- */
+.slot {
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+  gap: clamp(14px, 2.8vw, 34px); margin: 6px 0 2px;
+  padding: clamp(12px, 2vw, 18px) clamp(16px, 3vw, 26px);
+  border-radius: 14px; border: 2px solid #6b4f12;
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0 2px, transparent 2px 4px),
+    linear-gradient(180deg, #16110a, #0a0a0d);
+  box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(245, 197, 66, 0.14),
+    0 18px 40px -26px rgba(245, 197, 66, 0.35);
+}
+.slot-marquee {
+  font-family: var(--font-arcade), var(--mono);
+  font-size: 0.72rem; letter-spacing: 0.12em; color: #f5c542;
+  text-shadow: 0 0 10px rgba(245, 197, 66, 0.6); white-space: nowrap;
+}
+.slot.win .slot-marquee { animation: marquee-blink 0.66s steps(2, jump-none) infinite; }
+@keyframes marquee-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.slot-bay { display: inline-flex; flex-direction: column; align-items: center; gap: 0.5em; }
+.slot-label {
+  font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-dim);
+}
+.reels {
+  display: inline-flex; gap: 3px; padding: 0.26em 0.4em; border-radius: 7px;
+  background: #05060a; border: 1px solid #2a2410;
+  box-shadow: inset 0 2px 9px rgba(0, 0, 0, 0.9), inset 0 0 0 1px rgba(245, 197, 66, 0.06);
+  font-family: var(--font-arcade), var(--mono);
+  font-size: clamp(1.2rem, 3.4vw, 1.9rem); line-height: 1;
+}
+.reel {
+  display: inline-block; width: 1ch; height: 1em; overflow: hidden; vertical-align: top;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.55), rgba(255, 255, 255, 0.05) 50%, rgba(0, 0, 0, 0.55));
+}
+.reel-strip { display: block; transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1); will-change: transform; }
+.reel-strip.spin { animation: reelspin 0.4s linear infinite; transition: none; }
+.reel-digit { display: block; height: 1em; line-height: 1em; text-align: center; }
+@keyframes reelspin { from { transform: translateY(0); } to { transform: translateY(-10em); } }
+.tone-seq .reel-digit { color: var(--accent); text-shadow: 0 0 8px rgba(90, 209, 255, 0.55); }
+.tone-loop .reel-digit { color: var(--nut); text-shadow: 0 0 8px rgba(200, 255, 122, 0.55); }
+.tone-amp .reel-digit { color: var(--life-old); text-shadow: 0 0 8px rgba(255, 180, 84, 0.55); }
+.slot.idle .reel-digit { color: var(--ink-faint); text-shadow: none; }
+@media (prefers-reduced-motion: reduce) {
+  .reel-strip.spin { animation: none; }
+}
 
 /* footer ---------------------------------------------------- */
 .site-footer { margin-top: clamp(64px, 10vw, 120px); border-top: 1px solid var(--line); }

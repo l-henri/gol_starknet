@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
+import { Space_Grotesk, JetBrains_Mono, Press_Start_2P } from "next/font/google";
 import "./globals.css";
 import { GolSdkProvider } from "@/lib/sdk";
 import { WalletProvider } from "@/lib/wallet";
+import { LangProvider } from "@/lib/i18n";
 import GardenHeader from "@/components/GardenHeader";
+import SiteFooter from "@/components/SiteFooter";
 
 const grotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -15,6 +17,12 @@ const mono = JetBrains_Mono({
   variable: "--font-mono",
   weight: ["400", "500", "600"],
 });
+// 90s-arcade pixel face — drives the /create destiny "score"
+const arcade = Press_Start_2P({
+  subsets: ["latin"],
+  variable: "--font-arcade",
+  weight: "400",
+});
 
 export const metadata: Metadata = {
   title: "Digital Bacteria — autonomous life on Starknet",
@@ -25,19 +33,16 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${grotesk.variable} ${mono.variable}`}>
-        <GolSdkProvider>
-          <WalletProvider>
-            <GardenHeader />
-            <main>{children}</main>
-            <footer className="site-footer">
-              <div className="wrap bar">
-                <span>A Starknet experiment · creatures live on Sepolia testnet</span>
-                <span className="mono">digital bacteria</span>
-              </div>
-            </footer>
-          </WalletProvider>
-        </GolSdkProvider>
+      <body className={`${grotesk.variable} ${mono.variable} ${arcade.variable}`}>
+        <LangProvider>
+          <GolSdkProvider>
+            <WalletProvider>
+              <GardenHeader />
+              <main>{children}</main>
+              <SiteFooter />
+            </WalletProvider>
+          </GolSdkProvider>
+        </LangProvider>
       </body>
     </html>
   );

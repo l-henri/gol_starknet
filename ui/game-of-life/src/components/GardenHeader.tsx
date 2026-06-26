@@ -5,8 +5,10 @@ import { useEffect, useState } from "react";
 import { useGolSdk } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
 import { formatNut, shortAddr } from "@/lib/format";
+import { useT, LangToggle } from "@/lib/i18n";
 
 export default function GardenHeader() {
+  const { t } = useT();
   const { sdk } = useGolSdk();
   const { address, connecting, connect, disconnect, onSepolia, switchToSepolia, txEpoch } = useWallet();
   const [nut, setNut] = useState<string | null>(null);
@@ -35,16 +37,21 @@ export default function GardenHeader() {
           Digital Bacteria
         </Link>
         <div className="header-right">
-          <Link href="/create" className="btn">Draw a lifeform</Link>
+          <LangToggle />
+          <Link href="/create" className="btn">{t({ fr: "Créer", en: "Create" })}</Link>
           <span
             className={`pill ${onSepolia ? "" : "potential"}`}
-            title={onSepolia ? "Live on Sepolia testnet" : "Wrong network — click to switch to Sepolia"}
+            title={
+              onSepolia
+                ? t({ fr: "En ligne sur le testnet Sepolia", en: "Live on Sepolia testnet" })
+                : t({ fr: "Mauvais réseau — cliquez pour passer sur Sepolia", en: "Wrong network — click to switch to Sepolia" })
+            }
             onClick={onSepolia ? undefined : switchToSepolia}
             role={onSepolia ? undefined : "button"}
             style={onSepolia ? undefined : { cursor: "pointer" }}
           >
             <span className="dot" />
-            {onSepolia ? "Sepolia · testnet" : "Switch to Sepolia"}
+            {onSepolia ? "Sepolia · testnet" : t({ fr: "Passer sur Sepolia", en: "Switch to Sepolia" })}
           </span>
           {address && (
             <span className="nut-chip">
@@ -52,12 +59,12 @@ export default function GardenHeader() {
             </span>
           )}
           {address ? (
-            <button className="btn" onClick={disconnect} title="Disconnect">
+            <button className="btn" onClick={disconnect} title={t({ fr: "Se déconnecter", en: "Disconnect" })}>
               {shortAddr(address)}
             </button>
           ) : (
             <button className="btn primary" onClick={connect} disabled={connecting}>
-              {connecting ? "Connecting…" : "Connect"}
+              {connecting ? t({ fr: "Connexion…", en: "Connecting…" }) : t({ fr: "Connecter", en: "Connect" })}
             </button>
           )}
         </div>

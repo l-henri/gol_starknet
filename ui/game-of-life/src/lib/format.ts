@@ -1,4 +1,5 @@
 import type { JsLifeform } from "./types";
+import type { Dict } from "./i18n";
 
 export const shortAddr = (a: string): string =>
   a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a;
@@ -6,11 +7,17 @@ export const shortAddr = (a: string): string =>
 /** token_id hex -> decimal string (the display id, e.g. "98307"). */
 export const tokenIdDecimal = (hex: string): string => BigInt(hex).toString();
 
-export function lifeformKind(lf: Pick<JsLifeform, "is_loop" | "is_still" | "is_dead" | "sequence_length">): string {
-  if (lf.is_dead) return "Dead";
-  if (lf.is_still) return "Still life";
-  if (lf.is_loop) return lf.sequence_length > 1 ? `Loop · period ${lf.sequence_length}` : "Loop";
-  return "Path";
+/** A lifeform's kind as a bilingual pair — translate at the call site with `t(...)`. */
+export function lifeformKind(
+  lf: Pick<JsLifeform, "is_loop" | "is_still" | "is_dead" | "sequence_length">
+): Dict {
+  if (lf.is_dead) return { fr: "Éteinte", en: "Dead" };
+  if (lf.is_still) return { fr: "Nature morte", en: "Still life" };
+  if (lf.is_loop)
+    return lf.sequence_length > 1
+      ? { fr: `Boucle · période ${lf.sequence_length}`, en: `Loop · period ${lf.sequence_length}` }
+      : { fr: "Boucle", en: "Loop" };
+  return { fr: "Chemin", en: "Path" };
 }
 
 /** NUT hex balance -> human number with up to 2 decimals. */

@@ -8,14 +8,16 @@ import type { BeastSeed } from "@/lib/bestiary";
 import type { JsLifeform } from "@/lib/types";
 import { ageColor, ageToScale } from "@/lib/creatures";
 import { lifeformKind, tokenIdDecimal } from "@/lib/format";
+import { useT } from "@/lib/i18n";
 
 interface RenderParams { bg: number; cell: number; speed: number; }
 
 function MintedCard({ lf }: { lf: JsLifeform }) {
+  const { t } = useT();
   const { sdk } = useGolSdk();
   const [rp, setRp] = useState<RenderParams | null>(null);
   const id = tokenIdDecimal(lf.token_id);
-  const kind = lifeformKind(lf);
+  const kind = t(lifeformKind(lf));
   const dotRgb = lf.is_dead ? [58, 65, 80] : ageColor(ageToScale(lf.age));
   const dotCss = `rgb(${dotRgb.join(",")})`;
 
@@ -31,7 +33,7 @@ function MintedCard({ lf }: { lf: JsLifeform }) {
     <Link
       href={`/life/${lf.token_id}`}
       className="creature-card"
-      aria-label={`Lifeform ${id}, ${kind}, age ${lf.age}`}
+      aria-label={t({ fr: `Créature ${id}, ${kind}, âge ${lf.age}`, en: `Lifeform ${id}, ${kind}, age ${lf.age}` })}
     >
       <div className="dish">
         <Creature
@@ -41,7 +43,7 @@ function MintedCard({ lf }: { lf: JsLifeform }) {
           cell={rp?.cell}
           speed={rp?.speed}
           variant={lf.is_dead ? "dead" : "living"}
-          ariaLabel={`${kind} lifeform ${id}`}
+          ariaLabel={t({ fr: `créature ${kind} ${id}`, en: `${kind} lifeform ${id}` })}
         />
       </div>
       <div className="cmeta">
@@ -49,18 +51,19 @@ function MintedCard({ lf }: { lf: JsLifeform }) {
       </div>
       <div className="cfoot">
         <span className="age-dot" style={{ background: dotCss, boxShadow: lf.is_dead ? "none" : `0 0 7px ${dotCss}` }} />
-        {lf.is_dead ? "rests" : "alive"} · age {lf.age}
+        {lf.is_dead ? t({ fr: "au repos", en: "rests" }) : t({ fr: "en vie", en: "alive" })} · {t({ fr: "âge", en: "age" })} {lf.age}
       </div>
     </Link>
   );
 }
 
 function BeastCard({ beast }: { beast: BeastSeed }) {
+  const { t } = useT();
   return (
     <Link
       href={`/life/${beast.key}`}
       className="creature-card potential"
-      aria-label={`${beast.name}, ${beast.kind}, not yet minted`}
+      aria-label={t({ fr: `${beast.name}, ${beast.kind}, pas encore née`, en: `${beast.name}, ${beast.kind}, not yet minted` })}
     >
       <div className="dish">
         <Creature coords={beast.coords} variant="potential" ariaLabel={`${beast.name} pattern`} />
@@ -71,7 +74,7 @@ function BeastCard({ beast }: { beast: BeastSeed }) {
       </div>
       <div className="cfoot">
         <span className="age-dot" style={{ background: "var(--ink-faint)" }} />
-        waiting to be discovered
+        {t({ fr: "en attente de découverte", en: "waiting to be discovered" })}
       </div>
     </Link>
   );
@@ -80,6 +83,7 @@ function BeastCard({ beast }: { beast: BeastSeed }) {
 // Given just a token id, hydrate the creature on its own (so the gallery fills in progressively),
 // showing a skeleton until its data lands.
 function LazyMintedCard({ tokenId }: { tokenId: string }) {
+  const { t } = useT();
   const { sdk } = useGolSdk();
   const [lf, setLf] = useState<JsLifeform | null>(null);
 
@@ -97,7 +101,7 @@ function LazyMintedCard({ tokenId }: { tokenId: string }) {
         <span className="spinner" />
       </div>
       <div className="cmeta">
-        <span className="cid">summoning…</span>
+        <span className="cid">{t({ fr: "invocation…", en: "summoning…" })}</span>
       </div>
     </div>
   );

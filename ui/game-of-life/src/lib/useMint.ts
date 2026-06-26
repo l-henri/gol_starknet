@@ -3,13 +3,16 @@
 import { useCallback, useState } from "react";
 import { useGolSdk } from "./sdk";
 import { useWallet } from "./wallet";
+import { useT, type Dict } from "./i18n";
 
 export type MintStatus = "idle" | "signing" | "pending" | "confirmed" | "error";
 
-function humanize(e: unknown): string {
+function humanize(e: unknown, t: (d: Dict) => string): string {
   const m = e instanceof Error ? e.message : String(e);
-  if (/reject|abort|denied|cancel/i.test(m)) return "You declined the signature.";
-  if (/insufficient|balance|fee|funds|allowance/i.test(m)) return "Not enough Sepolia gas or NUT to mint.";
+  if (/reject|abort|denied|cancel/i.test(m))
+    return t({ fr: "Vous avez refusé la signature.", en: "You declined the signature." });
+  if (/insufficient|balance|fee|funds|allowance/i.test(m))
+    return t({ fr: "Pas assez de gas Sepolia ou de NUT pour faire naître.", en: "Not enough Sepolia gas or NUT to mint." });
   return m.length > 140 ? m.slice(0, 137) + "…" : m;
 }
 
@@ -19,6 +22,7 @@ function humanize(e: unknown): string {
  * the loop on-chain; on success a new lifeform NFT is born to the connected wallet.
  */
 export function useMint() {
+  const { t } = useT();
   const { sdk } = useGolSdk();
   const { address, connect, execute, waitForTx } = useWallet();
   const [status, setStatus] = useState<MintStatus>("idle");
@@ -45,12 +49,12 @@ export function useMint() {
         setStatus("confirmed");
         return true;
       } catch (e) {
-        setError(humanize(e));
+        setError(humanize(e, t));
         setStatus("error");
         return false;
       }
     },
-    [sdk, address, connect, execute, waitForTx]
+    [sdk, address, connect, execute, waitForTx, t]
   );
 
   const reset = useCallback(() => {
