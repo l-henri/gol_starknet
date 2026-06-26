@@ -43,6 +43,10 @@ pub trait IGolLifeFormsV2<TContractState> {
     fn get_lifeform_data(self: @TContractState, token_id: u256) -> LifeFormData;
     /// Advance a minted lifeform one generation and mint 1 NUT to the caller. Intentionally public.
     fn move_lifeform_forward(ref self: TContractState, token_id: u256);
+    /// Advance a minted lifeform `n` generations in ONE call and mint `n` NUT to the caller — a
+    /// cheaper single-tx batch of move_lifeform_forward (one state read/write + one mint).
+    /// Intentionally public, like the single-step version.
+    fn move_lifeform_forward_n(ref self: TContractState, token_id: u256, n: u32);
     /// Grid edge length (for SDK/frontend; replaces v1's component getter).
     fn get_grid_size(self: @TContractState) -> u32;
     /// Render params for a token: the stored ones, or (if unset) those derived from its token_id.
