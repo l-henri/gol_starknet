@@ -84,7 +84,28 @@ impl U256 {
                 low: u128::from_be_bytes(lo),
             })
         } else {
-            s.parse::<u128>().ok().map(U256::from_u128)
+            // Full-width decimal. v2 token ids are 252-bit Poseidon hashes, so their decimal form
+            // far exceeds u128 — parse digit-by-digit into 64-bit limbs (`acc = acc*10 + d`).
+            let bytes = s.as_bytes();
+            if bytes.is_empty() || !bytes.iter().all(u8::is_ascii_digit) {
+                return None;
+            }
+            let mut limbs = [0u64; 4]; // little-endian
+            for &b in bytes {
+                let mut carry = (b - b'0') as u64;
+                for limb in limbs.iter_mut() {
+                    let v = (*limb as u128) * 10 + carry as u128;
+                    *limb = v as u64;
+                    carry = (v >> 64) as u64;
+                }
+                if carry != 0 {
+                    return None; // overflow past 2^256
+                }
+            }
+            Some(U256 {
+                low: (limbs[0] as u128) | ((limbs[1] as u128) << 64),
+                high: (limbs[2] as u128) | ((limbs[3] as u128) << 64),
+            })
         }
     }
 }
@@ -194,6 +215,18 @@ mod tests {
         assert_eq!(U256::parse("98307"), Some(U256::from_u128(98307)));
         assert_eq!(U256::parse("0x18003"), Some(U256::from_u128(0x18003)));
         assert_eq!(U256::parse("0xZZ"), None);
+    }
+
+    #[test]
+    fn parses_decimal_beyond_u128() {
+        // v2 token ids are 252-bit; their decimal form exceeds u128 (the old parser silently failed).
+        assert_eq!(U256::parse("340282366920938463463374607431768211455"), Some(U256::new(u128::MAX, 0))); // 2^128 - 1
+        assert_eq!(U256::parse("340282366920938463463374607431768211456"), Some(U256::new(0, 1))); // 2^128
+        // a real v2 token id round-trips between its decimal and hex forms.
+        let hex = "0x411c2166602957139ae2f005a79f979ed0b6233924360487293edc79cc00a23";
+        let dec = "1840627337087318780751954265620527044040676149041008957592235432059066124835";
+        assert_eq!(U256::parse(dec), U256::parse(hex));
+        assert_eq!(U256::parse("12a"), None); // not all digits
     }
 
     #[test]

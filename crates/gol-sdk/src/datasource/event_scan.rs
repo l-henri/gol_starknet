@@ -39,11 +39,10 @@ impl EventScanDataSource {
         self
     }
 
-    /// Every minted lifeform (mints = `Transfer` from the zero address), most-recent first, capped
-    /// at `limit` (0 = unlimited). Each is confirmed live via the RPC reader, so the owner/state are
-    /// current even after later transfers. The route the global gallery reads from on Sepolia.
-    pub async fn recent_lifeforms(&self, limit: u32) -> Result<Vec<OwnedLifeform>, GolError> {
-        use crate::reader::Reader;
+    /// The token ids of every minted lifeform (mints = `Transfer` from the zero address), most-recent
+    /// first, capped at `limit` (0 = unlimited). Just the event scan — no per-token reads, so it
+    /// returns fast; a UI can then hydrate each id independently and render creatures as they load.
+    pub async fn recent_token_ids(&self, limit: u32) -> Result<Vec<U256>, GolError> {
         // Transfers FROM the zero address = mints: keys = [Transfer, 0, <any to>].
         let keys = vec![vec![selector("Transfer")], vec![Felt::ZERO], vec![]];
         let events = self.scan_all(self.addresses.lifeforms, keys).await?;
@@ -55,6 +54,14 @@ impl EventScanDataSource {
         if limit > 0 {
             ids.truncate(limit as usize);
         }
+        Ok(ids)
+    }
+
+    /// Every minted lifeform, most-recent first, each confirmed live via the RPC reader (owner/state
+    /// current even after later transfers). Convenience over [`Self::recent_token_ids`] + hydration.
+    pub async fn recent_lifeforms(&self, limit: u32) -> Result<Vec<OwnedLifeform>, GolError> {
+        use crate::reader::Reader;
+        let ids = self.recent_token_ids(limit).await?;
         let mut out = Vec::with_capacity(ids.len());
         for tid in ids {
             if let Some(lf) = self.reader.lifeform(tid).await? {

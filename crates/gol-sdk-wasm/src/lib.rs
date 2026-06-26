@@ -134,6 +134,19 @@ impl GolSdk {
         to_js(&js)
     }
 
+    /// Token ids ("0x…") of recent mints, newest first — the FAST event scan only (no per-token
+    /// reads). For progressive UIs: get the ids, then hydrate each via `lifeform()` as it renders.
+    #[wasm_bindgen(js_name = recentTokenIds)]
+    pub async fn recent_token_ids(&self, limit: u32) -> Result<JsValue, JsValue> {
+        let ds = EventScanDataSource::new(
+            self.client.config.rpc_url.clone(),
+            self.client.config.addresses.clone(),
+        );
+        let ids = ds.recent_token_ids(limit).await.map_err(err)?;
+        let hex: Vec<String> = ids.iter().map(U256::to_hex).collect();
+        to_js(&hex)
+    }
+
     /// `[approve, mint_loop]` calls for the wallet to sign + send. `rows` is the loop's canonical
     /// (smallest) state as 41 row bitmasks.
     #[wasm_bindgen(js_name = mintLoopCalls)]
