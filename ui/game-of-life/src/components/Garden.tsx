@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import CreatureCard from "./CreatureCard";
 import { useGolSdk } from "@/lib/sdk";
-import { BESTIARY } from "@/lib/bestiary";
 
 export default function Garden() {
   const { sdk, error } = useGolSdk();
@@ -66,19 +65,6 @@ export default function Garden() {
             ))}
           </div>
         )}
-      </section>
-
-      {/* Waiting to be discovered */}
-      <section className="garden-section">
-        <div className="head">
-          <div className="section-label">Waiting to be discovered</div>
-          <span className="note">a reservoir of life · not yet on chain</span>
-        </div>
-        <div className="garden-grid">
-          {BESTIARY.map((b) => (
-            <CreatureCard key={b.key} beast={b} />
-          ))}
-        </div>
       </section>
     </div>
   );
