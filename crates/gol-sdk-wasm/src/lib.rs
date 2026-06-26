@@ -164,11 +164,12 @@ impl GolSdk {
         calls_to_js(&[("approve", &calls[0]), ("mint_loop", &calls[1])])
     }
 
-    /// The `move_lifeform_forward` call for the wallet to sign + send.
+    /// The `move_lifeform_forward_n(token_id, n)` call for the wallet to sign + send — advances `n`
+    /// generations and mints `n` NUT in one tx. `n` is clamped to >= 1 (the contract asserts n > 0).
     #[wasm_bindgen(js_name = breatheLifeCall)]
-    pub fn breathe_life_call(&self, token_id: &str) -> Result<JsValue, JsValue> {
-        let call = self.client.writes().breathe_life(parse_u256(token_id)?);
-        calls_to_js(&[("move_lifeform_forward", &call)])
+    pub fn breathe_life_call(&self, token_id: &str, n: u32) -> Result<JsValue, JsValue> {
+        let call = self.client.writes().breathe_life(parse_u256(token_id)?, n.max(1));
+        calls_to_js(&[("move_lifeform_forward_n", &call)])
     }
 
     /// Per-token render params (`{ bg, cell, speed }`), or `null` if unminted.
