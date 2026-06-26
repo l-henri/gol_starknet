@@ -25,7 +25,7 @@ export function useBreathe() {
   const [error, setError] = useState<string | null>(null);
 
   const breathe = useCallback(
-    async (id: string) => {
+    async (id: string, count = 1) => {
       if (!sdk) return;
       if (!address) {
         await connect();
@@ -35,7 +35,9 @@ export function useBreathe() {
       setTxHash(null);
       setStatus("signing");
       try {
-        const calls = sdk.breatheLifeCall(id); // [{ contractAddress, entrypoint, calldata }]
+        // feeding N generations is a single move_lifeform_forward_n(id, N) call — one state
+        // read/write + one mint of N NUT, cheaper than N separate moves.
+        const calls = sdk.breatheLifeCall(id, Math.max(1, count));
         const hash = await execute(calls);
         setTxHash(hash);
         setStatus("pending");

@@ -13,7 +13,6 @@ interface RenderParams { bg: number; cell: number; speed: number; }
 
 function MintedCard({ lf }: { lf: JsLifeform }) {
   const { sdk } = useGolSdk();
-  const [engaged, setEngaged] = useState(false);
   const [rp, setRp] = useState<RenderParams | null>(null);
   const id = tokenIdDecimal(lf.token_id);
   const kind = lifeformKind(lf);
@@ -32,10 +31,6 @@ function MintedCard({ lf }: { lf: JsLifeform }) {
     <Link
       href={`/life/${lf.token_id}`}
       className="creature-card"
-      onMouseEnter={() => setEngaged(true)}
-      onMouseLeave={() => setEngaged(false)}
-      onFocus={() => setEngaged(true)}
-      onBlur={() => setEngaged(false)}
       aria-label={`Lifeform ${id}, ${kind}, age ${lf.age}`}
     >
       <div className="dish">
@@ -46,36 +41,29 @@ function MintedCard({ lf }: { lf: JsLifeform }) {
           cell={rp?.cell}
           speed={rp?.speed}
           variant={lf.is_dead ? "dead" : "living"}
-          engaged={engaged}
           ariaLabel={`${kind} lifeform ${id}`}
         />
       </div>
       <div className="cmeta">
-        <span className="cid">#{id}</span>
         <span className="ckind">{kind}</span>
       </div>
       <div className="cfoot">
         <span className="age-dot" style={{ background: dotCss, boxShadow: lf.is_dead ? "none" : `0 0 7px ${dotCss}` }} />
-        {lf.is_dead ? "rests" : "living on Starknet"} · age {lf.age}
+        {lf.is_dead ? "rests" : "alive"} · age {lf.age}
       </div>
     </Link>
   );
 }
 
 function BeastCard({ beast }: { beast: BeastSeed }) {
-  const [engaged, setEngaged] = useState(false);
   return (
     <Link
       href={`/life/${beast.key}`}
       className="creature-card potential"
-      onMouseEnter={() => setEngaged(true)}
-      onMouseLeave={() => setEngaged(false)}
-      onFocus={() => setEngaged(true)}
-      onBlur={() => setEngaged(false)}
       aria-label={`${beast.name}, ${beast.kind}, not yet minted`}
     >
       <div className="dish">
-        <Creature coords={beast.coords} variant="potential" engaged={engaged} ariaLabel={`${beast.name} pattern`} />
+        <Creature coords={beast.coords} variant="potential" ariaLabel={`${beast.name} pattern`} />
       </div>
       <div className="cmeta">
         <span className="cid">{beast.name}</span>

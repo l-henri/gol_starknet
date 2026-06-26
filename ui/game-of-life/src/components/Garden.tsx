@@ -32,10 +32,8 @@ export default function Garden() {
 
   return (
     <div className="wrap">
-      {/* Living on Starknet */}
       <section className="garden-section">
         <div className="head">
-          <div className="section-label">Living on Starknet</div>
           {ids && ids.length > 0 && (
             <span className="note">showing all {ids.length} minted on Sepolia</span>
           )}

@@ -15,6 +15,22 @@ import { explorerTxUrl } from "@/lib/config";
 import type { JsLifeform } from "@/lib/types";
 import { onchainHtml, LIFEFORM_DESCRIPTION } from "@/lib/onchainRender";
 
+// max generations advanceable in one feed tx; the slider caps at 75% of it. Each generation is a
+// separate move_lifeform_forward call (~a v2 step + storage + NUT mint), so the real ceiling is
+// gas-bounded — this is a conservative default. (TODO: confirm the gas-safe per-tx max with you.)
+const MAX_GEN_STEP = 40;
+const FEED_CAP = Math.floor(0.75 * MAX_GEN_STEP);
+const SPEED_MAX = 200; // contract invariant: 0 < speed < SPEED_MAX
+const toHexColor = (n: number) => "#" + (n & 0xffffff).toString(16).padStart(6, "0");
+const fromHexColor = (s: string) => parseInt(s.replace("#", ""), 16) || 0;
+const sameId = (a: string, b: string) => {
+  try {
+    return BigInt(a) === BigInt(b);
+  } catch {
+    return false;
+  }
+};
+
 export default function LifePage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
@@ -27,13 +43,18 @@ export default function LifePage() {
 /* ---------- a minted, on-chain creature ---------- */
 function MintedDetail({ id }: { id: string }) {
   const { sdk, error } = useGolSdk();
-  const { onSepolia } = useWallet();
+  const { address, onSepolia, switchToSepolia, execute, waitForTx } = useWallet();
   const { status, txHash, error: breatheError, breathe, reset, connected } = useBreathe();
   const [lf, setLf] = useState<JsLifeform | null>(null);
   const [rp, setRp] = useState<{ bg: number; cell: number; speed: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [reward, setReward] = useState(false);
+  const [feedGen, setFeedGen] = useState(1);
+  // owner-editable render params: `edit` starts as the on-chain values; an "Edit creature" tx persists.
+  const [edit, setEdit] = useState<{ bg: number; cell: number; speed: number } | null>(null);
+  const [editStatus, setEditStatus] = useState<"idle" | "signing" | "pending" | "confirmed" | "error">("idle");
+  const [editErr, setEditErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!sdk) return;
@@ -59,6 +80,11 @@ function MintedDetail({ id }: { id: string }) {
     load();
   }, [load]);
 
+  // keep the editable params synced to the on-chain values (resets after a confirmed edit)
+  useEffect(() => {
+    if (rp) setEdit({ ...rp });
+  }, [rp]);
+
   // on confirmation: refetch the (now older) creature, flash +1 NUT, then settle
   useEffect(() => {
     if (status !== "confirmed") return;
@@ -81,6 +107,34 @@ function MintedDetail({ id }: { id: string }) {
   const decId = tokenIdDecimal(lf.token_id);
   const busy = status === "signing" || status === "pending";
 
+  const isOwner = !!address && sameId(address, lf.owner);
+  const editBusy = editStatus === "signing" || editStatus === "pending";
+  const editChanged = !!edit && !!rp && (edit.bg !== rp.bg || edit.cell !== rp.cell || edit.speed !== rp.speed);
+  const editInvalid = !!edit && edit.bg === edit.cell;
+
+  const doEdit = async () => {
+    if (!sdk || !edit) return;
+    if (editStatus === "error") {
+      setEditStatus("idle");
+      setEditErr(null);
+      return;
+    }
+    setEditErr(null);
+    setEditStatus("signing");
+    try {
+      const calls = sdk.setRenderParamsCall(lf.token_id, edit.bg, edit.cell, edit.speed);
+      const hash = await execute(calls);
+      setEditStatus("pending");
+      await waitForTx(hash);
+      setEditStatus("confirmed");
+      await load(); // refetch → rp updates → edit re-syncs → "changed" clears
+      setTimeout(() => setEditStatus("idle"), 1800);
+    } catch (e) {
+      setEditErr(e instanceof Error ? e.message : String(e));
+      setEditStatus("error");
+    }
+  };
+
   return (
     <Shell>
       <div className="detail">
@@ -96,46 +150,116 @@ function MintedDetail({ id }: { id: string }) {
               <span className="status-line">reading render params…</span>
             </div>
           )}
-          {reward && <span className="nut-float">+1 NUT</span>}
+          {reward && <span className="nut-float">+{feedGen} NUT</span>}
         </div>
 
         <div>
           <span className="kicker">{lf.is_alive ? "alive" : "dormant"} · living on Starknet</span>
-          <h1>Lifeform #{decId}</h1>
           <div className="meta-row">
-            <span>owner {shortAddr(lf.owner)}</span>
-            <span>token <span className="mono">{shortAddr(lf.token_id)}</span></span>
+            <Copyable label="owner" value={lf.owner} display={shortAddr(lf.owner)} />
+            <Copyable label="token" value={lf.token_id} display={shortAddr(lf.token_id)} />
           </div>
 
           <div className="trait-grid">
-            <Trait t="Status" v={lf.is_dead ? "Dead" : lf.is_alive ? "Alive" : "Dormant"} />
             <Trait t="Kind" v={kind} />
             <Trait t="Sequence length" v={String(lf.sequence_length)} />
             <Trait t="Age" v={`${lf.age} ${lf.age === 1 ? "breath" : "breaths"}`} />
           </div>
 
+          {rp && edit && (
+            <div style={{ marginTop: 14 }}>
+              <div className="note" style={{ marginBottom: 6 }}>appearance{isOwner ? " · yours to tune" : ""}</div>
+              <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
+                <label className="note" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  background
+                  {isOwner ? (
+                    <input type="color" value={toHexColor(edit.bg)} onChange={(e) => setEdit({ ...edit, bg: fromHexColor(e.target.value) })} />
+                  ) : (
+                    <Swatch color={toHexColor(rp.bg)} />
+                  )}
+                </label>
+                <label className="note" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  cell
+                  {isOwner ? (
+                    <input type="color" value={toHexColor(edit.cell)} onChange={(e) => setEdit({ ...edit, cell: fromHexColor(e.target.value) })} />
+                  ) : (
+                    <Swatch color={toHexColor(rp.cell)} />
+                  )}
+                </label>
+                <label className="note" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  speed
+                  {isOwner ? (
+                    <input
+                      type="number"
+                      min={1}
+                      max={SPEED_MAX - 1}
+                      value={edit.speed}
+                      onChange={(e) => setEdit({ ...edit, speed: Math.max(1, Math.min(SPEED_MAX - 1, Number(e.target.value) || 1)) })}
+                      style={{ width: 64 }}
+                    />
+                  ) : (
+                    <span className="mono">{rp.speed}</span>
+                  )}
+                </label>
+              </div>
+              {isOwner && editChanged && (
+                <div style={{ marginTop: 10 }}>
+                  {editInvalid && <p className="breathe-err">background and cell colour must differ</p>}
+                  <button className="btn primary" onClick={doEdit} disabled={editBusy || editInvalid}>
+                    {editStatus === "signing"
+                      ? "Confirm in your wallet…"
+                      : editStatus === "pending"
+                        ? "Editing… (tx pending)"
+                        : editStatus === "confirmed"
+                          ? "✓ Edited"
+                          : editStatus === "error"
+                            ? "Try again"
+                            : "Edit creature"}
+                  </button>
+                  {editErr && editStatus === "error" && <p className="breathe-err">{editErr}</p>}
+                </div>
+              )}
+            </div>
+          )}
+
           <p className="dim" style={{ maxWidth: "46ch" }}>{LIFEFORM_DESCRIPTION}</p>
 
           {!lf.is_dead && (
             <div className="breathe-block">
+              {connected && onSepolia && (
+                <label className="note" style={{ display: "block", marginBottom: 8 }}>
+                  feed {feedGen} generation{feedGen === 1 ? "" : "s"} · earn {feedGen} $NUT
+                  <input
+                    type="range"
+                    min={1}
+                    max={FEED_CAP}
+                    value={feedGen}
+                    onChange={(e) => setFeedGen(Number(e.target.value))}
+                    disabled={busy}
+                    style={{ display: "block", width: "100%", maxWidth: 320 }}
+                  />
+                </label>
+              )}
               <button
                 className="btn primary breathe-btn"
-                onClick={() => (status === "error" ? reset() : breathe(decId))}
-                disabled={busy || (connected && !onSepolia)}
+                onClick={() =>
+                  status === "error" ? reset() : connected && !onSepolia ? switchToSepolia() : breathe(decId, feedGen)
+                }
+                disabled={busy}
               >
                 {!connected
-                  ? "Connect to breathe life"
+                  ? "Connect to feed"
                   : !onSepolia
-                    ? "Switch to Sepolia to breathe"
+                    ? "Switch to Sepolia to feed"
                     : status === "signing"
                       ? "Confirm in your wallet…"
                       : status === "pending"
-                        ? "Breathing… (tx pending)"
+                        ? "Feeding… (tx pending)"
                         : status === "confirmed"
-                          ? "✓ Breathed · +1 NUT"
+                          ? `✓ Fed · +${feedGen} $NUT`
                           : status === "error"
                             ? "Try again"
-                            : `Breathe life into #${decId}`}
+                            : `Feed & get ${feedGen} $NUT`}
               </button>
               {txHash && (status === "pending" || status === "confirmed") && (
                 <a className="tx-link" href={explorerTxUrl(txHash)} target="_blank" rel="noreferrer">
@@ -144,7 +268,7 @@ function MintedDetail({ id }: { id: string }) {
               )}
               {status === "error" && breatheError && <p className="breathe-err">{breatheError}</p>}
               {status === "idle" && connected && (
-                <p className="breathe-hint">advance it one generation, earn 1 NUT, keep it alive — feed anyone&rsquo;s creature.</p>
+                <p className="breathe-hint">feed it forward — each generation keeps it alive and earns you 1 $NUT.</p>
               )}
             </div>
           )}
@@ -165,7 +289,7 @@ function BeastDetail() {
   const beast = findBeast(params.id)!;
   const router = useRouter();
   const { sdk } = useGolSdk();
-  const { address, connect, onSepolia } = useWallet();
+  const { address, connect, onSepolia, switchToSepolia } = useWallet();
   const { status, txHash, error, mint, reset } = useMint();
   const [info, setInfo] = useState<BeastInfo>({ kind: "loading" });
 
@@ -246,7 +370,7 @@ function BeastDetail() {
             ) : !address ? (
               <button className="btn" onClick={connect}>Connect to set it free</button>
             ) : !onSepolia ? (
-              <button className="btn" disabled>Switch to Sepolia to mint</button>
+              <button className="btn primary" onClick={switchToSepolia}>Switch to Sepolia to mint</button>
             ) : (
               <button
                 className="btn primary breathe-btn"
@@ -281,6 +405,37 @@ function Trait({ t, v }: { t: string; v: string }) {
       <div className="t">{t}</div>
       <div className="v">{v}</div>
     </div>
+  );
+}
+
+// Click to copy the full value to the clipboard (shows a brief "copied!").
+function Copyable({ label, value, display }: { label: string; value: string; display: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <span
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1200);
+        } catch {
+          /* clipboard unavailable */
+        }
+      }}
+      title="Click to copy"
+      style={{ cursor: "pointer" }}
+    >
+      {label} <span className="mono">{copied ? "copied!" : display}</span>
+    </span>
+  );
+}
+
+function Swatch({ color }: { color: string }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      <span style={{ display: "inline-block", width: 16, height: 16, borderRadius: 4, background: color, border: "1px solid rgba(255,255,255,0.2)" }} />
+      <span className="mono">{color}</span>
+    </span>
   );
 }
 

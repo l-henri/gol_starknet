@@ -25,6 +25,15 @@ export function rowsFromCoords(coords: [number, number][]): number[] {
   return rows;
 }
 
+/** Cells -> the 41 row bitmasks (inverse of `fromRows`); feeds the SDK stepper / mint builders. */
+export function rowsFromCells(cells: Cells): number[] {
+  const rows = new Array<number>(N).fill(0);
+  for (let r = 0; r < N; r++) {
+    for (let c = 0; c < N; c++) if (cells[r * N + c]) rows[r] += 2 ** c;
+  }
+  return rows;
+}
+
 /** Build the grid from a v2 lifeform's `current_state` — the 41 row bitmasks (bit k of row r). */
 export function fromRows(rows: number[]): Cells {
   const c = new Array<boolean>(N * N).fill(false);

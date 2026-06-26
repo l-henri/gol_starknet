@@ -8,7 +8,7 @@ import { formatNut, shortAddr } from "@/lib/format";
 
 export default function GardenHeader() {
   const { sdk } = useGolSdk();
-  const { address, connecting, connect, disconnect, onSepolia, txEpoch } = useWallet();
+  const { address, connecting, connect, disconnect, onSepolia, switchToSepolia, txEpoch } = useWallet();
   const [nut, setNut] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,7 +35,14 @@ export default function GardenHeader() {
           Digital Bacteria
         </Link>
         <div className="header-right">
-          <span className={`pill ${onSepolia ? "" : "potential"}`} title={onSepolia ? "Live on Sepolia testnet" : "Wrong network — switch to Sepolia"}>
+          <Link href="/create" className="btn">Draw a lifeform</Link>
+          <span
+            className={`pill ${onSepolia ? "" : "potential"}`}
+            title={onSepolia ? "Live on Sepolia testnet" : "Wrong network — click to switch to Sepolia"}
+            onClick={onSepolia ? undefined : switchToSepolia}
+            role={onSepolia ? undefined : "button"}
+            style={onSepolia ? undefined : { cursor: "pointer" }}
+          >
             <span className="dot" />
             {onSepolia ? "Sepolia · testnet" : "Switch to Sepolia"}
           </span>

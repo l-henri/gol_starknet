@@ -11,7 +11,6 @@ import {
   N,
   step,
   STEP_AMBIENT,
-  STEP_ENGAGED,
 } from "@/lib/creatures";
 
 type Variant = "living" | "potential" | "dead";
@@ -25,8 +24,6 @@ interface Inst {
   variant: Variant;
   animate: boolean;
   interval: number;
-  target: number;
-  baseAmbient: number;
   lastStep: number;
   phase: number;
   visible: boolean;
@@ -102,7 +99,6 @@ function tick(now: number) {
   for (const inst of insts) {
     if (!inst.visible) continue;
     if (!reduced && inst.animate && inst.variant !== "dead") {
-      inst.interval += (inst.target - inst.interval) * 0.14;
       if (now - inst.lastStep >= inst.interval) {
         inst.cells = step(inst.cells);
         inst.lastStep = now;
@@ -143,7 +139,7 @@ export interface CreatureProps {
   cell?: number;
   speed?: number;
   variant?: Variant;
-  /** accelerate the simulation (hover / focus / detail) */
+  /** deprecated/ignored: hover no longer changes speed — a creature always runs at its own cadence */
   engaged?: boolean;
   /** false = hold current state, no stepping */
   animate?: boolean;
@@ -154,7 +150,7 @@ export interface CreatureProps {
 }
 
 export default function Creature(props: CreatureProps) {
-  const { age = 0, variant = "living", engaged = false, animate = true, res = 360 } = props;
+  const { age = 0, variant = "living", animate = true, res = 360 } = props;
   const ref = useRef<HTMLCanvasElement>(null);
   const instRef = useRef<Inst | null>(null);
   // re-seed when the pattern identity changes
@@ -182,8 +178,6 @@ export default function Creature(props: CreatureProps) {
       variant,
       animate,
       interval: base,
-      target: engaged ? Math.min(STEP_ENGAGED, base) : base,
-      baseAmbient: base,
       lastStep: 0,
       phase: Math.random() * Math.PI * 2,
       visible: true,
@@ -208,12 +202,6 @@ export default function Creature(props: CreatureProps) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seedKey, variant, age, res, props.bg, props.cell, props.speed]);
-
-  // engage / disengage without re-seeding (never slower than the creature's own cadence)
-  useEffect(() => {
-    const inst = instRef.current;
-    if (inst) inst.target = engaged ? Math.min(STEP_ENGAGED, inst.baseAmbient) : inst.baseAmbient;
-  }, [engaged]);
 
   useEffect(() => {
     const inst = instRef.current;

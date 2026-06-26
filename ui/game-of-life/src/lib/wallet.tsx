@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useRef,
   useState,
   type ReactNode,
@@ -26,6 +27,8 @@ interface WalletCtx {
   execute: (calls: unknown) => Promise<string>;
   /** wait for a tx to be accepted, then signal a refetch */
   waitForTx: (hash: string) => Promise<void>;
+  /** ask the connected wallet to switch to Sepolia (shows the wallet's own popup) */
+  switchToSepolia: () => Promise<void>;
 }
 
 const Ctx = createContext<WalletCtx>({
@@ -41,6 +44,7 @@ const Ctx = createContext<WalletCtx>({
     throw new Error("wallet not ready");
   },
   waitForTx: async () => {},
+  switchToSepolia: async () => {},
 });
 
 export const useWallet = () => useContext(Ctx);
@@ -68,6 +72,12 @@ async function readChainId(swo: any): Promise<string | null> {
     /* fall through */
   }
   return swo?.chainId ?? null;
+}
+
+async function requestSwitch(swo: any): Promise<void> {
+  if (swo?.request) {
+    await swo.request({ type: "wallet_switchStarknetChain", params: { chainId: SEPOLIA_CHAIN_ID } });
+  }
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -99,8 +109,25 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       }
       swoRef.current = swo;
       accountRef.current = null; // rebuild on next execute
+      // react to in-wallet network/account changes so onSepolia + address stay current after a
+      // switch (this is why the button could get stuck on "Switch to Sepolia" after switching).
+      swo.on?.("networkChanged", () => {
+        accountRef.current = null;
+        void readChainId(swo).then(setChainId);
+      });
+      swo.on?.("accountsChanged", () => void readAddress(swo).then(setAddress));
       setAddress(await readAddress(swo));
-      setChainId(await readChainId(swo));
+      const id = await readChainId(swo);
+      setChainId(id);
+      // wrong network on connect → invite to switch (the wallet shows its own popup)
+      if (id && id !== SEPOLIA_CHAIN_ID) {
+        try {
+          await requestSwitch(swo);
+          setChainId(await readChainId(swo));
+        } catch {
+          /* user declined — the Switch-to-Sepolia affordances stay available */
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -145,11 +172,45 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setTxEpoch((n) => n + 1);
   }, []);
 
+  const switchToSepolia = useCallback(async () => {
+    const swo = swoRef.current;
+    if (!swo) {
+      setError("Connect a wallet first.");
+      return;
+    }
+    setError(null);
+    try {
+      await requestSwitch(swo);
+      accountRef.current = null; // rebuild the account for the new chain
+      setChainId(await readChainId(swo));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
+  // Poll the wallet's chain while connected — not every wallet emits "networkChanged", so this
+  // guarantees a switch is reflected (and `onSepolia` updated) within a few seconds.
+  useEffect(() => {
+    if (!address) return;
+    const poll = setInterval(() => {
+      const swo = swoRef.current;
+      if (!swo) return;
+      void readChainId(swo).then((c) => {
+        if (!c) return;
+        setChainId((prev) => {
+          if (c !== prev) accountRef.current = null; // chain changed → rebuild the account
+          return c;
+        });
+      });
+    }, 3000);
+    return () => clearInterval(poll);
+  }, [address]);
+
   const onSepolia = !chainId || chainId === SEPOLIA_CHAIN_ID;
 
   return (
     <Ctx.Provider
-      value={{ address, chainId, connecting, error, onSepolia, txEpoch, connect, disconnect, execute, waitForTx }}
+      value={{ address, chainId, connecting, error, onSepolia, txEpoch, connect, disconnect, execute, waitForTx, switchToSepolia }}
     >
       {children}
     </Ctx.Provider>
