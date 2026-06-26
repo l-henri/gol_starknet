@@ -148,6 +148,47 @@ mod tests {
     }
 
     #[test]
+    fn move_forward_n_advances_and_mints() {
+        let d = deploy_all();
+        let (loop_state, rows) = blinker_canonical();
+        let id = token_id(@rows);
+        let lifeforms = IGolLifeFormsV2Dispatcher { contract_address: d.lifeforms };
+        let nut = IERC20Dispatcher { contract_address: d.nutrient };
+
+        start_cheat_caller_address(d.loop_minter, d.creator);
+        IGolLoopMinterV2Dispatcher { contract_address: d.loop_minter }
+            .mint_loop(loop_state, 2, d.creator);
+        stop_cheat_caller_address(d.loop_minter);
+
+        let before = nut.balance_of(d.creator);
+        start_cheat_caller_address(d.lifeforms, d.creator);
+        lifeforms.move_lifeform_forward_n(id, 5);
+        stop_cheat_caller_address(d.lifeforms);
+
+        let data = lifeforms.get_lifeform_data(id);
+        assert(data.age == 5, 'age += n');
+        // period-2 blinker after 5 (odd) steps = phase B, not the canonical state
+        assert(data.current_state != loop_state, 'advanced 5 gens');
+        // minted exactly 5 NUT (1 per generation) to the caller
+        assert(nut.balance_of(d.creator) - before == 5000000000000000000, '5 NUT minted');
+    }
+
+    #[test]
+    #[should_panic(expected: 'n must be positive')]
+    fn move_forward_n_rejects_zero() {
+        let d = deploy_all();
+        let (loop_state, rows) = blinker_canonical();
+        let id = token_id(@rows);
+        start_cheat_caller_address(d.loop_minter, d.creator);
+        IGolLoopMinterV2Dispatcher { contract_address: d.loop_minter }
+            .mint_loop(loop_state, 2, d.creator);
+        stop_cheat_caller_address(d.loop_minter);
+        start_cheat_caller_address(d.lifeforms, d.creator);
+        IGolLifeFormsV2Dispatcher { contract_address: d.lifeforms }.move_lifeform_forward_n(id, 0);
+        stop_cheat_caller_address(d.lifeforms);
+    }
+
+    #[test]
     fn mint_loop_from_partial_paths() {
         let d = deploy_all();
         let (loop_state, rows) = blinker_canonical();

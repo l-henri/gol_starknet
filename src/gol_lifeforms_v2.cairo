@@ -200,6 +200,31 @@ pub mod GolLifeformsV2 {
             nutrient_token.mint(get_caller_address(), NUT_DECIMALS);
         }
 
+        fn move_lifeform_forward_n(ref self: ContractState, token_id: u256, n: u32) {
+            // Batch of move_lifeform_forward: one state read/write + one NUT mint of `n`, stepping
+            // `n` generations in a loop. Intentionally public, like the single-step version; cheaper
+            // than `n` separate calls (no per-step storage round-trip or per-step mint).
+            assert(self.erc721.exists(token_id), 'Lifeform not minted');
+            assert(n > 0, 'n must be positive');
+            let mut lifeform_data = self.lifeform_data.read(token_id);
+            let mut rows = gol_grid_v2::unpack(@lifeform_data.current_state);
+            let mut i: u32 = 0;
+            while i < n {
+                rows = gol_grid_v2::step(@rows);
+                i += 1;
+            };
+            lifeform_data.current_state = gol_grid_v2::pack(@rows);
+            lifeform_data.age += n;
+            self.lifeform_data.write(token_id, lifeform_data);
+            self.emit(Event::NewMove(NewMoveEvent { token_id, age: lifeform_data.age }));
+            // Mint `n` NUT to the caller (1 per generation), in a single transfer.
+            let reward: u256 = n.into();
+            let nutrient_token = IGolNutrientTokenDispatcher {
+                contract_address: self.nutrient_token_contract.read(),
+            };
+            nutrient_token.mint(get_caller_address(), reward * NUT_DECIMALS);
+        }
+
         fn get_grid_size(self: @ContractState) -> u32 {
             gol_grid_v2::N
         }
