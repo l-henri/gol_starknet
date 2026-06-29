@@ -1,6 +1,10 @@
 # Frontend Redesign — the "Digital Bacteria" web experience
 
-> **Status:** proposal / planning artifact (2026-06-17). **Needs sign-off before any frontend code is written.**
+> **Status:** ✅ **SHIPPED & evolved** (signed off; built in `ui/game-of-life`). This stays as the
+> design/planning artifact — the *thesis* below still holds, but the app has moved past it (living
+> gallery, `/create` editor with a slot-machine score, breathe/feed, owner-editable params, a
+> bilingual FR/EN switch). For the **as-built** app, see [frontend.md](frontend.md) (architecture) and
+> the app [README](../ui/game-of-life/README.md). Original planning status: *proposal (2026-06-17)*.
 > **Scope tier:** internal (AMBER) — references unreleased plans + Sepolia deployment addresses.
 > **Audience:** whoever builds the web app; the designer (me) owns the design chart.
 > **Companions:** [purpose.md](purpose.md) (the soul), [sdk-plan.md](sdk-plan.md) (the SDK surface this consumes),
