@@ -164,6 +164,70 @@ impl GolSdk {
         calls_to_js(&[("approve", &calls[0]), ("mint_loop", &calls[1])])
     }
 
+    /// Plan the full transaction sequence to mint a loop. `rows` = the loop's canonical (smallest)
+    /// state; `loop_length` = its period. Short loops are a single `mint_loop` tx; long loops (whose
+    /// on-chain verification exceeds the wallet's per-tx gas cap) are tiled into partial-path segments
+    /// the wallet signs in sequence. Returns
+    /// `{ steps: [{ label, calls: [{contractAddress, entrypoint, calldata}] }], txCount, singleShot, tooLong }`.
+    /// Each `step` is one transaction (a multicall); fire them in order, awaiting each.
+    #[wasm_bindgen(js_name = planLoopMint)]
+    pub fn plan_loop_mint(
+        &self,
+        rows: Vec<f64>,
+        loop_length: u32,
+        recipient: &str,
+        chunk_steps: u32,
+        single_shot_max: u32,
+        max_tx: u32,
+    ) -> Result<JsValue, JsValue> {
+        let canonical = rows_from_js(rows)?;
+        let plan = self.client.writes().plan_loop_mint(
+            &canonical,
+            loop_length,
+            parse_felt(recipient)?,
+            chunk_steps,
+            single_shot_max,
+            max_tx,
+        );
+        #[derive(Serialize)]
+        struct JsStep {
+            label: String,
+            calls: Vec<JsCall>,
+        }
+        #[derive(Serialize)]
+        struct JsPlan {
+            steps: Vec<JsStep>,
+            #[serde(rename = "txCount")]
+            tx_count: u32,
+            #[serde(rename = "singleShot")]
+            single_shot: bool,
+            #[serde(rename = "tooLong")]
+            too_long: bool,
+        }
+        let steps = plan
+            .steps
+            .iter()
+            .map(|s| JsStep {
+                label: s.label.clone(),
+                calls: s
+                    .calls
+                    .iter()
+                    .map(|c| JsCall {
+                        contract_address: felt_to_hex(&c.to),
+                        entrypoint: name_for_selector(&c.selector),
+                        calldata: c.calldata.iter().map(felt_to_hex).collect(),
+                    })
+                    .collect(),
+            })
+            .collect();
+        to_js(&JsPlan {
+            steps,
+            tx_count: plan.tx_count,
+            single_shot: plan.single_shot,
+            too_long: plan.too_long,
+        })
+    }
+
     /// The `move_lifeform_forward_n(token_id, n)` call for the wallet to sign + send — advances `n`
     /// generations and mints `n` NUT in one tx. `n` is clamped to >= 1 (the contract asserts n > 0).
     #[wasm_bindgen(js_name = breatheLifeCall)]
@@ -267,6 +331,29 @@ fn rows_from_js(rows: Vec<f64>) -> Result<Rows, JsValue> {
 
 fn rows_to_js(r: &Rows) -> Vec<f64> {
     r.iter().map(|&x| x as f64).collect()
+}
+
+/// Reverse-map a call's selector felt to its entry-point name (browser wallets take the name, not the
+/// selector). Falls back to the selector hex for an unknown call.
+fn name_for_selector(sel: &Felt) -> String {
+    const NAMES: &[&str] = &[
+        "approve",
+        "mint_loop",
+        "mint_partial_path",
+        "combine_partial_path",
+        "mint_loop_from_partial_paths",
+        "mint_path",
+        "mint_path_from_partial_paths",
+        "move_lifeform_forward_n",
+        "set_render_params",
+        "transfer_from",
+    ];
+    for name in NAMES {
+        if gol_sdk::encoding::selector(name) == *sel {
+            return (*name).to_string();
+        }
+    }
+    felt_to_hex(sel)
 }
 
 fn calls_to_js(named: &[(&str, &Call)]) -> Result<JsValue, JsValue> {

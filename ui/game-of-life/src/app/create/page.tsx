@@ -7,10 +7,12 @@ import GolCanvas from "@/components/GolCanvas";
 import { useGolSdk } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
 import { useMint } from "@/lib/useMint";
+import { useGasCaps, plannedTxCount, MAX_TX } from "@/lib/gasCaps";
 import { N, type Cells, fromRows, rowsFromCells, liveCountRows } from "@/lib/creatures";
 import { shortAddr } from "@/lib/format";
 import { explorerTxUrl } from "@/lib/config";
 import { useT } from "@/lib/i18n";
+import { addBookmark, removeBookmark, isBookmarked, getMintProgress } from "@/lib/incubator";
 
 const EMPTY: Cells = new Array(N * N).fill(false);
 const isEmpty = (rows: number[]) => rows.every((r) => r === 0);
@@ -107,7 +109,8 @@ export default function CreatePage() {
   const { t } = useT();
   const { sdk } = useGolSdk();
   const { address, connect, onSepolia, switchToSepolia } = useWallet();
-  const { status, txHash, error: mintError, mint, reset } = useMint();
+  const { status, txHash, error: mintError, progress, mint, reset } = useMint();
+  const caps = useGasCaps();
   const router = useRouter();
 
   const [left, setLeft] = useState<Cells>(EMPTY);
@@ -118,6 +121,9 @@ export default function CreatePage() {
   const [fate, setFate] = useState<Fate>({ kind: "empty" });
   const [tokenId, setTokenId] = useState<string | null>(null);
   const [alreadyMinted, setAlreadyMinted] = useState(false);
+  const [bookmarked, setBookmarked] = useState(false);
+  // a half-finished partial-path mint for this loop, if any (drives the "Resume" copy)
+  const [resumeAt, setResumeAt] = useState<{ done: number; total: number } | null>(null);
   // amplitude observed live: max - min population seen so far this run (resets with the drawing)
   const popMin = useRef(Infinity);
   const popMax = useRef(-Infinity);
@@ -226,6 +232,19 @@ export default function CreatePage() {
     };
   }, [sdk, fate]);
 
+  // reflect local (Incubator) state for this loop: is it bookmarked, and is there a paused mint to
+  // resume? Re-checked when the status settles (a paused mint leaves progress; a confirmed one clears).
+  useEffect(() => {
+    if (!tokenId) {
+      setBookmarked(false);
+      setResumeAt(null);
+      return;
+    }
+    setBookmarked(isBookmarked(tokenId));
+    const p = getMintProgress(tokenId);
+    setResumeAt(p ? { done: p.done, total: p.total } : null);
+  }, [tokenId, status]);
+
   // on a confirmed mint, send them to their newborn creature
   useEffect(() => {
     if (status === "confirmed" && tokenId) {
@@ -237,6 +256,19 @@ export default function CreatePage() {
   const rightCells = useMemo(() => fromRows(rightRows), [rightRows]);
   const busy = status === "signing" || status === "pending";
   const loop = fate.kind === "loop" ? fate : null;
+  // how many transactions this loop needs (1 for short loops; tiled partial-path mint for long ones)
+  const mintTx = loop ? plannedTxCount(loop.period, caps) : 0;
+  const willTooLong = mintTx > MAX_TX;
+  const toggleBookmark = () => {
+    if (!loop || !tokenId) return;
+    if (bookmarked) {
+      removeBookmark(tokenId);
+      setBookmarked(false);
+    } else {
+      addBookmark({ id: tokenId, rows: loop.canonical, period: loop.period, savedAt: Date.now() });
+      setBookmarked(true);
+    }
+  };
 
   // Slot-machine score, revealed live as the right grid advances. `gen` is the live generation
   // counter; the fate (computed ahead, in the background) is the destiny the live grid converges to,
@@ -318,31 +350,57 @@ export default function CreatePage() {
               {t({ fr: " — une créature à faire naître.", en: " — a creature you can spawn." })}
               {tokenId && <> · <span className="mono">{shortAddr(tokenId)}</span></>}
             </div>
-            <div style={{ marginTop: 12 }}>
+            <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
               {alreadyMinted ? (
                 <Link className="btn primary" href={`/life/${tokenId}`}>{t({ fr: "Déjà découverte → la rencontrer", en: "Already discovered → meet it" })}</Link>
               ) : !address ? (
                 <button className="btn" onClick={connect}>{t({ fr: "Connectez-vous pour faire naître", en: "Connect to spawn" })}</button>
               ) : !onSepolia ? (
                 <button className="btn primary" onClick={switchToSepolia}>{t({ fr: "Passez sur Sepolia pour faire naître", en: "Switch to Sepolia to spawn" })}</button>
+              ) : willTooLong ? (
+                <span className="note">{t({
+                  fr: `Boucle trop longue à faire naître pour l'instant (~${mintTx} transactions, max ${MAX_TX}).`,
+                  en: `Too long to mint right now (~${mintTx} transactions, max ${MAX_TX}).`,
+                })}</span>
               ) : (
-                <button className="btn primary breathe-btn" onClick={() => (status === "error" ? reset() : mint(loop.canonical, loop.period))} disabled={busy}>
+                <button className="btn primary breathe-btn" onClick={() => mint(loop.canonical, loop.period)} disabled={busy}>
                   {status === "signing"
-                    ? t({ fr: "Confirmez dans votre portefeuille…", en: "Confirm in your wallet…" })
+                    ? progress
+                      ? t({ fr: `Confirmez l'étape ${progress.current}/${progress.total}…`, en: `Confirm step ${progress.current}/${progress.total}…` })
+                      : t({ fr: "Confirmez dans votre portefeuille…", en: "Confirm in your wallet…" })
                     : status === "pending"
-                      ? t({ fr: "Naissance… (tx en attente)", en: "Spawning… (tx pending)" })
+                      ? progress
+                        ? t({ fr: `Vérification… (${progress.current}/${progress.total})`, en: `Verifying… (${progress.current}/${progress.total})` })
+                        : t({ fr: "Naissance… (tx en attente)", en: "Spawning… (tx pending)" })
                       : status === "confirmed"
                         ? t({ fr: "✓ Née — on vous y emmène…", en: "✓ Spawned — taking you there…" })
                         : status === "error"
                           ? t({ fr: "Réessayer", en: "Try again" })
-                          : t({ fr: `Faire naître · ${loop.period} NUT`, en: `Spawn · ${loop.period} NUT` })}
+                          : resumeAt
+                            ? t({ fr: `Reprendre (${resumeAt.done}/${resumeAt.total}) · ${loop.period} NUT`, en: `Resume (${resumeAt.done}/${resumeAt.total}) · ${loop.period} NUT` })
+                            : mintTx > 1
+                              ? t({ fr: `Faire naître · ${loop.period} NUT · ${mintTx} tx`, en: `Spawn · ${loop.period} NUT · ${mintTx} txs` })
+                              : t({ fr: `Faire naître · ${loop.period} NUT`, en: `Spawn · ${loop.period} NUT` })}
+                </button>
+              )}
+              {!alreadyMinted && tokenId && (
+                <button className="btn" onClick={toggleBookmark} disabled={busy} title={t({ fr: "Garder sans faire naître", en: "Save without minting" })}>
+                  {bookmarked ? t({ fr: "★ Gardée", en: "★ Saved" }) : t({ fr: "☆ Garder", en: "☆ Bookmark" })}
                 </button>
               )}
               {txHash && (status === "pending" || status === "confirmed") && (
-                <a className="tx-link" href={explorerTxUrl(txHash)} target="_blank" rel="noreferrer" style={{ marginLeft: 12 }}>{t({ fr: "voir la tx ↗", en: "view tx ↗" })}</a>
+                <a className="tx-link" href={explorerTxUrl(txHash)} target="_blank" rel="noreferrer">{t({ fr: "voir la tx ↗", en: "view tx ↗" })}</a>
               )}
-              {status === "error" && mintError && <p className="breathe-err">{mintError}</p>}
             </div>
+            {!alreadyMinted && !willTooLong && address && onSepolia && mintTx > 1 && status !== "error" && (
+              <p className="note" style={{ marginTop: 8, maxWidth: "52ch" }}>
+                {t({
+                  fr: `Les longues boucles sont vérifiées par morceaux — votre portefeuille demandera d'approuver ${mintTx} transactions à la suite.`,
+                  en: `Long loops are verified in pieces — your wallet will ask you to approve ${mintTx} transactions in a row.`,
+                })}
+              </p>
+            )}
+            {status === "error" && mintError && <p className="breathe-err" style={{ marginTop: 8 }}>{mintError}</p>}
           </div>
         ) : null}
       </div>

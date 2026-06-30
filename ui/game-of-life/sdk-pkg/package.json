@@ -1,0 +1,17 @@
+{
+  "name": "gol-sdk-wasm",
+  "type": "module",
+  "description": "WASM bindings for gol-sdk — reads + call-building for the browser (signing stays in JS)",
+  "version": "0.0.0",
+  "license": "MIT",
+  "files": [
+    "gol_sdk_wasm_bg.wasm",
+    "gol_sdk_wasm.js",
+    "gol_sdk_wasm.d.ts"
+  ],
+  "main": "gol_sdk_wasm.js",
+  "types": "gol_sdk_wasm.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

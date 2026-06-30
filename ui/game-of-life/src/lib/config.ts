@@ -8,4 +8,6 @@ export const RPC_URL =
 
 export const NETWORK = "sepolia";
 
-export const explorerTxUrl = (hash: string): string => `https://sepolia.starkscan.co/tx/${hash}`;
+// Voyager explorer (network-aware: sepolia.voyager.online on testnet, voyager.online on mainnet).
+export const explorerTxUrl = (hash: string): string =>
+  `https://${(NETWORK as string) === "mainnet" ? "" : "sepolia."}voyager.online/tx/${hash}`;

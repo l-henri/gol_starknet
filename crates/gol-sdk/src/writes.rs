@@ -7,7 +7,7 @@
 
 use crate::config::GolAddresses;
 use crate::encoding::selector;
-use crate::grid::GridState;
+use crate::grid::{step, token_hash, GridState, Rows};
 use crate::types::{Call, Felt, RenderParams, U256};
 
 /// Which minter a partial-path call targets (both expose the same partial-path entry points).
@@ -15,6 +15,24 @@ use crate::types::{Call, Felt, RenderParams, U256};
 pub enum Minter {
     Loop,
     Path,
+}
+
+/// One transaction in a mint plan: a multicall the wallet signs + sends as a single tx.
+#[derive(Clone, Debug)]
+pub struct MintStep {
+    pub label: String,
+    pub calls: Vec<Call>,
+}
+
+/// The full transaction sequence to mint a loop (see [`GolWrites::plan_loop_mint`]).
+#[derive(Clone, Debug)]
+pub struct MintPlan {
+    pub steps: Vec<MintStep>,
+    pub tx_count: u32,
+    /// True when the loop fits a single `mint_loop` tx (no partial paths needed).
+    pub single_shot: bool,
+    /// True when the plan needs more than `max_tx` transactions (caller should refuse).
+    pub too_long: bool,
 }
 
 pub struct GolWrites<'a> {
@@ -185,6 +203,76 @@ impl<'a> GolWrites<'a> {
         }
     }
 
+    /// Plan the full transaction sequence to mint a loop of period `loop_length` whose canonical
+    /// (smallest) state is `canonical`. Short loops fit one `mint_loop` tx; longer ones are tiled into
+    /// overlapping partial-path segments (each ≤ `chunk_steps` Conway steps). Segments overlap by one
+    /// state — segment k+1 starts at segment k's exitpoint — so they `combine` cleanly. Every segment
+    /// after the first is batched with a `combine` that folds it into the accumulator keyed under
+    /// `token_hash(canonical)` (the loop id the final mint reads). The last step is
+    /// `mint_loop_from_partial_paths` (approve + mint). `too_long` is set if the plan exceeds `max_tx`.
+    ///
+    /// Mirrors the on-chain checks: the first segment starts at `canonical` (so the accumulator's key
+    /// is the loop id), no segment interior hits the canonical (only at closure), the assembled length
+    /// equals `loop_length`, its smallest is the canonical, and stepping its exitpoint returns to it.
+    pub fn plan_loop_mint(
+        &self,
+        canonical: &Rows,
+        loop_length: u32,
+        recipient: Felt,
+        chunk_steps: u32,
+        single_shot_max: u32,
+        max_tx: u32,
+    ) -> MintPlan {
+        let canon_state = GridState::pack(canonical);
+        if loop_length <= single_shot_max {
+            return MintPlan {
+                steps: vec![MintStep {
+                    label: "mint".into(),
+                    calls: self.mint_loop(&canon_state, loop_length, recipient),
+                }],
+                tx_count: 1,
+                single_shot: true,
+                too_long: false,
+            };
+        }
+        let loop_id = token_hash(canonical);
+        let total_steps = loop_length.saturating_sub(1); // walk s0..s_{L-1}
+        let chunk = chunk_steps.max(1);
+        let mut steps: Vec<MintStep> = Vec::new();
+        let mut current = *canonical; // s_{b_prev}
+        let mut b_prev = 0u32;
+        let mut seg_index = 0u32;
+        while b_prev < total_steps {
+            let b_next = (b_prev + chunk).min(total_steps);
+            let seg_steps = b_next - b_prev;
+            let path_start_rows = current;
+            let path_start = GridState::pack(&path_start_rows);
+            // a segment of `seg_steps` steps spans seg_steps+1 states
+            let mpp = self.mint_partial_path(Minter::Loop, &path_start, seg_steps + 1, &canon_state);
+            seg_index += 1;
+            if b_prev == 0 {
+                steps.push(MintStep { label: format!("segment {seg_index}"), calls: vec![mpp] });
+            } else {
+                let combine =
+                    self.combine_partial_path(Minter::Loop, loop_id, token_hash(&path_start_rows));
+                steps.push(MintStep {
+                    label: format!("segment {seg_index} + combine"),
+                    calls: vec![mpp, combine],
+                });
+            }
+            for _ in 0..seg_steps {
+                current = step(&current); // advance to the exitpoint = next segment's start
+            }
+            b_prev = b_next;
+        }
+        steps.push(MintStep {
+            label: "mint".into(),
+            calls: self.mint_loop_from_partial_paths(&canon_state, loop_length, recipient),
+        });
+        let tx_count = steps.len() as u32;
+        MintPlan { steps, tx_count, single_shot: false, too_long: tx_count > max_tx }
+    }
+
     fn minter_addr(&self, minter: Minter) -> Felt {
         match minter {
             Minter::Loop => self.addresses.loop_minter,
@@ -309,6 +397,80 @@ mod tests {
         assert_eq!(calls[1].calldata.len(), 8);
         assert_eq!(&calls[1].calldata[0..7], &state.to_calldata()[..]);
         assert_eq!(calls[1].calldata[7], Felt::from(0xabcu32));
+    }
+
+    #[test]
+    fn plan_loop_mint_tiles_a_glider_and_matches_contract_checks() {
+        use crate::engine::{combine_partial_path, compute_partial_path, find_loop, PartialPathData};
+        use crate::grid::{eq, grid_with, step, GridState};
+        let addrs = deployments(Network::Sepolia).unwrap();
+        let w = GolWrites::new(&addrs, 18);
+        // A glider returns to itself after a long period on the torus — a real multi-segment loop.
+        let glider = grid_with(&[(0, 0b010), (1, 0b100), (2, 0b111)]);
+        let (period, canonical) = find_loop(&glider, 4096).expect("glider loops");
+        assert!(period > 8, "need a multi-segment loop, got period {period}");
+
+        let chunk = 16u32;
+        let plan = w.plan_loop_mint(&canonical, period, Felt::from(0xabcu32), chunk, 8, 64);
+        assert!(!plan.single_shot && !plan.too_long);
+        let n_segments = plan.steps.len() - 1; // last step is the final mint
+
+        // Re-derive the tiling and run the SAME checks the contract runs, segment by segment.
+        let mut current = canonical;
+        let mut b_prev = 0u32;
+        let total_steps = period - 1;
+        let mut acc: Option<PartialPathData> = None;
+        let mut idx = 0usize;
+        while b_prev < total_steps {
+            let b_next = (b_prev + chunk).min(total_steps);
+            let seg_steps = b_next - b_prev;
+            // the planner's segment path_start (calldata[0..7]) must be this state
+            let mpp = &plan.steps[idx].calls[0];
+            assert_eq!(mpp.selector, selector("mint_partial_path"));
+            let plan_start = GridState::from_felts(&mpp.calldata[0..7]).unwrap();
+            assert!(eq(&plan_start.unpack(), &current), "segment {idx} path_start");
+            assert!(eq(&GridState::from_felts(&mpp.calldata[8..15]).unwrap().unpack(), &canonical), "trigger");
+            // contract accepts the segment (trigger not hit inside it)
+            let seg = compute_partial_path(&current, &canonical, seg_steps + 1).expect("segment computes");
+            acc = Some(match acc {
+                None => {
+                    assert_eq!(plan.steps[idx].calls.len(), 1, "first segment has no combine");
+                    seg
+                }
+                Some(a) => {
+                    assert_eq!(plan.steps[idx].calls.len(), 2);
+                    assert_eq!(plan.steps[idx].calls[1].selector, selector("combine_partial_path"));
+                    combine_partial_path(a, seg).expect("segments chain & combine")
+                }
+            });
+            for _ in 0..seg_steps {
+                current = step(&current);
+            }
+            b_prev = b_next;
+            idx += 1;
+        }
+        assert_eq!(idx, n_segments);
+        let assembled = acc.unwrap();
+        assert_eq!(assembled.length, period, "assembled length == loop period");
+        assert!(eq(&assembled.smallest.unpack(), &canonical), "smallest == canonical");
+        assert!(eq(&step(&assembled.exitpoint.unpack()), &canonical), "loop closes back to canonical");
+
+        // final step = approve + mint_loop_from_partial_paths
+        let last = plan.steps.last().unwrap();
+        assert_eq!(last.calls.len(), 2);
+        assert_eq!(last.calls[1].selector, selector("mint_loop_from_partial_paths"));
+    }
+
+    #[test]
+    fn plan_loop_mint_short_loop_is_single_shot() {
+        use crate::grid::grid_with;
+        let addrs = deployments(Network::Sepolia).unwrap();
+        let w = GolWrites::new(&addrs, 18);
+        let blinker = grid_with(&[(5, 0b111)]); // period 2
+        let plan = w.plan_loop_mint(&blinker, 2, Felt::from(1u32), 16, 8, 8);
+        assert!(plan.single_shot);
+        assert_eq!(plan.tx_count, 1);
+        assert_eq!(plan.steps[0].calls[1].selector, selector("mint_loop"));
     }
 
     #[test]

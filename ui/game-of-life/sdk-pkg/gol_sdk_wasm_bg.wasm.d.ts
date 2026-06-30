@@ -1,0 +1,32 @@
+/* tslint:disable */
+/* eslint-disable */
+export const memory: WebAssembly.Memory;
+export const __wbg_golsdk_free: (a: number, b: number) => void;
+export const golsdk_breatheLifeCall: (a: number, b: number, c: number, d: number) => [number, number, number];
+export const golsdk_findLoop: (a: number, b: number, c: number, d: number) => [number, number, number];
+export const golsdk_gridSize: (a: number) => any;
+export const golsdk_lifeform: (a: number, b: number, c: number) => any;
+export const golsdk_mintLoopCalls: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
+export const golsdk_new: (a: number, b: number, c: number, d: number) => [number, number, number];
+export const golsdk_nutBalance: (a: number, b: number, c: number) => any;
+export const golsdk_ownedLifeforms: (a: number, b: number, c: number) => any;
+export const golsdk_planLoopMint: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number, number];
+export const golsdk_recentLifeforms: (a: number, b: number) => any;
+export const golsdk_recentTokenIds: (a: number, b: number) => any;
+export const golsdk_renderParams: (a: number, b: number, c: number) => any;
+export const golsdk_setRenderParamsCall: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
+export const golsdk_stepRows: (a: number, b: number, c: number) => [number, number, number];
+export const golsdk_tokenIdForRows: (a: number, b: number, c: number) => [number, number, number];
+export const golsdk_tokenUri: (a: number, b: number, c: number) => any;
+export const wasm_bindgen__convert__closures_____invoke__h74bcc3753d680b42: (a: number, b: number, c: any) => [number, number];
+export const wasm_bindgen__convert__closures_____invoke__h3fd1d41b9588f30c: (a: number, b: number, c: any, d: any) => void;
+export const wasm_bindgen__convert__closures_____invoke__hc0e1ada004448962: (a: number, b: number) => void;
+export const __wbindgen_malloc: (a: number, b: number) => number;
+export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+export const __wbindgen_exn_store: (a: number) => void;
+export const __externref_table_alloc: () => number;
+export const __wbindgen_externrefs: WebAssembly.Table;
+export const __wbindgen_free: (a: number, b: number, c: number) => void;
+export const __wbindgen_destroy_closure: (a: number, b: number) => void;
+export const __externref_table_dealloc: (a: number) => void;
+export const __wbindgen_start: () => void;

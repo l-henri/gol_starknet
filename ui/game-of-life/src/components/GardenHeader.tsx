@@ -39,6 +39,7 @@ export default function GardenHeader() {
         <div className="header-right">
           <LangToggle />
           <Link href="/create" className="btn">{t({ fr: "Créer", en: "Create" })}</Link>
+          <Link href="/incubator" className="btn" title={t({ fr: "Naissances en cours et motifs gardés", en: "In-progress mints and saved patterns" })}>{t({ fr: "Incubateur", en: "Incubator" })}</Link>
           <span
             className={`pill ${onSepolia ? "" : "potential"}`}
             title={

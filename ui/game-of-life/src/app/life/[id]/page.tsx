@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Creature from "@/components/Creature";
 import { useGolSdk } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
 import { useBreathe } from "@/lib/useBreathe";
 import { useMint } from "@/lib/useMint";
+import { useGasCaps } from "@/lib/gasCaps";
 import { findBeast } from "@/lib/bestiary";
 import { rowsFromCoords } from "@/lib/creatures";
 import { lifeformKind, shortAddr, tokenIdDecimal } from "@/lib/format";
@@ -16,11 +17,10 @@ import type { JsLifeform } from "@/lib/types";
 import { onchainHtml, LIFEFORM_DESCRIPTION } from "@/lib/onchainRender";
 import { useT } from "@/lib/i18n";
 
-// max generations advanceable in one feed tx; the slider caps at 75% of it. Each generation is a
-// separate move_lifeform_forward call (~a v2 step + storage + NUT mint), so the real ceiling is
-// gas-bounded — this is a conservative default. (TODO: confirm the gas-safe per-tx max with you.)
-const MAX_GEN_STEP = 40;
-const FEED_CAP = Math.floor(0.75 * MAX_GEN_STEP);
+// The feed slider max is sized per-wallet from the connected account's gas-metering tier (see
+// gasCaps.ts): one move_lifeform_forward_n(id, n) costs ~3.0M gas/gen on a modern Sierra-gas account
+// vs ~14M/gen on a legacy one, so the ~1.2B per-tx wallet cap allows ~340 vs ~82 generations. The cap
+// comes from useGasCaps(); legacy is the safe default while the tier is still resolving.
 const SPEED_MAX = 200; // contract invariant: 0 < speed < SPEED_MAX
 const toHexColor = (n: number) => "#" + (n & 0xffffff).toString(16).padStart(6, "0");
 const fromHexColor = (s: string) => parseInt(s.replace("#", ""), 16) || 0;
@@ -46,6 +46,7 @@ function MintedDetail({ id }: { id: string }) {
   const { t } = useT();
   const { sdk, error } = useGolSdk();
   const { address, onSepolia, switchToSepolia, execute, waitForTx } = useWallet();
+  const { feedCap, tier } = useGasCaps();
   const { status, txHash, error: breatheError, breathe, reset, connected } = useBreathe();
   const [lf, setLf] = useState<JsLifeform | null>(null);
   const [rp, setRp] = useState<{ bg: number; cell: number; speed: number } | null>(null);
@@ -60,21 +61,27 @@ function MintedDetail({ id }: { id: string }) {
 
   const load = useCallback(async () => {
     if (!sdk) return;
-    try {
-      // No token_uri fetch: the on-chain artifact is rebuilt locally from these cheap reads + the
-      // cached template (see onchainRender). lifeform() already covers owner + current_state.
-      const [l, p] = await Promise.all([sdk.lifeform(id), sdk.renderParams(id)]);
-      if (!l) {
-        setNotFound(true);
-        return;
+    // No token_uri fetch: the on-chain artifact is rebuilt locally from these cheap reads + the
+    // cached template (see onchainRender). lifeform() already covers owner + current_state.
+    // A just-minted creature can lag chain reads by a beat, so retry briefly before concluding it
+    // isn't minted — this makes the post-mint redirect land smoothly without a manual refresh.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        const [l, p] = await Promise.all([sdk.lifeform(id), sdk.renderParams(id)]);
+        if (l) {
+          setLf(l as JsLifeform);
+          setRp((p as { bg: number; cell: number; speed: number } | null) ?? null);
+          setNotFound(false);
+          setLoading(false);
+          return;
+        }
+      } catch {
+        // transient read error — retry
       }
-      setLf(l as JsLifeform);
-      setRp((p as { bg: number; cell: number; speed: number } | null) ?? null);
-    } catch {
-      setNotFound(true);
-    } finally {
-      setLoading(false);
+      if (attempt < 4) await new Promise((r) => setTimeout(r, 1800));
     }
+    setNotFound(true);
+    setLoading(false);
   }, [sdk, id]);
 
   useEffect(() => {
@@ -169,47 +176,44 @@ function MintedDetail({ id }: { id: string }) {
             <Trait t={t({ fr: "Type", en: "Kind" })} v={t(kind)} />
             <Trait t={t({ fr: "Longueur de séquence", en: "Sequence length" })} v={String(lf.sequence_length)} />
             <Trait t={t({ fr: "Âge", en: "Age" })} v={`${lf.age} ${t({ fr: lf.age === 1 ? "souffle" : "souffles", en: lf.age === 1 ? "breath" : "breaths" })}`} />
+            {rp && (
+              <>
+                <Trait t={t({ fr: "Fond", en: "Background" })} v={<Swatch color={toHexColor(rp.bg)} />} />
+                <Trait t={t({ fr: "Cellule", en: "Cell" })} v={<Swatch color={toHexColor(rp.cell)} />} />
+                <Trait t={t({ fr: "Vitesse", en: "Speed" })} v={`${rp.speed} ${t({ fr: "gén/s", en: "gen/s" })}`} />
+              </>
+            )}
           </div>
 
-          {rp && edit && (
+          {/* Editing the appearance is owner-only — the values themselves are shown read-only in the
+              characteristics grid above. These controls appear only when the owner's wallet is connected. */}
+          {isOwner && rp && edit && (
             <div style={{ marginTop: 14 }}>
               <div className="note" style={{ marginBottom: 6 }}>
-                {t({ fr: `apparence${isOwner ? " · à vous de régler" : ""}`, en: `appearance${isOwner ? " · yours to tune" : ""}` })}
+                {t({ fr: "apparence · à vous de régler", en: "appearance · yours to tune" })}
               </div>
               <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
                 <label className="note" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   {t({ fr: "fond", en: "background" })}
-                  {isOwner ? (
-                    <input type="color" value={toHexColor(edit.bg)} onChange={(e) => setEdit({ ...edit, bg: fromHexColor(e.target.value) })} />
-                  ) : (
-                    <Swatch color={toHexColor(rp.bg)} />
-                  )}
+                  <input type="color" value={toHexColor(edit.bg)} onChange={(e) => setEdit({ ...edit, bg: fromHexColor(e.target.value) })} />
                 </label>
                 <label className="note" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   {t({ fr: "cellule", en: "cell" })}
-                  {isOwner ? (
-                    <input type="color" value={toHexColor(edit.cell)} onChange={(e) => setEdit({ ...edit, cell: fromHexColor(e.target.value) })} />
-                  ) : (
-                    <Swatch color={toHexColor(rp.cell)} />
-                  )}
+                  <input type="color" value={toHexColor(edit.cell)} onChange={(e) => setEdit({ ...edit, cell: fromHexColor(e.target.value) })} />
                 </label>
                 <label className="note" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   {t({ fr: "vitesse", en: "speed" })}
-                  {isOwner ? (
-                    <input
-                      type="number"
-                      min={1}
-                      max={SPEED_MAX - 1}
-                      value={edit.speed}
-                      onChange={(e) => setEdit({ ...edit, speed: Math.max(1, Math.min(SPEED_MAX - 1, Number(e.target.value) || 1)) })}
-                      style={{ width: 64 }}
-                    />
-                  ) : (
-                    <span className="mono">{rp.speed}</span>
-                  )}
+                  <input
+                    type="number"
+                    min={1}
+                    max={SPEED_MAX - 1}
+                    value={edit.speed}
+                    onChange={(e) => setEdit({ ...edit, speed: Math.max(1, Math.min(SPEED_MAX - 1, Number(e.target.value) || 1)) })}
+                    style={{ width: 64 }}
+                  />
                 </label>
               </div>
-              {isOwner && editChanged && (
+              {editChanged && (
                 <div style={{ marginTop: 10 }}>
                   {editInvalid && <p className="breathe-err">{t({ fr: "le fond et la cellule doivent différer", en: "background and cell colour must differ" })}</p>}
                   <button className="btn primary" onClick={doEdit} disabled={editBusy || editInvalid}>
@@ -242,12 +246,20 @@ function MintedDetail({ id }: { id: string }) {
                   <input
                     type="range"
                     min={1}
-                    max={FEED_CAP}
+                    max={feedCap}
                     value={feedGen}
                     onChange={(e) => setFeedGen(Number(e.target.value))}
                     disabled={busy}
                     style={{ display: "block", width: "100%", maxWidth: 320 }}
                   />
+                  {tier === "modern" && (
+                    <span className="note" style={{ display: "block", marginTop: 4, opacity: 0.7 }}>
+                      {t({
+                        fr: `⚡ jusqu'à ${feedCap} générations par transaction (portefeuille à gas moderne)`,
+                        en: `⚡ up to ${feedCap} generations per feed (modern-gas wallet)`,
+                      })}
+                    </span>
+                  )}
                 </label>
               )}
               <button
@@ -413,7 +425,7 @@ function BeastDetail() {
   );
 }
 
-function Trait({ t, v }: { t: string; v: string }) {
+function Trait({ t, v }: { t: string; v: ReactNode }) {
   return (
     <div className="trait">
       <div className="t">{t}</div>

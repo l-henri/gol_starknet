@@ -13,7 +13,15 @@ function humanize(e: unknown, t: (d: Dict) => string): string {
     return t({ fr: "Vous avez refusé la signature.", en: "You declined the signature." });
   if (/insufficient|balance|fee|funds/i.test(m))
     return t({ fr: "Pas assez de gas Sepolia pour nourrir.", en: "Not enough Sepolia gas to feed." });
-  return m.length > 140 ? m.slice(0, 137) + "…" : m;
+  // Some wallets (seen with Xverse) throw a blank error when they fail to broadcast — never show an
+  // empty message, or the failure reads as "nothing happened". Give an actionable fallback.
+  const msg = m.trim();
+  if (!msg)
+    return t({
+      fr: "Votre portefeuille n'a pas diffusé la transaction. Réessayez, ou utilisez un autre portefeuille Starknet (ArgentX, Braavos).",
+      en: "Your wallet didn't broadcast the transaction. Try again, or use another Starknet wallet (ArgentX, Braavos).",
+    });
+  return msg.length > 140 ? msg.slice(0, 137) + "…" : msg;
 }
 
 /**
@@ -43,11 +51,17 @@ export function useBreathe() {
         // read/write + one mint of N NUT, cheaper than N separate moves.
         const calls = sdk.breatheLifeCall(id, Math.max(1, count));
         const hash = await execute(calls);
+        // Some wallets (seen with Xverse) resolve the request without broadcasting and return no
+        // hash — surface that as an error instead of silently waiting on `undefined`.
+        if (!hash) throw new Error("Wallet returned no transaction hash (the feed was not broadcast).");
         setTxHash(hash);
         setStatus("pending");
         await waitForTx(hash);
         setStatus("confirmed");
       } catch (e) {
+        // Log the raw wallet/provider error — humanize() collapses it for the UI, but the original is
+        // what we need when a wallet (e.g. Xverse) fails the handoff.
+        console.error("[breathe] feed failed:", e);
         setError(humanize(e, t));
         setStatus("error");
       }

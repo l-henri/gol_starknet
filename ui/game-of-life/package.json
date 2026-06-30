@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "wasm": "wasm-pack build ../../crates/gol-sdk-wasm --target web && mkdir -p public && cp ../../crates/gol-sdk-wasm/pkg/gol_sdk_wasm.js ../../crates/gol-sdk-wasm/pkg/gol_sdk_wasm_bg.wasm public/",
+    "wasm": "wasm-pack build ../../crates/gol-sdk-wasm --target web && mkdir -p public sdk-pkg && cp ../../crates/gol-sdk-wasm/pkg/gol_sdk_wasm.js ../../crates/gol-sdk-wasm/pkg/gol_sdk_wasm_bg.wasm public/ && cp ../../crates/gol-sdk-wasm/pkg/gol_sdk_wasm.js ../../crates/gol-sdk-wasm/pkg/gol_sdk_wasm_bg.wasm ../../crates/gol-sdk-wasm/pkg/gol_sdk_wasm.d.ts ../../crates/gol-sdk-wasm/pkg/gol_sdk_wasm_bg.wasm.d.ts ../../crates/gol-sdk-wasm/pkg/package.json sdk-pkg/",
     "predev": "npm run wasm",
     "dev": "next dev",
     "prebuild": "npm run wasm",
     "build": "next build",
+    "vercel-build": "mkdir -p public && cp sdk-pkg/gol_sdk_wasm.js sdk-pkg/gol_sdk_wasm_bg.wasm public/ && next build",
     "start": "next start",
     "lint": "next lint"
   },
@@ -16,7 +17,7 @@
     "next": "15.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "gol-sdk-wasm": "file:../../crates/gol-sdk-wasm/pkg",
+    "gol-sdk-wasm": "file:./sdk-pkg",
     "starknet": "^7.6.4"
   },
   "devDependencies": {
