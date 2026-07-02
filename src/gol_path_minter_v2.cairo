@@ -14,12 +14,13 @@ pub mod GolPathMinterV2 {
     use gol_starknet::gol_utilities_v2::PartialPathData;
     use gol_starknet::gol_utilities_v2;
     use gol_starknet::interfaces_v2::{
-        IGolPathMinterV2, IGolLifeFormsV2Dispatcher, IGolLifeFormsV2DispatcherTrait, LifeFormData,
+        IGolPathMinterV2, IGolPathLifeFormsV2Dispatcher, IGolPathLifeFormsV2DispatcherTrait,
+        PathFormData, LifeState,
     };
 
     #[storage]
     struct Storage {
-        pub gol_lifeforms_nft: ContractAddress,
+        pub gol_path_lifeforms_nft: ContractAddress,
         pub partial_path_registry: Map<ContractAddress, Map<felt252, PartialPathData>>,
     }
 
@@ -43,9 +44,9 @@ pub mod GolPathMinterV2 {
     }
 
     #[constructor]
-    fn constructor(ref self: ContractState, gol_lifeforms_nft: ContractAddress) {
-        assert!(!gol_lifeforms_nft.is_zero(), "lifeforms_zero");
-        self.gol_lifeforms_nft.write(gol_lifeforms_nft);
+    fn constructor(ref self: ContractState, gol_path_lifeforms_nft: ContractAddress) {
+        assert!(!gol_path_lifeforms_nft.is_zero(), "lifeforms_zero");
+        self.gol_path_lifeforms_nft.write(gol_path_lifeforms_nft);
     }
 
     #[abi(embed_v0)]
@@ -65,7 +66,7 @@ pub mod GolPathMinterV2 {
             );
             // loop_entry must begin a single loop of loop_length; get the loop's own predecessor.
             // (is_single_loop panics if loop_entry isn't a clean loop of that length.)
-            let (is_loop, _smallest, loop_prev) = gol_utilities_v2::is_single_loop(
+            let (is_loop, smallest, loop_prev) = gol_utilities_v2::is_single_loop(
                 @loop_entry, loop_length,
             );
             assert(is_loop, 'Not entering a loop');
@@ -73,20 +74,28 @@ pub mod GolPathMinterV2 {
             // the loop's internal predecessor (otherwise path_start is already in the loop).
             assert(!gol_grid_v2::eq(@loop_prev, @path_prev), 'Incorrect loop entrypoint');
             let empty = gol_grid_v2::is_empty(@loop_entry);
-            let lifeform = LifeFormData {
-                is_loop: false,
-                is_still: false,
-                is_alive: !empty,
-                is_dead: empty,
-                sequence_length: length_to_loop_entrypoint,
-                current_state: gol_grid_v2::pack(@path_rows), // audit #1: store canonical, not raw
-                age: 0,
+            // Three-way life state: dead (empty) / frozen (still life, period 1) / alive (period>1).
+            let life_state = if empty {
+                LifeState::Dead
+            } else if loop_length == 1 {
+                LifeState::Frozen
+            } else {
+                LifeState::Alive
             };
-            let lifeforms = IGolLifeFormsV2Dispatcher {
-                contract_address: self.gol_lifeforms_nft.read(),
+            let path_data = PathFormData {
+                life_state,
+                sequence_length: length_to_loop_entrypoint,
+                start_state: gol_grid_v2::pack(@path_rows), // audit #1: store canonical, not raw
+                target_loop_id: gol_grid_v2::token_hash(@smallest),
+                target_period: loop_length,
+                minted_at: 0, // stamped by the NFT at mint
+                escrow: 0, // stamped by the NFT at mint
+            };
+            let lifeforms = IGolPathLifeFormsV2Dispatcher {
+                contract_address: self.gol_path_lifeforms_nft.read(),
             };
             lifeforms
-                .mint(recipient, get_caller_address(), gol_grid_v2::token_id(@path_rows), lifeform);
+                .mint(recipient, get_caller_address(), gol_grid_v2::token_id(@path_rows), path_data);
             true
         }
 
@@ -158,19 +167,27 @@ pub mod GolPathMinterV2 {
             // The path's loop segment is not the path itself.
             assert(main_path.exitpoint != loop_partial.exitpoint, 'Loop is the main path');
             let empty = gol_grid_v2::is_empty(@loop_entry);
-            let lifeform = LifeFormData {
-                is_loop: false,
-                is_still: false,
-                is_alive: !empty,
-                is_dead: empty,
+            let loop_length = loop_partial.length;
+            let life_state = if empty {
+                LifeState::Dead
+            } else if loop_length == 1 {
+                LifeState::Frozen
+            } else {
+                LifeState::Alive
+            };
+            let path_data = PathFormData {
+                life_state,
                 sequence_length: main_path.length,
-                current_state: gol_grid_v2::pack(@path_rows), // audit #1: store canonical, not raw
-                age: 0,
+                start_state: gol_grid_v2::pack(@path_rows), // audit #1: store canonical, not raw
+                target_loop_id: gol_grid_v2::grid_hash(@loop_partial.smallest),
+                target_period: loop_length,
+                minted_at: 0, // stamped by the NFT at mint
+                escrow: 0, // stamped by the NFT at mint
             };
-            let lifeforms = IGolLifeFormsV2Dispatcher {
-                contract_address: self.gol_lifeforms_nft.read(),
+            let lifeforms = IGolPathLifeFormsV2Dispatcher {
+                contract_address: self.gol_path_lifeforms_nft.read(),
             };
-            lifeforms.mint(recipient, caller, path_id.into(), lifeform);
+            lifeforms.mint(recipient, caller, path_id.into(), path_data);
         }
     }
 }

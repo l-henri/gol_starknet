@@ -30,6 +30,41 @@ pub struct LifeFormData {
     pub age: u32,
 }
 
+/// A path creature's life state — what it converges to. See docs/path-creatures-spec.md.
+///  * `Alive`  — settles into a dynamic loop (period > 1).
+///  * `Frozen` — settles into a still life (period-1, non-empty).
+///  * `Dead`   — settles into the empty grid.
+/// Store: unit-variant enum stores as a felt; `Alive` is the zero/default variant.
+#[derive(Drop, Copy, Serde, PartialEq, starknet::Store)]
+pub enum LifeState {
+    // `#[default]` is the value an uninitialized storage slot deserializes to; all reads are guarded
+    // by `exists(token_id)` so it's only a formality, but the Store derive requires one.
+    #[default]
+    Alive,
+    Frozen,
+    Dead,
+}
+
+/// Per-token record for a PATH creature (a transient that leads into a loop but isn't in it).
+/// `token_id = token_hash(start_state)`. Paths are static snapshots — NOT feedable, no `age`.
+/// `minted_at` + `escrow` are stamped by the NFT contract at mint; the minter leaves them 0.
+#[derive(Drop, Copy, Serde, starknet::Store)]
+pub struct PathFormData {
+    pub life_state: LifeState,
+    /// distance to the loop: generations from start until it first enters the terminal loop (>=1).
+    pub sequence_length: usize,
+    /// the path's starting state (identity preimage).
+    pub start_state: GridState,
+    /// token_hash of the terminal the path settles into (canonical loop / still / empty state).
+    pub target_loop_id: felt252,
+    /// the terminal loop's period (1 for frozen/dead).
+    pub target_period: usize,
+    /// block timestamp at mint — the direction guard for sub-path burning.
+    pub minted_at: u64,
+    /// NUT held for this token (= sequence_length * 1e18); paid to a successful challenger on burn.
+    pub escrow: u256,
+}
+
 #[starknet::interface]
 pub trait IGolLifeFormsV2<TContractState> {
     /// Mint a lifeform. Guarded: only MINTER_ROLE (the minter contracts).
@@ -97,4 +132,26 @@ pub trait IGolPathMinterV2<TContractState> {
     fn mint_path_from_partial_paths(
         ref self: TContractState, path_start: GridState, recipient: ContractAddress,
     );
+}
+
+#[starknet::interface]
+pub trait IGolPathLifeFormsV2<TContractState> {
+    /// Mint a path lifeform. Guarded: only MINTER_ROLE (the path minter). The contract stamps
+    /// `minted_at` and escrows `sequence_length` NUT from `minter`, overriding those fields on input.
+    fn mint(
+        ref self: TContractState,
+        recipient: ContractAddress,
+        minter: ContractAddress,
+        token_id: u256,
+        path_data: PathFormData,
+    );
+    fn get_path_data(self: @TContractState, token_id: u256) -> PathFormData;
+    fn get_grid_size(self: @TContractState) -> u32;
+    fn get_render_params(self: @TContractState, token_id: u256) -> RenderParams;
+    /// Owner-only: customise a token's render params. Asserts bg != cell and 0 < speed < SPEED_MAX.
+    fn set_render_params(ref self: TContractState, token_id: u256, bg: u32, cell: u32, speed: u16);
+    /// Permissionless anti-farm: prove `older_id` is a proper forward ancestor of `younger_id`
+    /// (older leads to younger) and was minted earlier; on success burn `younger_id` and pay its
+    /// escrowed NUT to the caller. Verification (on-chain stepping) is the gate.
+    fn challenge_burn(ref self: TContractState, older_id: u256, younger_id: u256);
 }

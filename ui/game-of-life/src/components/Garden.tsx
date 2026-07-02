@@ -8,18 +8,25 @@ import { useT } from "@/lib/i18n";
 export default function Garden() {
   const { t } = useT();
   const { sdk, error } = useGolSdk();
-  // The fast scan returns just the token ids; each card then hydrates itself, so creatures appear
-  // as they're detected instead of all-at-once after a long sequential wait.
-  const [ids, setIds] = useState<string[] | null>(null);
+  // The fast scan returns just the token ids (loops + paths); each card hydrates itself, so creatures
+  // appear as they're detected instead of all-at-once after a long sequential wait.
+  const [items, setItems] = useState<{ id: string; kind: "loop" | "path" }[] | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     if (!sdk) return;
-    sdk
-      .recentTokenIds(60)
-      .then((r: unknown) => {
-        if (!cancelled) setIds((r as string[]) ?? []);
+    const asIds = (r: unknown) => (r as string[]) ?? [];
+    Promise.all([
+      sdk.recentTokenIds(60).then(asIds).catch(() => [] as string[]),
+      sdk.recentPathTokenIds(60).then(asIds).catch(() => [] as string[]),
+    ])
+      .then(([loops, paths]) => {
+        if (cancelled) return;
+        setItems([
+          ...loops.map((id) => ({ id, kind: "loop" as const })),
+          ...paths.map((id) => ({ id, kind: "path" as const })),
+        ]);
       })
       .catch((e: unknown) => {
         if (!cancelled) setScanError(e instanceof Error ? e.message : String(e));
@@ -30,15 +37,15 @@ export default function Garden() {
   }, [sdk]);
 
   const initialising = !sdk && !error;
-  const scanning = !!sdk && ids === null && !scanError;
+  const scanning = !!sdk && items === null && !scanError;
 
   return (
     <div className="wrap">
       <section className="garden-section">
         <div className="head">
-          {ids && ids.length > 0 && (
+          {items && items.length > 0 && (
             <span className="note">
-              {t({ fr: `les ${ids.length} créatures nées sur Sepolia`, en: `showing all ${ids.length} minted on Sepolia` })}
+              {t({ fr: `les ${items.length} créatures nées sur Sepolia`, en: `showing all ${items.length} minted on Sepolia` })}
             </span>
           )}
         </div>
@@ -60,16 +67,16 @@ export default function Garden() {
           <p className="status-line">{t({ fr: "impossible de scruter la chaîne — ", en: "couldn’t scan the chain — " })}{scanError}</p>
         )}
 
-        {ids && ids.length === 0 && !scanError && (
+        {items && items.length === 0 && !scanError && (
           <p className="status-line">
             {t({ fr: "aucune créature pour l’instant — soyez le premier à en libérer une ci-dessous.", en: "no creatures minted yet — be the first to set one free below." })}
           </p>
         )}
 
-        {ids && ids.length > 0 && (
+        {items && items.length > 0 && (
           <div className="garden-grid">
-            {ids.map((id) => (
-              <CreatureCard key={id} tokenId={id} />
+            {items.map(({ id, kind }) => (
+              <CreatureCard key={`${kind}:${id}`} tokenId={id} kind={kind} />
             ))}
           </div>
         )}

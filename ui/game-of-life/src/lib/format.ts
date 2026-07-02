@@ -13,10 +13,8 @@ export function lifeformKind(
 ): Dict {
   if (lf.is_dead) return { fr: "Éteinte", en: "Dead" };
   if (lf.is_still) return { fr: "Nature morte", en: "Still life" };
-  if (lf.is_loop)
-    return lf.sequence_length > 1
-      ? { fr: `Boucle · période ${lf.sequence_length}`, en: `Loop · period ${lf.sequence_length}` }
-      : { fr: "Boucle", en: "Loop" };
+  // The period is shown as its own trait now, so the kind label stays clean ("Loop", not "Loop · period N").
+  if (lf.is_loop) return { fr: "Boucle", en: "Loop" };
   return { fr: "Chemin", en: "Path" };
 }
 

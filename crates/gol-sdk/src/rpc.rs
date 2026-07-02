@@ -9,7 +9,7 @@ use crate::encoding::selector;
 use crate::error::GolError;
 use crate::reader::Reader;
 use crate::grid::GridState;
-use crate::types::{felt_hex, felt_to_bool, felt_to_u128, Felt, LifeformData, OwnedLifeform, RenderParams, TokenUri, U256};
+use crate::types::{felt_hex, felt_to_bool, felt_to_u128, Felt, LifeState, LifeformData, OwnedLifeform, OwnedPath, PathForm, RenderParams, TokenUri, U256};
 
 /// JSON-RPC `CONTRACT_ERROR` — a call that reverted (e.g. `owner_of` on an unminted token).
 const CONTRACT_ERROR: i64 = 40;
@@ -212,6 +212,25 @@ fn decode_lifeform(f: &[Felt]) -> Result<LifeformData, GolError> {
     })
 }
 
+fn decode_path_form(f: &[Felt]) -> Result<PathForm, GolError> {
+    // layout: life_state(0), sequence_length(1), start_state GridState(2..9), target_loop_id(9),
+    // target_period(10), minted_at(11), escrow low(12)/high(13) — 14 felts.
+    let start = GridState::from_felts(
+        f.get(2..9)
+            .ok_or_else(|| GolError::Encoding("path: result too short for GridState".into()))?,
+    )
+    .ok_or_else(|| GolError::Encoding("path: bad GridState".into()))?;
+    Ok(PathForm {
+        life_state: LifeState::from_index(felt_to_u128(at(f, 0)?) as u8),
+        sequence_length: felt_to_u128(at(f, 1)?) as u32,
+        start_state: start,
+        target_loop_id: *at(f, 9)?,
+        target_period: felt_to_u128(at(f, 10)?) as u32,
+        minted_at: felt_to_u128(at(f, 11)?) as u64,
+        escrow: U256::from_felts(at(f, 12)?, at(f, 13)?),
+    })
+}
+
 #[async_trait(?Send)]
 impl Reader for RpcReader {
     async fn grid_size(&self) -> Result<u32, GolError> {
@@ -300,6 +319,63 @@ impl Reader for RpcReader {
         let r = self
             .call_inner(
                 self.addr(ContractKey::Lifeforms)?,
+                selector("get_render_params"),
+                &token_id.to_calldata(),
+                true,
+            )
+            .await?;
+        match r {
+            None => Ok(None),
+            Some(v) => Ok(Some(RenderParams {
+                bg: felt_to_u128(at(&v, 0)?) as u32,
+                cell: felt_to_u128(at(&v, 1)?) as u32,
+                speed: felt_to_u128(at(&v, 2)?) as u16,
+            })),
+        }
+    }
+
+    async fn path_form(&self, token_id: U256) -> Result<Option<PathForm>, GolError> {
+        let r = self
+            .call_inner(
+                self.addr(ContractKey::PathLifeforms)?,
+                selector("get_path_data"),
+                &token_id.to_calldata(),
+                true,
+            )
+            .await?;
+        match r {
+            None => Ok(None),
+            Some(v) => Ok(Some(decode_path_form(&v)?)),
+        }
+    }
+
+    async fn path_lifeform(&self, token_id: U256) -> Result<Option<OwnedPath>, GolError> {
+        // owner_of on the PATH NFT gates existence (a burned/unminted id reverts).
+        let owner = self
+            .call_inner(
+                self.addr(ContractKey::PathLifeforms)?,
+                selector("owner_of"),
+                &token_id.to_calldata(),
+                true,
+            )
+            .await?
+            .and_then(|v| v.into_iter().next());
+        match owner {
+            None => Ok(None),
+            Some(owner) => {
+                let data = self
+                    .path_form(token_id)
+                    .await?
+                    .ok_or_else(|| GolError::Read("owner present but path_form reverted".into()))?;
+                Ok(Some(OwnedPath { token_id, owner, data }))
+            }
+        }
+    }
+
+    async fn path_render_params(&self, token_id: U256) -> Result<Option<RenderParams>, GolError> {
+        let r = self
+            .call_inner(
+                self.addr(ContractKey::PathLifeforms)?,
                 selector("get_render_params"),
                 &token_id.to_calldata(),
                 true,

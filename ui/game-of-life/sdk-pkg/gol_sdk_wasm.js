@@ -28,6 +28,42 @@ export class GolSdk {
         return takeFromExternrefTable0(ret[0]);
     }
     /**
+     * The permissionless `challenge_burn(older_id, younger_id)` call — burns a proven forward
+     * sub-path and pays its escrow to the caller.
+     * @param {string} older_id
+     * @param {string} younger_id
+     * @returns {any}
+     */
+    challengeBurnCall(older_id, younger_id) {
+        const ptr0 = passStringToWasm0(older_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(younger_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.golsdk_challengeBurnCall(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
+     * Classify what a drawing settles into: `{ kind: "loop"|"path"|"transient", … }`.
+     * - loop → `{ period, canonical: rows }` (mint a loop creature)
+     * - path → `{ sequenceLength, loopPeriod, loopCanonical: rows, loopEntry: rows, lifeState }`
+     * - transient → `{ steps }` (no loop within `max_steps`)
+     * @param {Float64Array} rows
+     * @param {number} max_steps
+     * @returns {any}
+     */
+    classifyFate(rows, max_steps) {
+        const ptr0 = passArrayF64ToWasm0(rows, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.golsdk_classifyFate(this.__wbg_ptr, ptr0, len0, max_steps);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
      * Discover the loop reachable from `rows` within `max_period`: `{ period, smallest }` (the
      * canonical state to mint) or `null` if it doesn't recur in range.
      * @param {Float64Array} rows
@@ -121,6 +157,28 @@ export class GolSdk {
         return ret;
     }
     /**
+     * Path creature by token id (decimal or `0x` hex), or `null` if not minted (or burned).
+     * @param {string} token_id
+     * @returns {Promise<any>}
+     */
+    pathLifeform(token_id) {
+        const ptr0 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.golsdk_pathLifeform(this.__wbg_ptr, ptr0, len0);
+        return ret;
+    }
+    /**
+     * Per-token render params on the path NFT (`{ bg, cell, speed }`), or `null` if not minted.
+     * @param {string} token_id
+     * @returns {Promise<any>}
+     */
+    pathRenderParams(token_id) {
+        const ptr0 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.golsdk_pathRenderParams(this.__wbg_ptr, ptr0, len0);
+        return ret;
+    }
+    /**
      * Plan the full transaction sequence to mint a loop. `rows` = the loop's canonical (smallest)
      * state; `loop_length` = its period. Short loops are a single `mint_loop` tx; long loops (whose
      * on-chain verification exceeds the wallet's per-tx gas cap) are tiled into partial-path segments
@@ -147,6 +205,30 @@ export class GolSdk {
         return takeFromExternrefTable0(ret[0]);
     }
     /**
+     * Plan the transaction(s) to mint a PATH creature. `rows` = the path's start state; `sequence_length`
+     * = its distance to the loop; `loop_period` = the loop's period. Short paths mint in one tx; longer
+     * ones need tiling (not yet built) and come back `tooLong`. Same shape as `planLoopMint`.
+     * @param {Float64Array} rows
+     * @param {number} sequence_length
+     * @param {number} loop_period
+     * @param {string} recipient
+     * @param {number} chunk_steps
+     * @param {number} single_shot_max
+     * @param {number} max_tx
+     * @returns {any}
+     */
+    planPathMint(rows, sequence_length, loop_period, recipient, chunk_steps, single_shot_max, max_tx) {
+        const ptr0 = passArrayF64ToWasm0(rows, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(recipient, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.golsdk_planPathMint(this.__wbg_ptr, ptr0, len0, sequence_length, loop_period, ptr1, len1, chunk_steps, single_shot_max, max_tx);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
      * Every minted lifeform (newest first), capped at `limit` (0 = unlimited), via the RPC event
      * scan. The global gallery feed on Sepolia. Each is confirmed live (current owner + state).
      * @param {number} limit
@@ -154,6 +236,16 @@ export class GolSdk {
      */
     recentLifeforms(limit) {
         const ret = wasm.golsdk_recentLifeforms(this.__wbg_ptr, limit);
+        return ret;
+    }
+    /**
+     * Token ids ("0x…") of recent PATH mints, newest first — the fast event scan of the path NFT.
+     * Hydrate each via `pathLifeform()`; burned paths hydrate to null and should be skipped.
+     * @param {number} limit
+     * @returns {Promise<any>}
+     */
+    recentPathTokenIds(limit) {
+        const ret = wasm.golsdk_recentPathTokenIds(this.__wbg_ptr, limit);
         return ret;
     }
     /**
@@ -176,6 +268,23 @@ export class GolSdk {
         const len0 = WASM_VECTOR_LEN;
         const ret = wasm.golsdk_renderParams(this.__wbg_ptr, ptr0, len0);
         return ret;
+    }
+    /**
+     * The owner-only path `set_render_params` call for the wallet to sign + send.
+     * @param {string} token_id
+     * @param {number} bg
+     * @param {number} cell
+     * @param {number} speed
+     * @returns {any}
+     */
+    setPathRenderParamsCall(token_id, bg, cell, speed) {
+        const ptr0 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.golsdk_setPathRenderParamsCall(this.__wbg_ptr, ptr0, len0, bg, cell, speed);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
     }
     /**
      * The owner-only `set_render_params` call for the wallet to sign + send.
@@ -517,12 +626,12 @@ function __wbg_get_imports() {
             return ret;
         },
         __wbindgen_cast_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 246, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 259, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__h74bcc3753d680b42);
             return ret;
         },
         __wbindgen_cast_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [], shim_idx: 218, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [], shim_idx: 231, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__hc0e1ada004448962);
             return ret;
         },

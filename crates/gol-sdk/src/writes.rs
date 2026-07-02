@@ -80,8 +80,9 @@ impl<'a> GolWrites<'a> {
         loop_length: u32,
         recipient: Felt,
     ) -> Vec<Call> {
+        // Paths escrow NUT into the PATH NFT (not the loop lifeforms) — that contract charges + holds it.
         let approve = self.approve_nut(
-            self.addresses.lifeforms,
+            self.addresses.path_lifeforms,
             nut_cost_for_path(length_to_loop_entrypoint, self.nut_decimals),
         );
         let mut calldata = path_start.to_calldata().to_vec();
@@ -152,8 +153,8 @@ impl<'a> GolWrites<'a> {
         sequence_length: u32,
         recipient: Felt,
     ) -> Vec<Call> {
-        let approve =
-            self.approve_nut(self.addresses.lifeforms, unit_cost(sequence_length, self.nut_decimals));
+        let approve = self
+            .approve_nut(self.addresses.path_lifeforms, unit_cost(sequence_length, self.nut_decimals));
         let mut calldata = path_start.to_calldata().to_vec();
         calldata.push(recipient);
         vec![
@@ -164,6 +165,127 @@ impl<'a> GolWrites<'a> {
                 calldata,
             },
         ]
+    }
+
+    /// `path_lifeforms.set_render_params(token_id, bg, cell, speed)` — owner-only (path NFT).
+    pub fn set_path_render_params(&self, token_id: U256, params: RenderParams) -> Call {
+        let mut calldata = token_id.to_calldata().to_vec();
+        calldata.push(Felt::from(params.bg));
+        calldata.push(Felt::from(params.cell));
+        calldata.push(Felt::from(params.speed));
+        Call {
+            to: self.addresses.path_lifeforms,
+            selector: selector("set_render_params"),
+            calldata,
+        }
+    }
+
+    /// `path_lifeforms.challenge_burn(older_id, younger_id)` — permissionless anti-farm: burns a
+    /// proven forward sub-path (`younger`) of an older path and pays its escrow to the caller.
+    pub fn challenge_burn(&self, older_id: U256, younger_id: U256) -> Call {
+        let mut calldata = older_id.to_calldata().to_vec();
+        calldata.extend_from_slice(&younger_id.to_calldata());
+        Call {
+            to: self.addresses.path_lifeforms,
+            selector: selector("challenge_burn"),
+            calldata,
+        }
+    }
+
+    /// Tile a run of `n_states` states starting at `start` into overlapping partial-path segments of
+    /// ≤ `chunk` Conway steps, registered under the PATH minter and combined into the accumulator keyed
+    /// at `token_hash(start)`. `trigger` guards against overshoot (a segment that reaches it is
+    /// rejected). Segments overlap by one state (seg k+1 starts at seg k's exitpoint). Handles the
+    /// single-state case (`n_states == 1`) as one length-1 segment. Appends `MintStep`s to `steps` and
+    /// returns the accumulator's final state (its exitpoint) so the caller can continue the walk.
+    fn tile_partial(
+        &self,
+        start: &Rows,
+        n_states: u32,
+        trigger: &GridState,
+        chunk: u32,
+        label: &str,
+        steps: &mut Vec<MintStep>,
+    ) -> Rows {
+        let acc_id = token_hash(start);
+        let total_steps = n_states.saturating_sub(1);
+        let mut current = *start;
+        let mut b_prev = 0u32;
+        let mut seg_index = 0u32;
+        loop {
+            let b_next = (b_prev + chunk).min(total_steps);
+            let seg_steps = b_next - b_prev;
+            let seg_state = GridState::pack(&current);
+            let mpp = self.mint_partial_path(Minter::Path, &seg_state, seg_steps + 1, trigger);
+            seg_index += 1;
+            if b_prev == 0 {
+                steps.push(MintStep { label: format!("{label} {seg_index}"), calls: vec![mpp] });
+            } else {
+                let combine = self.combine_partial_path(Minter::Path, acc_id, token_hash(&current));
+                steps.push(MintStep {
+                    label: format!("{label} {seg_index} + combine"),
+                    calls: vec![mpp, combine],
+                });
+            }
+            for _ in 0..seg_steps {
+                current = step(&current);
+            }
+            b_prev = b_next;
+            if b_prev >= total_steps {
+                break;
+            }
+        }
+        current
+    }
+
+    /// Plan the transaction(s) to mint a PATH of `sequence_length` (distance to loop) whose terminal
+    /// loop has period `loop_period`, from `start` rows. Short paths mint in one `mint_path` tx; longer
+    /// ones are tiled: the **main path** (`start` → the state before the loop entry, `sequence_length`
+    /// states) and the **loop witness** (`loop_period` states, keyed at the loop entry) are each split
+    /// into ≤`chunk_steps` segments, then a cheap `mint_path_from_partial_paths` finalises. Single-shot
+    /// cost is ∝ `sequence_length + loop_period` (mint_path steps both), so that's the single-shot gate.
+    pub fn plan_path_mint(
+        &self,
+        start: &Rows,
+        sequence_length: u32,
+        loop_period: u32,
+        recipient: Felt,
+        chunk_steps: u32,
+        single_shot_max: u32,
+        max_tx: u32,
+    ) -> MintPlan {
+        let start_state = GridState::pack(start);
+        // mint_path re-steps the transient AND walks the loop once, so cost ∝ sequence_length + period.
+        if sequence_length + loop_period <= single_shot_max {
+            return MintPlan {
+                steps: vec![MintStep {
+                    label: "mint".into(),
+                    calls: self.mint_path(&start_state, sequence_length, loop_period, recipient),
+                }],
+                tx_count: 1,
+                single_shot: true,
+                too_long: false,
+            };
+        }
+        let chunk = chunk_steps.max(1);
+        // The loop entry = start stepped `sequence_length` times; it's the trigger for both tilings
+        // (never hit inside the main path, and only at closure of the loop witness).
+        let mut loop_entry = *start;
+        for _ in 0..sequence_length {
+            loop_entry = step(&loop_entry);
+        }
+        let loop_entry_state = GridState::pack(&loop_entry);
+        let mut steps: Vec<MintStep> = Vec::new();
+        // Main path: `sequence_length` states (s0..s_{L-1}); its exitpoint steps to the loop entry.
+        self.tile_partial(start, sequence_length, &loop_entry_state, chunk, "path segment", &mut steps);
+        // Loop witness: `loop_period` states from the loop entry; keyed at token_hash(loop_entry).
+        self.tile_partial(&loop_entry, loop_period, &loop_entry_state, chunk, "loop segment", &mut steps);
+        steps.push(MintStep {
+            label: "mint".into(),
+            calls: self.mint_path_from_partial_paths(&start_state, sequence_length, recipient),
+        });
+        let tx_count = steps.len() as u32;
+        MintPlan { steps, tx_count, single_shot: false, too_long: tx_count > max_tx }
     }
 
     /// `lifeforms.move_lifeform_forward_n(token_id, n)` — advance `n` generations and mint `n` NUT to
@@ -471,6 +593,92 @@ mod tests {
         assert!(plan.single_shot);
         assert_eq!(plan.tx_count, 1);
         assert_eq!(plan.steps[0].calls[1].selector, selector("mint_loop"));
+    }
+
+    #[test]
+    fn plan_path_mint_single_shot_targets_path_nft() {
+        let addrs = deployments(Network::Sepolia).unwrap();
+        let w = GolWrites::new(&addrs, 18);
+        let l = grid_with(&[(1, 0b110), (2, 0b010)]); // L-tromino -> block, len 1
+        let plan = w.plan_path_mint(&l, 1, 1, Felt::from(0xabcu32), 16, 60, 16);
+        assert!(plan.single_shot && !plan.too_long);
+        assert_eq!(plan.steps[0].calls.len(), 2);
+        // approve escrows into the PATH NFT (not the loop lifeforms)
+        assert_eq!(plan.steps[0].calls[0].to, addrs.nutrient);
+        assert_eq!(plan.steps[0].calls[0].calldata[0], addrs.path_lifeforms);
+        assert_eq!(plan.steps[0].calls[1].to, addrs.path_minter);
+        assert_eq!(plan.steps[0].calls[1].selector, selector("mint_path"));
+    }
+
+    #[test]
+    fn plan_path_mint_too_long_when_over_max_tx() {
+        let addrs = deployments(Network::Sepolia).unwrap();
+        let w = GolWrites::new(&addrs, 18);
+        let l = grid_with(&[(1, 0b110), (2, 0b010)]);
+        // force tiling (single_shot_max 0) -> 3 steps (main+loop+mint) > max_tx 1 -> too_long.
+        let plan = w.plan_path_mint(&l, 1, 1, Felt::from(1u32), 16, 0, 1);
+        assert!(plan.too_long && !plan.single_shot);
+    }
+
+    // Tiled path mint: force multi-tx (single_shot_max 0) and re-run the contract's checks segment by
+    // segment for BOTH the main path and the loop witness, then confirm the final mint step.
+    #[test]
+    fn plan_path_mint_tiles_main_and_loop_witness() {
+        use crate::engine::{classify_fate, combine_partial_path, compute_partial_path, Fate, PartialPathData};
+        use crate::grid::{eq, step};
+        let addrs = deployments(Network::Sepolia).unwrap();
+        let w = GolWrites::new(&addrs, 18);
+        // A real path: L-tromino -> block (still life). seq 1, loop period 1.
+        let start = grid_with(&[(1, 0b110), (2, 0b010)]);
+        let (seq, period, loop_entry) = match classify_fate(&start, 64) {
+            Fate::Path(p) => (p.sequence_length, p.loop_period, p.loop_entry),
+            f => panic!("expected a path, got {f:?}"),
+        };
+        let plan = w.plan_path_mint(&start, seq, period, Felt::from(0xabcu32), 16, 0, 16);
+        assert!(!plan.single_shot && !plan.too_long);
+
+        let trigger = GridState::pack(&loop_entry);
+        // Walk the plan's mint_partial_path segments up to the final mint; fold main vs loop separately.
+        let mut main_acc: Option<PartialPathData> = None;
+        let mut loop_acc: Option<PartialPathData> = None;
+        let mut on_loop = false;
+        for stepx in &plan.steps[..plan.steps.len() - 1] {
+            let mpp = &stepx.calls[0];
+            assert_eq!(mpp.selector, selector("mint_partial_path"));
+            let seg_start = GridState::from_felts(&mpp.calldata[0..7]).unwrap();
+            let seg_len = crate::types::felt_to_u128(&mpp.calldata[7]) as u32;
+            assert_eq!(&GridState::from_felts(&mpp.calldata[8..15]).unwrap(), &trigger, "trigger = loop entry");
+            let seg = compute_partial_path(&seg_start.unpack(), &loop_entry, seg_len).expect("segment computes");
+            // the main path's first segment starts at `start`; the loop witness's at `loop_entry`.
+            if !on_loop && eq(&seg_start.unpack(), &loop_entry) && main_acc.is_some() {
+                on_loop = true;
+            }
+            let acc = if on_loop { &mut loop_acc } else { &mut main_acc };
+            *acc = Some(match acc.take() {
+                None => seg,
+                Some(a) => combine_partial_path(a, seg).expect("segments combine"),
+            });
+        }
+        let main = main_acc.unwrap();
+        let looping = loop_acc.unwrap();
+        assert_eq!(main.length, seq, "main length == sequence_length");
+        assert!(eq(&step(&main.exitpoint.unpack()), &loop_entry), "main exit steps to loop entry");
+        assert_eq!(looping.length, period, "loop witness length == period");
+        assert!(eq(&step(&looping.exitpoint.unpack()), &loop_entry), "loop closes to entry");
+        // final step = approve + mint_path_from_partial_paths
+        let last = plan.steps.last().unwrap();
+        assert_eq!(last.calls[1].selector, selector("mint_path_from_partial_paths"));
+    }
+
+    #[test]
+    fn challenge_burn_calldata() {
+        let addrs = deployments(Network::Sepolia).unwrap();
+        let w = GolWrites::new(&addrs, 18);
+        let call = w.challenge_burn(U256::from_u128(0xa), U256::from_u128(0xb));
+        assert_eq!(call.to, addrs.path_lifeforms);
+        assert_eq!(call.selector, selector("challenge_burn"));
+        // [older.lo, older.hi, younger.lo, younger.hi]
+        assert_eq!(call.calldata, vec![Felt::from(0xau32), Felt::ZERO, Felt::from(0xbu32), Felt::ZERO]);
     }
 
     #[test]

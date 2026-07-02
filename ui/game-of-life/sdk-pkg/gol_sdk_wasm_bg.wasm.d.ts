@@ -3,6 +3,8 @@
 export const memory: WebAssembly.Memory;
 export const __wbg_golsdk_free: (a: number, b: number) => void;
 export const golsdk_breatheLifeCall: (a: number, b: number, c: number, d: number) => [number, number, number];
+export const golsdk_challengeBurnCall: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
+export const golsdk_classifyFate: (a: number, b: number, c: number, d: number) => [number, number, number];
 export const golsdk_findLoop: (a: number, b: number, c: number, d: number) => [number, number, number];
 export const golsdk_gridSize: (a: number) => any;
 export const golsdk_lifeform: (a: number, b: number, c: number) => any;
@@ -10,10 +12,15 @@ export const golsdk_mintLoopCalls: (a: number, b: number, c: number, d: number, 
 export const golsdk_new: (a: number, b: number, c: number, d: number) => [number, number, number];
 export const golsdk_nutBalance: (a: number, b: number, c: number) => any;
 export const golsdk_ownedLifeforms: (a: number, b: number, c: number) => any;
+export const golsdk_pathLifeform: (a: number, b: number, c: number) => any;
+export const golsdk_pathRenderParams: (a: number, b: number, c: number) => any;
 export const golsdk_planLoopMint: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number, number];
+export const golsdk_planPathMint: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => [number, number, number];
 export const golsdk_recentLifeforms: (a: number, b: number) => any;
+export const golsdk_recentPathTokenIds: (a: number, b: number) => any;
 export const golsdk_recentTokenIds: (a: number, b: number) => any;
 export const golsdk_renderParams: (a: number, b: number, c: number) => any;
+export const golsdk_setPathRenderParamsCall: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
 export const golsdk_setRenderParamsCall: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
 export const golsdk_stepRows: (a: number, b: number, c: number) => [number, number, number];
 export const golsdk_tokenIdForRows: (a: number, b: number, c: number) => [number, number, number];

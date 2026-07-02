@@ -48,6 +48,22 @@ Format note (marketplace-facing): `token_uri` is now raw JSON (not base64). Stan
 after the first comma and `JSON.parse`. The `name` is `Lifeform <decimal token_id>` (77-digit) —
 cosmetic, could shorten later.
 
+## Path creatures (deployed 2026-07-01)
+
+New separate NFT for **path** creatures + a new minter that targets it (spec: `docs/path-creatures-spec.md`). The OLD `GolPathMinterV2` `0x5a3c3aff…` (which minted paths into the *loop* lifeforms) is **superseded** — the new path system is self-contained on its own NFT.
+
+| Contract | Address | class_hash |
+|---|---|---|
+| GolPathLifeformsV2 | `0x177545eec73206ea5313aa44482d02103824fca91801e32da106dbaad5e1fc` | `0x3ae1237d06f6d88095e40959c4f4c8d28a1c6bc8df770d813d4704490c6f209` |
+| GolPathMinterV2 (new) | `0x749695d6919cb110760acd9f63b2c9bbfcc9747139a19602c39593995219e0a` | `0x196ec04849eb7683da68e152925c1253867b4dd4a7c813dec35b4c09928355b` |
+
+- Constructors: `GolPathLifeformsV2(creator=admin, nutrient=NUT)`; `GolPathMinterV2(path_lifeforms)`. NUT reused (no fresh token).
+- Wiring: `GolPathLifeformsV2.grant_role(MINTER_ROLE, GolPathMinterV2)`; admin approved 1000 NUT to the path NFT (mint escrow).
+- **Live tests (Sepolia):**
+  - `mint_path` (L-tromino → 2×2 block): frozen, seq_length 1, target_period 1, minted_at stamped, **1 NUT escrowed**, owner = admin. tx `0x146faaeb068e29d508c38789ae326f6ae1c71a0dd502db4dd4744e446461f2b`.
+  - `challenge_burn` (older len-2 path burns its newer len-1 forward sub-path): sub-path **burned**, **1 NUT bounty** paid to challenger. tx `0x9b3c34c25bd3d713133480676dd6e43de0c68a52f721a291f7e01ce167ae42`.
+- **Cleanup before mainnet:** (1) admin was granted `MINTER_ROLE` on the path NFT for the challenge test (lets it forge path records bypassing the minter) — **revoke it**; (2) the challenge test left a bogus crafted path record `0x743d91e9…` (agent-owned) — testnet pollution; (3) revoke the old path minter's `MINTER_ROLE` on the loop lifeforms if fully retiring it.
+
 ## Notes / gotchas hit during deploy
 - Declare requires the contract-class `abi` as the **canonical `formatSpaces` string** (decimal/raw array → node error `invalid type: sequence, expected a string`).
 - strkd calldata must be **hex felts** (`num.toHex`), not decimal (error `114: invalid felt`).

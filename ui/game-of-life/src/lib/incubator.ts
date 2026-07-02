@@ -9,17 +9,24 @@
 // from the last *succeeded* step is always safe. (A future hardening could reconstruct progress from
 // the on-chain PartialPathCreated/Combined events if localStorage is lost.)
 
+/** Loop creature (canonical loop state) or path creature (transient into a loop). */
+export type CreatureKind = "loop" | "path";
+
 export type Bookmark = {
-  id: string; // token id (0x hex) — the canonical loop's identity
-  rows: number[]; // canonical state, 41 row bitmasks
-  period: number;
+  id: string; // token id (0x hex)
+  rows: number[]; // loop: canonical state; path: start state — 41 row bitmasks
+  period: number; // loop: loop length; path: sequence_length (distance to loop)
+  kind?: CreatureKind; // undefined = "loop" (back-compat with pre-path bookmarks)
+  loopPeriod?: number; // path only: the terminal loop's period
   savedAt: number;
 };
 
 export type MintProgress = {
-  id: string; // loop/token id (0x hex)
-  rows: number[]; // canonical state
-  period: number;
+  id: string; // token id (0x hex)
+  rows: number[]; // loop: canonical state; path: start state
+  period: number; // loop: loop length; path: sequence_length
+  kind?: CreatureKind; // undefined = "loop"
+  loopPeriod?: number; // path only
   done: number; // number of plan steps completed
   total: number; // total plan steps
   updatedAt: number;

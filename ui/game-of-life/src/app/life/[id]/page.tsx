@@ -41,8 +41,45 @@ export default function LifePage() {
   return <MintedDetail key={id} id={id} />;
 }
 
-/* ---------- a minted, on-chain creature ---------- */
+/* ---------- dispatcher: a minted id is either a loop creature or a path creature ---------- */
 function MintedDetail({ id }: { id: string }) {
+  const { t } = useT();
+  const { sdk, error } = useGolSdk();
+  const [kind, setKind] = useState<"loading" | "loop" | "path" | "none">("loading");
+  useEffect(() => {
+    if (!sdk) return;
+    let cancelled = false;
+    (async () => {
+      // Loop and path NFTs share the token-id scheme but live on different contracts. Race both;
+      // render whichever exists. A just-minted creature can lag chain reads, so retry briefly.
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const [l, p] = await Promise.all([
+          sdk.lifeform(id).catch(() => null),
+          sdk.pathLifeform(id).catch(() => null),
+        ]);
+        if (cancelled) return;
+        if (l) return setKind("loop");
+        if (p) return setKind("path");
+        if (attempt < 4) await new Promise((r) => setTimeout(r, 1800));
+      }
+      if (!cancelled) setKind("none");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sdk, id]);
+
+  if (error)
+    return <Shell><p className="status-line">{t({ fr: "la boîte de Pétri est hors ligne — ", en: "the petri dish is offline — " })}{error}</p></Shell>;
+  if (kind === "loading")
+    return <Shell><p className="status-line"><span className="spinner" /> {t({ fr: "lecture de la chaîne…", en: "reading the chain…" })}</p></Shell>;
+  if (kind === "loop") return <LoopDetail id={id} />;
+  if (kind === "path") return <PathDetail id={id} />;
+  return <Shell><p className="status-line">{t({ fr: `aucune créature #${id} sur Sepolia.`, en: `no creature #${id} is minted on Sepolia.` })}</p></Shell>;
+}
+
+/* ---------- a minted, on-chain LOOP creature ---------- */
+function LoopDetail({ id }: { id: string }) {
   const { t } = useT();
   const { sdk, error } = useGolSdk();
   const { address, onSepolia, switchToSepolia, execute, waitForTx } = useWallet();
@@ -174,7 +211,7 @@ function MintedDetail({ id }: { id: string }) {
 
           <div className="trait-grid">
             <Trait t={t({ fr: "Type", en: "Kind" })} v={t(kind)} />
-            <Trait t={t({ fr: "Longueur de séquence", en: "Sequence length" })} v={String(lf.sequence_length)} />
+            <Trait t={t({ fr: "Période de la boucle", en: "Loop period" })} v={String(lf.sequence_length)} />
             <Trait t={t({ fr: "Âge", en: "Age" })} v={`${lf.age} ${t({ fr: lf.age === 1 ? "souffle" : "souffles", en: lf.age === 1 ? "breath" : "breaths" })}`} />
             {rp && (
               <>
@@ -294,6 +331,174 @@ function MintedDetail({ id }: { id: string }) {
               )}
             </div>
           )}
+        </div>
+      </div>
+    </Shell>
+  );
+}
+
+/* ---------- a minted PATH creature (a transient that leads into a loop) ---------- */
+type JsPath = {
+  token_id: string;
+  owner: string;
+  life_state: string; // "alive" | "frozen" | "dead"
+  sequence_length: number;
+  start_state: number[];
+  target_loop_id: string;
+  target_period: number;
+  minted_at: number;
+  escrow: string;
+};
+
+function PathDetail({ id }: { id: string }) {
+  const { t } = useT();
+  const { sdk } = useGolSdk();
+  const { address, execute, waitForTx } = useWallet();
+  const [pf, setPf] = useState<JsPath | null>(null);
+  const [rp, setRp] = useState<{ bg: number; cell: number; speed: number } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [edit, setEdit] = useState<{ bg: number; cell: number; speed: number } | null>(null);
+  const [editStatus, setEditStatus] = useState<"idle" | "signing" | "pending" | "confirmed" | "error">("idle");
+  const [editErr, setEditErr] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!sdk) return;
+    const [p, params] = await Promise.all([sdk.pathLifeform(id), sdk.pathRenderParams(id)]);
+    setPf((p as JsPath) ?? null);
+    setRp((params as { bg: number; cell: number; speed: number } | null) ?? null);
+    setLoading(false);
+  }, [sdk, id]);
+  useEffect(() => {
+    load();
+  }, [load]);
+  useEffect(() => {
+    if (rp) setEdit({ ...rp });
+  }, [rp]);
+
+  if (loading) return <Shell><p className="status-line"><span className="spinner" /> {t({ fr: "lecture de la chaîne…", en: "reading the chain…" })}</p></Shell>;
+  if (!pf) return <Shell><p className="status-line">{t({ fr: `aucun chemin #${id} sur Sepolia.`, en: `no path #${id} is minted on Sepolia.` })}</p></Shell>;
+
+  const isOwner = !!address && sameId(address, pf.owner);
+  const editBusy = editStatus === "signing" || editStatus === "pending";
+  const editChanged = !!edit && !!rp && (edit.bg !== rp.bg || edit.cell !== rp.cell || edit.speed !== rp.speed);
+  const editInvalid = !!edit && edit.bg === edit.cell;
+  const doEdit = async () => {
+    if (!sdk || !edit) return;
+    if (editStatus === "error") {
+      setEditStatus("idle");
+      setEditErr(null);
+      return;
+    }
+    setEditErr(null);
+    setEditStatus("signing");
+    try {
+      const calls = sdk.setPathRenderParamsCall(pf.token_id, edit.bg, edit.cell, edit.speed);
+      const hash = await execute(calls);
+      setEditStatus("pending");
+      await waitForTx(hash);
+      setEditStatus("confirmed");
+      await load();
+      setTimeout(() => setEditStatus("idle"), 1800);
+    } catch (e) {
+      setEditErr(e instanceof Error ? e.message : String(e));
+      setEditStatus("error");
+    }
+  };
+
+  const lifeLabel =
+    pf.life_state === "dead"
+      ? t({ fr: "Mort · s’éteint dans le vide", en: "Dead · fades to nothing" })
+      : pf.life_state === "frozen"
+        ? t({ fr: "Figé · devient une nature morte", en: "Frozen · settles to a still life" })
+        : t({ fr: "Vivant · rejoint une boucle", en: "Alive · joins a dynamic loop" });
+
+  return (
+    <Shell>
+      <div className="detail">
+        <div className="stage">
+          {/* the exact on-chain render of the path's start state (the contract's renderer). */}
+          {rp ? (
+            <div className="svg-frame">
+              <iframe
+                srcDoc={onchainHtml(pf.start_state, rp.bg, rp.cell, rp.speed)}
+                title={`On-chain renderer for path ${tokenIdDecimal(pf.token_id)}`}
+                sandbox="allow-scripts"
+                style={{ width: "100%", height: "100%", border: 0, background: "var(--bg-dish)" }}
+              />
+            </div>
+          ) : (
+            <div className="svg-frame" style={{ background: "var(--bg-dish)" }} />
+          )}
+        </div>
+        <div>
+          <span className="kicker">{t({ fr: "un chemin · vit sur Starknet", en: "a path · living on Starknet" })}</span>
+          <div className="meta-row">
+            <Copyable label={t({ fr: "propriétaire", en: "owner" })} value={pf.owner} display={shortAddr(pf.owner)} />
+            <Copyable label={t({ fr: "token", en: "token" })} value={pf.token_id} display={shortAddr(pf.token_id)} />
+          </div>
+
+          <div className="trait-grid">
+            <Trait t={t({ fr: "Type", en: "Kind" })} v={t({ fr: "Chemin", en: "Path" })} />
+            <Trait t={t({ fr: "État", en: "State" })} v={lifeLabel} />
+            <Trait t={t({ fr: "Longueur", en: "Length" })} v={String(pf.sequence_length)} />
+            {pf.life_state !== "dead" && (
+              <Trait t={t({ fr: "Période de la boucle", en: "Loop period" })} v={String(pf.target_period)} />
+            )}
+            {rp && <Trait t={t({ fr: "Fond", en: "Background" })} v={<Swatch color={toHexColor(rp.bg)} />} />}
+            {rp && <Trait t={t({ fr: "Cellule", en: "Cell" })} v={<Swatch color={toHexColor(rp.cell)} />} />}
+            {rp && <Trait t={t({ fr: "Vitesse", en: "Speed" })} v={`${rp.speed} ${t({ fr: "gén/s", en: "gen/s" })}`} />}
+          </div>
+
+          {/* Appearance is owner-only; the values show read-only in the grid above. */}
+          {isOwner && rp && edit && (
+            <div style={{ marginTop: 14 }}>
+              <div className="note" style={{ marginBottom: 6 }}>{t({ fr: "apparence · à vous de régler", en: "appearance · yours to tune" })}</div>
+              <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
+                <label className="note" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {t({ fr: "fond", en: "background" })}
+                  <input type="color" value={toHexColor(edit.bg)} onChange={(e) => setEdit({ ...edit, bg: fromHexColor(e.target.value) })} />
+                </label>
+                <label className="note" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {t({ fr: "cellule", en: "cell" })}
+                  <input type="color" value={toHexColor(edit.cell)} onChange={(e) => setEdit({ ...edit, cell: fromHexColor(e.target.value) })} />
+                </label>
+                <label className="note" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {t({ fr: "vitesse", en: "speed" })}
+                  <input type="number" min={1} max={SPEED_MAX - 1} value={edit.speed} onChange={(e) => setEdit({ ...edit, speed: Math.max(1, Math.min(SPEED_MAX - 1, Number(e.target.value) || 1)) })} style={{ width: 64 }} />
+                </label>
+              </div>
+              {editChanged && (
+                <div style={{ marginTop: 10 }}>
+                  {editInvalid && <p className="breathe-err">{t({ fr: "le fond et la cellule doivent différer", en: "background and cell colour must differ" })}</p>}
+                  <button className="btn primary" onClick={doEdit} disabled={editBusy || editInvalid}>
+                    {editStatus === "signing"
+                      ? t({ fr: "Confirmez dans votre portefeuille…", en: "Confirm in your wallet…" })
+                      : editStatus === "pending"
+                        ? t({ fr: "Modification… (tx en attente)", en: "Editing… (tx pending)" })
+                        : editStatus === "confirmed"
+                          ? t({ fr: "✓ Modifiée", en: "✓ Edited" })
+                          : editStatus === "error"
+                            ? t({ fr: "Réessayer", en: "Try again" })
+                            : t({ fr: "Modifier le chemin", en: "Edit path" })}
+                  </button>
+                  {editErr && editStatus === "error" && <p className="breathe-err">{editErr}</p>}
+                </div>
+              )}
+            </div>
+          )}
+
+          {pf.life_state !== "dead" && (
+            <p className="dim" style={{ maxWidth: "46ch", marginTop: 14 }}>
+              {t({ fr: "Ce chemin mène à une ", en: "This path leads into a " })}
+              <Link className="tx-link" href={`/life/${pf.target_loop_id}`}>{t({ fr: "boucle →", en: "loop →" })}</Link>
+            </p>
+          )}
+          <p className="dim" style={{ maxWidth: "46ch" }}>
+            {t({
+              fr: "Un chemin est un instantané figé : il ne se nourrit pas. Sa rareté tient à sa longueur — plus il est loin de sa boucle, plus il est rare.",
+              en: "A path is a frozen snapshot: it can't be fed. Its rarity is its length — the farther from its loop, the rarer.",
+            })}
+          </p>
         </div>
       </div>
     </Shell>

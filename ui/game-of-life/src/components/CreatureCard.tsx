@@ -107,9 +107,95 @@ function LazyMintedCard({ tokenId }: { tokenId: string }) {
   );
 }
 
-export default function CreatureCard(props: { lf?: JsLifeform; beast?: BeastSeed; tokenId?: string }) {
+/* ---------- path creatures (a transient into a loop, on the separate path NFT) ---------- */
+type JsPath = {
+  token_id: string;
+  owner: string;
+  life_state: string; // "alive" | "frozen" | "dead"
+  sequence_length: number;
+  start_state: number[];
+  target_loop_id: string;
+  target_period: number;
+  minted_at: number;
+  escrow: string;
+};
+
+function PathCard({ pf }: { pf: JsPath }) {
+  const { t } = useT();
+  const { sdk } = useGolSdk();
+  const [rp, setRp] = useState<RenderParams | null>(null);
+  const id = tokenIdDecimal(pf.token_id);
+  const dead = pf.life_state === "dead";
+
+  useEffect(() => {
+    if (!sdk) return;
+    let cancelled = false;
+    sdk.pathRenderParams(pf.token_id).then((p) => { if (!cancelled && p) setRp(p as RenderParams); });
+    return () => { cancelled = true; };
+  }, [sdk, pf.token_id]);
+
+  return (
+    <Link
+      href={`/life/${pf.token_id}`}
+      className="creature-card"
+      aria-label={t({ fr: `Chemin ${id}, longueur ${pf.sequence_length}`, en: `Path ${id}, length ${pf.sequence_length}` })}
+    >
+      <div className="dish">
+        <Creature
+          rows={pf.start_state}
+          bg={rp?.bg}
+          cell={rp?.cell}
+          speed={rp?.speed}
+          variant={dead ? "dead" : "living"}
+          ariaLabel={t({ fr: `chemin ${id}`, en: `path ${id}` })}
+        />
+      </div>
+      <div className="cmeta">
+        <span className="ckind">{t({ fr: "Chemin", en: "Path" })}</span>
+      </div>
+      <div className="cfoot">
+        <span className="age-dot" style={{ background: dead ? "rgb(58,65,80)" : "var(--nut)" }} />
+        {dead ? t({ fr: "mort", en: "dead" }) : t({ fr: "chemin", en: "path" })} · {t({ fr: "longueur", en: "length" })} {pf.sequence_length}
+      </div>
+    </Link>
+  );
+}
+
+function LazyPathCard({ tokenId }: { tokenId: string }) {
+  const { t } = useT();
+  const { sdk } = useGolSdk();
+  const [pf, setPf] = useState<JsPath | null>(null);
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    if (!sdk) return;
+    let cancelled = false;
+    sdk.pathLifeform(tokenId).then((p) => {
+      if (!cancelled) {
+        setPf((p as JsPath) ?? null);
+        setDone(true);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [sdk, tokenId]);
+
+  if (pf) return <PathCard pf={pf} />;
+  if (done) return null; // burned / not found — drop it from the gallery
+  return (
+    <div className="creature-card" aria-busy="true">
+      <div className="dish" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span className="spinner" />
+      </div>
+      <div className="cmeta">
+        <span className="cid">{t({ fr: "invocation…", en: "summoning…" })}</span>
+      </div>
+    </div>
+  );
+}
+
+export default function CreatureCard(props: { lf?: JsLifeform; beast?: BeastSeed; tokenId?: string; kind?: "loop" | "path" }) {
   if (props.lf) return <MintedCard lf={props.lf} />;
-  if (props.tokenId) return <LazyMintedCard tokenId={props.tokenId} />;
+  if (props.tokenId) return props.kind === "path" ? <LazyPathCard tokenId={props.tokenId} /> : <LazyMintedCard tokenId={props.tokenId} />;
   if (props.beast) return <BeastCard beast={props.beast} />;
   return null;
 }

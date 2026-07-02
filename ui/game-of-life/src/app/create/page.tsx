@@ -7,9 +7,8 @@ import GolCanvas from "@/components/GolCanvas";
 import { useGolSdk } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
 import { useMint } from "@/lib/useMint";
-import { useGasCaps, plannedTxCount, MAX_TX } from "@/lib/gasCaps";
+import { useGasCaps, plannedTxCount, plannedPathTxCount, MAX_TX } from "@/lib/gasCaps";
 import { N, type Cells, fromRows, rowsFromCells, liveCountRows } from "@/lib/creatures";
-import { shortAddr } from "@/lib/format";
 import { explorerTxUrl } from "@/lib/config";
 import { useT } from "@/lib/i18n";
 import { addBookmark, removeBookmark, isBookmarked, getMintProgress } from "@/lib/incubator";
@@ -105,11 +104,47 @@ function SlotScore({
   );
 }
 
+/** The spawn button, status-aware (idle → signing → pending → confirmed/error). One instance drives
+ *  whichever creature (loop or path) the drawing settles into, so its status text is unambiguous. */
+function SpawnButton({
+  status,
+  progress,
+  busy,
+  onClick,
+  idleLabel,
+  t,
+}: {
+  status: string;
+  progress: { current: number; total: number } | null;
+  busy: boolean;
+  onClick: () => void;
+  idleLabel: string;
+  t: (d: { fr: string; en: string }) => string;
+}) {
+  return (
+    <button className="btn primary breathe-btn" onClick={onClick} disabled={busy}>
+      {status === "signing"
+        ? progress
+          ? t({ fr: `Confirmez l'étape ${progress.current}/${progress.total}…`, en: `Confirm step ${progress.current}/${progress.total}…` })
+          : t({ fr: "Confirmez dans votre portefeuille…", en: "Confirm in your wallet…" })
+        : status === "pending"
+          ? progress
+            ? t({ fr: `Vérification… (${progress.current}/${progress.total})`, en: `Verifying… (${progress.current}/${progress.total})` })
+            : t({ fr: "Naissance… (tx en attente)", en: "Spawning… (tx pending)" })
+          : status === "confirmed"
+            ? t({ fr: "✓ Née — on vous y emmène…", en: "✓ Spawned — taking you there…" })
+            : status === "error"
+              ? t({ fr: "Réessayer", en: "Try again" })
+              : idleLabel}
+    </button>
+  );
+}
+
 export default function CreatePage() {
   const { t } = useT();
   const { sdk } = useGolSdk();
   const { address, connect, onSepolia, switchToSepolia } = useWallet();
-  const { status, txHash, error: mintError, progress, mint, reset } = useMint();
+  const { status, txHash, error: mintError, progress, mint, mintPath, reset } = useMint();
   const caps = useGasCaps();
   const router = useRouter();
 
@@ -121,13 +156,18 @@ export default function CreatePage() {
   const [fate, setFate] = useState<Fate>({ kind: "empty" });
   const [tokenId, setTokenId] = useState<string | null>(null);
   const [alreadyMinted, setAlreadyMinted] = useState(false);
-  const [bookmarked, setBookmarked] = useState(false);
-  // a half-finished partial-path mint for this loop, if any (drives the "Resume" copy)
-  const [resumeAt, setResumeAt] = useState<{ done: number; total: number } | null>(null);
   // amplitude observed live: max - min population seen so far this run (resets with the drawing)
   const popMin = useRef(Infinity);
   const popMax = useRef(-Infinity);
   const [ampLive, setAmpLive] = useState(0);
+  // Path minting: the DRAWING itself, when it's a transient leading into a loop (or into death).
+  const [pathTokenId, setPathTokenId] = useState<string | null>(null);
+  const [pathMinted, setPathMinted] = useState(false);
+  // A drawing that settles into a loop offers TWO spawns (the path it is, the loop it becomes); one
+  // shared mint status → track which is in-flight so only that button reflects it, and redirect there.
+  const [activeKind, setActiveKind] = useState<"loop" | "path" | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [bmTick, setBmTick] = useState(0); // bump to re-read bookmark state after a toggle
 
   const paint = useCallback((i: number, value: boolean) => {
     setLeft((prev) => (prev[i] === value ? prev : prev.map((v, k) => (k === i ? value : v))));
@@ -232,42 +272,139 @@ export default function CreatePage() {
     };
   }, [sdk, fate]);
 
-  // reflect local (Incubator) state for this loop: is it bookmarked, and is there a paused mint to
-  // resume? Re-checked when the status settles (a paused mint leaves progress; a confirmed one clears).
+  // path token id + already-minted, when the DRAWING is a transient into a loop (or into death) —
+  // i.e. it settles after >0 steps, or it dies out. The path creature IS the drawing (its start state).
+  const pathMintable =
+    (fate.kind === "loop" && fate.steps > 0) || fate.kind === "dead";
   useEffect(() => {
-    if (!tokenId) {
-      setBookmarked(false);
-      setResumeAt(null);
+    if (!sdk || !pathMintable) {
+      setPathTokenId(null);
+      setPathMinted(false);
       return;
     }
-    setBookmarked(isBookmarked(tokenId));
-    const p = getMintProgress(tokenId);
-    setResumeAt(p ? { done: p.done, total: p.total } : null);
-  }, [tokenId, status]);
+    let cancelled = false;
+    const id = sdk.tokenIdForRows(new Float64Array(leftRows)) as string;
+    setPathTokenId(id);
+    setPathMinted(false);
+    sdk.pathLifeform(id).then((p) => {
+      if (!cancelled && p) setPathMinted(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [sdk, pathMintable, leftRows]);
 
-  // on a confirmed mint, send them to their newborn creature
+  // on a confirmed mint, send them to their newborn creature (the one just spawned — loop or path)
   useEffect(() => {
-    if (status === "confirmed" && tokenId) {
-      const t = setTimeout(() => router.push(`/life/${tokenId}`), 1200);
+    const target = activeId ?? tokenId;
+    if (status === "confirmed" && target) {
+      const t = setTimeout(() => router.push(`/life/${target}`), 1200);
       return () => clearTimeout(t);
     }
-  }, [status, tokenId, router]);
+  }, [status, activeId, tokenId, router]);
 
   const rightCells = useMemo(() => fromRows(rightRows), [rightRows]);
   const busy = status === "signing" || status === "pending";
   const loop = fate.kind === "loop" ? fate : null;
-  // how many transactions this loop needs (1 for short loops; tiled partial-path mint for long ones)
-  const mintTx = loop ? plannedTxCount(loop.period, caps) : 0;
-  const willTooLong = mintTx > MAX_TX;
-  const toggleBookmark = () => {
-    if (!loop || !tokenId) return;
-    if (bookmarked) {
-      removeBookmark(tokenId);
-      setBookmarked(false);
-    } else {
-      addBookmark({ id: tokenId, rows: loop.canonical, period: loop.period, savedAt: Date.now() });
-      setBookmarked(true);
-    }
+  const dead = fate.kind === "dead" ? fate : null;
+
+  // The drawing can offer up to two spawns: the PATH it is (its start state) and/or the LOOP it
+  // settles into. A drawing already on a loop (steps 0) offers only the loop; a dying drawing offers
+  // only the (dead) path; a transient into a live loop offers both — path first (it's the drawing).
+  const pathSpawn =
+    (loop && loop.steps > 0) || dead
+      ? {
+          kind: "path" as const,
+          rows: leftRows,
+          tokenId: pathTokenId,
+          already: pathMinted,
+          nut: loop ? loop.steps : dead!.steps,
+          tx: plannedPathTxCount(loop ? loop.steps : dead!.steps, loop ? loop.period : 1, caps),
+          loopPeriod: loop ? loop.period : 1,
+          run: () => {
+            setActiveId(pathTokenId);
+            setActiveKind("path");
+            void mintPath(leftRows, loop ? loop.steps : dead!.steps, loop ? loop.period : 1);
+          },
+        }
+      : null;
+  const loopSpawn = loop
+    ? {
+        kind: "loop" as const,
+        rows: loop.canonical,
+        tokenId,
+        already: alreadyMinted,
+        nut: loop.period,
+        tx: plannedTxCount(loop.period, caps),
+        loopPeriod: loop.period,
+        run: () => {
+          setActiveId(tokenId);
+          setActiveKind("loop");
+          void mint(loop.canonical, loop.period);
+        },
+      }
+    : null;
+  type SpawnDesc = NonNullable<typeof pathSpawn> | NonNullable<typeof loopSpawn>;
+  const options: SpawnDesc[] = [pathSpawn, loopSpawn].filter(Boolean) as SpawnDesc[];
+  const anyMulti = options.some((o) => !o.already && o.tx > 1 && o.tx <= MAX_TX);
+
+  // One spawn option row: its own button (status only when it's the in-flight one) + bookmark. `bmTick`
+  // is read so a bookmark toggle re-renders.
+  const renderOption = (desc: SpawnDesc) => {
+    void bmTick;
+    const tooLong = desc.tx > MAX_TX;
+    const active = activeKind === desc.kind;
+    const resume = desc.tokenId ? getMintProgress(desc.tokenId) : null;
+    const bm = desc.tokenId ? isBookmarked(desc.tokenId) : false;
+    const base =
+      desc.kind === "path"
+        ? t({ fr: "Faire naître le chemin", en: "Spawn this path" })
+        : t({ fr: "Faire naître la boucle", en: "Spawn the loop" });
+    const idle = resume
+      ? t({ fr: `Reprendre (${resume.done}/${resume.total}) · ${desc.nut} NUT`, en: `Resume (${resume.done}/${resume.total}) · ${desc.nut} NUT` })
+      : desc.tx > 1
+        ? t({ fr: `${base} · ${desc.nut} NUT · ${desc.tx} tx`, en: `${base} · ${desc.nut} NUT · ${desc.tx} txs` })
+        : t({ fr: `${base} · ${desc.nut} NUT`, en: `${base} · ${desc.nut} NUT` });
+    return (
+      <div key={desc.kind} style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        {desc.already ? (
+          <Link className="btn primary" href={`/life/${desc.tokenId}`}>
+            {desc.kind === "path"
+              ? t({ fr: "Chemin déjà né → le rencontrer", en: "Path already born → meet it" })
+              : t({ fr: "Boucle déjà née → la rencontrer", en: "Loop already born → meet it" })}
+          </Link>
+        ) : !address ? (
+          <button className="btn" onClick={connect}>{base}</button>
+        ) : !onSepolia ? (
+          <button className="btn primary" onClick={switchToSepolia}>{t({ fr: "Passez sur Sepolia", en: "Switch to Sepolia" })}</button>
+        ) : tooLong ? (
+          <span className="note">{t({ fr: `${base} : trop long (~${desc.tx} tx, max ${MAX_TX}).`, en: `${base}: too long (~${desc.tx} txs, max ${MAX_TX}).` })}</span>
+        ) : (
+          <SpawnButton
+            status={active ? status : "idle"}
+            progress={active ? progress : null}
+            busy={busy}
+            onClick={desc.run}
+            idleLabel={idle}
+            t={t}
+          />
+        )}
+        {!desc.already && desc.tokenId && (
+          <button
+            className="btn"
+            disabled={busy}
+            title={t({ fr: "Garder sans faire naître", en: "Save without minting" })}
+            onClick={() => {
+              if (bm) removeBookmark(desc.tokenId!);
+              else addBookmark({ id: desc.tokenId!, rows: desc.rows, period: desc.nut, kind: desc.kind, loopPeriod: desc.loopPeriod, savedAt: Date.now() });
+              setBmTick((x) => x + 1);
+            }}
+          >
+            {bm ? t({ fr: "★ Gardée", en: "★ Saved" }) : t({ fr: "☆ Garder", en: "☆ Bookmark" })}
+          </button>
+        )}
+      </div>
+    );
   };
 
   // Slot-machine score, revealed live as the right grid advances. `gen` is the live generation
@@ -325,80 +462,39 @@ export default function CreatePage() {
           <span>{t({ fr: "Dessinez quelque chose à gauche pour commencer.", en: "Draw something on the left to begin." })}</span>
         ) : fate.kind === "computing" ? (
           <span><span className="spinner" /> {t({ fr: "on trace sa destinée…", en: "tracing its fate…" })}</span>
-        ) : fate.kind === "dead" ? (
-          <span>
-            {t({
-              fr: `S’éteint après ${fate.steps} générations — rien à faire naître. Essayez un autre motif.`,
-              en: `Dies out after ${fate.steps} generations — nothing to spawn. Try another pattern.`,
-            })}
-          </span>
         ) : fate.kind === "transient" ? (
           <span>{t({ fr: "Évolue encore après 10 000 générations — aucune boucle trouvée pour l’instant.", en: "Still evolving after 10,000 generations — no loop found yet." })}</span>
-        ) : loop ? (
+        ) : options.length > 0 ? (
           <div>
             <div>
-              {t({ fr: "Se stabilise en une ", en: "Settles into a " })}
-              <b>
-                {t({
-                  fr: `${loop.period === 1 ? "nature morte" : "boucle"} de période ${loop.period}`,
-                  en: `period-${loop.period} ${loop.period === 1 ? "still life" : "loop"}`,
-                })}
-              </b>
-              {loop.steps > 0
-                ? t({ fr: ` après ${loop.steps} générations`, en: ` after ${loop.steps} generations` })
-                : t({ fr: " aussitôt", en: " right away" })}
-              {t({ fr: " — une créature à faire naître.", en: " — a creature you can spawn." })}
-              {tokenId && <> · <span className="mono">{shortAddr(tokenId)}</span></>}
+              {loop ? (
+                <>
+                  {t({ fr: "Se stabilise en une ", en: "Settles into a " })}
+                  <b>{t({ fr: `${loop.period === 1 ? "nature morte" : "boucle"} de période ${loop.period}`, en: `period-${loop.period} ${loop.period === 1 ? "still life" : "loop"}` })}</b>
+                  {loop.steps > 0
+                    ? t({ fr: ` après ${loop.steps} génération${loop.steps === 1 ? "" : "s"}`, en: ` after ${loop.steps} generation${loop.steps === 1 ? "" : "s"}` })
+                    : t({ fr: " aussitôt", en: " right away" })}
+                  {loop.steps > 0
+                    ? t({ fr: " — faites naître le chemin, ou la boucle qu’il rejoint.", en: " — spawn the path, or the loop it joins." })
+                    : t({ fr: " — à faire naître.", en: " — ready to spawn." })}
+                </>
+              ) : dead ? (
+                <>{t({ fr: `Un chemin mourant : s’éteint après ${dead.steps} génération${dead.steps === 1 ? "" : "s"} — à faire naître.`, en: `A dying path: fades to nothing after ${dead.steps} generation${dead.steps === 1 ? "" : "s"} — ready to spawn.` })}</>
+              ) : null}
             </div>
-            <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-              {alreadyMinted ? (
-                <Link className="btn primary" href={`/life/${tokenId}`}>{t({ fr: "Déjà découverte → la rencontrer", en: "Already discovered → meet it" })}</Link>
-              ) : !address ? (
-                <button className="btn" onClick={connect}>{t({ fr: "Connectez-vous pour faire naître", en: "Connect to spawn" })}</button>
-              ) : !onSepolia ? (
-                <button className="btn primary" onClick={switchToSepolia}>{t({ fr: "Passez sur Sepolia pour faire naître", en: "Switch to Sepolia to spawn" })}</button>
-              ) : willTooLong ? (
-                <span className="note">{t({
-                  fr: `Boucle trop longue à faire naître pour l'instant (~${mintTx} transactions, max ${MAX_TX}).`,
-                  en: `Too long to mint right now (~${mintTx} transactions, max ${MAX_TX}).`,
-                })}</span>
-              ) : (
-                <button className="btn primary breathe-btn" onClick={() => mint(loop.canonical, loop.period)} disabled={busy}>
-                  {status === "signing"
-                    ? progress
-                      ? t({ fr: `Confirmez l'étape ${progress.current}/${progress.total}…`, en: `Confirm step ${progress.current}/${progress.total}…` })
-                      : t({ fr: "Confirmez dans votre portefeuille…", en: "Confirm in your wallet…" })
-                    : status === "pending"
-                      ? progress
-                        ? t({ fr: `Vérification… (${progress.current}/${progress.total})`, en: `Verifying… (${progress.current}/${progress.total})` })
-                        : t({ fr: "Naissance… (tx en attente)", en: "Spawning… (tx pending)" })
-                      : status === "confirmed"
-                        ? t({ fr: "✓ Née — on vous y emmène…", en: "✓ Spawned — taking you there…" })
-                        : status === "error"
-                          ? t({ fr: "Réessayer", en: "Try again" })
-                          : resumeAt
-                            ? t({ fr: `Reprendre (${resumeAt.done}/${resumeAt.total}) · ${loop.period} NUT`, en: `Resume (${resumeAt.done}/${resumeAt.total}) · ${loop.period} NUT` })
-                            : mintTx > 1
-                              ? t({ fr: `Faire naître · ${loop.period} NUT · ${mintTx} tx`, en: `Spawn · ${loop.period} NUT · ${mintTx} txs` })
-                              : t({ fr: `Faire naître · ${loop.period} NUT`, en: `Spawn · ${loop.period} NUT` })}
-                </button>
-              )}
-              {!alreadyMinted && tokenId && (
-                <button className="btn" onClick={toggleBookmark} disabled={busy} title={t({ fr: "Garder sans faire naître", en: "Save without minting" })}>
-                  {bookmarked ? t({ fr: "★ Gardée", en: "★ Saved" }) : t({ fr: "☆ Garder", en: "☆ Bookmark" })}
-                </button>
-              )}
-              {txHash && (status === "pending" || status === "confirmed") && (
-                <a className="tx-link" href={explorerTxUrl(txHash)} target="_blank" rel="noreferrer">{t({ fr: "voir la tx ↗", en: "view tx ↗" })}</a>
-              )}
+            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+              {options.map(renderOption)}
             </div>
-            {!alreadyMinted && !willTooLong && address && onSepolia && mintTx > 1 && status !== "error" && (
+            {anyMulti && status !== "error" && address && onSepolia && (
               <p className="note" style={{ marginTop: 8, maxWidth: "52ch" }}>
                 {t({
-                  fr: `Les longues boucles sont vérifiées par morceaux — votre portefeuille demandera d'approuver ${mintTx} transactions à la suite.`,
-                  en: `Long loops are verified in pieces — your wallet will ask you to approve ${mintTx} transactions in a row.`,
+                  fr: "Les longues créatures sont vérifiées par morceaux — votre portefeuille demandera d'approuver plusieurs transactions à la suite.",
+                  en: "Long creatures are verified in pieces — your wallet will ask you to approve several transactions in a row.",
                 })}
               </p>
+            )}
+            {txHash && (status === "pending" || status === "confirmed") && (
+              <a className="tx-link" href={explorerTxUrl(txHash)} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginTop: 8 }}>{t({ fr: "voir la tx ↗", en: "view tx ↗" })}</a>
             )}
             {status === "error" && mintError && <p className="breathe-err" style={{ marginTop: 8 }}>{mintError}</p>}
           </div>

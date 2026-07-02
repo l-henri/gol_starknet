@@ -43,6 +43,14 @@ export function plannedTxCount(period: number, caps: GasCaps): number {
   return Math.ceil((period - 1) / caps.chunkSteps) + 1; // segments + final mint
 }
 
+/** Transactions a PATH needs to mint (mirrors `plan_path_mint`): single-shot when the whole cost
+ *  (transient + terminal loop) fits, else the main-path segments + loop-witness segments + final mint. */
+export function plannedPathTxCount(sequenceLength: number, loopPeriod: number, caps: GasCaps): number {
+  if (sequenceLength + loopPeriod <= caps.singleShotMax) return 1;
+  const segs = (n: number) => (n <= 1 ? 1 : Math.ceil((n - 1) / caps.chunkSteps));
+  return segs(sequenceLength) + segs(loopPeriod) + 1;
+}
+
 /** The active caps for the connected account's metering tier (legacy when unknown — safe default). */
 export function useGasCaps(): GasCaps & { tier: MeteringTier } {
   const { meteringTier } = useWallet();

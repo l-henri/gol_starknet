@@ -4,18 +4,22 @@ mod tests {
     use starknet::ContractAddress;
     use snforge_std::{
         declare, ContractClassTrait, DeclareResultTrait, start_cheat_caller_address,
-        stop_cheat_caller_address,
+        stop_cheat_caller_address, start_cheat_block_timestamp, stop_cheat_block_timestamp,
     };
     use openzeppelin::interfaces::accesscontrol::{
         IAccessControlDispatcher, IAccessControlDispatcherTrait,
     };
     use openzeppelin::interfaces::erc20::{IERC20Dispatcher, IERC20DispatcherTrait};
-    use openzeppelin::interfaces::erc721::{IERC721MetadataDispatcher, IERC721MetadataDispatcherTrait};
+    use openzeppelin::interfaces::erc721::{
+        IERC721MetadataDispatcher, IERC721MetadataDispatcherTrait, IERC721Dispatcher,
+        IERC721DispatcherTrait,
+    };
     use gol_starknet::gol_grid_v2::{GridState, grid_with, step, lt, pack, token_id};
     use gol_starknet::interfaces_v2::{
         IGolLifeFormsV2Dispatcher, IGolLifeFormsV2DispatcherTrait, IGolLoopMinterV2Dispatcher,
         IGolLoopMinterV2DispatcherTrait, IGolPathMinterV2Dispatcher,
-        IGolPathMinterV2DispatcherTrait, LifeFormData,
+        IGolPathMinterV2DispatcherTrait, IGolPathLifeFormsV2Dispatcher,
+        IGolPathLifeFormsV2DispatcherTrait, LifeFormData, PathFormData, LifeState,
     };
 
     const MINTER_ROLE: felt252 = selector!("MINTER_ROLE");
@@ -26,6 +30,7 @@ mod tests {
         creator: ContractAddress,
         nutrient: ContractAddress,
         lifeforms: ContractAddress,
+        path_lifeforms: ContractAddress,
         loop_minter: ContractAddress,
         path_minter: ContractAddress,
     }
@@ -51,29 +56,43 @@ mod tests {
         lifeforms.serialize(ref loop_cd);
         let (loop_minter, _) = loop_class.deploy(@loop_cd).unwrap();
 
+        // Path creatures live on their OWN NFT contract (separate from loops).
+        let path_lf_class = declare("GolPathLifeformsV2").unwrap().contract_class();
+        let mut path_lf_cd: Array<felt252> = ArrayTrait::new();
+        creator.serialize(ref path_lf_cd);
+        nutrient.serialize(ref path_lf_cd);
+        let (path_lifeforms, _) = path_lf_class.deploy(@path_lf_cd).unwrap();
+
         let path_class = declare("GolPathMinterV2").unwrap().contract_class();
         let mut path_cd: Array<felt252> = ArrayTrait::new();
-        lifeforms.serialize(ref path_cd);
+        path_lifeforms.serialize(ref path_cd); // path minter points at the PATH NFT
         let (path_minter, _) = path_class.deploy(@path_cd).unwrap();
 
-        // lifeforms may mint NUT
+        // lifeforms may mint NUT (the faucet). The path NFT does NOT mint NUT — it only holds/moves
+        // the escrow it pulls at mint, so it needs no MINTER_ROLE on the nutrient token.
         start_cheat_caller_address(nutrient, creator);
         IAccessControlDispatcher { contract_address: nutrient }.grant_role(MINTER_ROLE, lifeforms);
         stop_cheat_caller_address(nutrient);
 
-        // minters may mint lifeforms; set nutrient address
+        // loop minter may mint loop lifeforms
         start_cheat_caller_address(lifeforms, creator);
-        let ac = IAccessControlDispatcher { contract_address: lifeforms };
-        ac.grant_role(MINTER_ROLE, loop_minter);
-        ac.grant_role(MINTER_ROLE, path_minter);
+        IAccessControlDispatcher { contract_address: lifeforms }
+            .grant_role(MINTER_ROLE, loop_minter);
         stop_cheat_caller_address(lifeforms);
 
-        // creator funds minting
+        // path minter may mint path lifeforms
+        start_cheat_caller_address(path_lifeforms, creator);
+        IAccessControlDispatcher { contract_address: path_lifeforms }
+            .grant_role(MINTER_ROLE, path_minter);
+        stop_cheat_caller_address(path_lifeforms);
+
+        // creator funds minting on both NFTs (loops charge NUT; paths escrow NUT)
         start_cheat_caller_address(nutrient, creator);
         IERC20Dispatcher { contract_address: nutrient }.approve(lifeforms, initial_supply);
+        IERC20Dispatcher { contract_address: nutrient }.approve(path_lifeforms, initial_supply);
         stop_cheat_caller_address(nutrient);
 
-        Deployment { creator, nutrient, lifeforms, loop_minter, path_minter }
+        Deployment { creator, nutrient, lifeforms, path_lifeforms, loop_minter, path_minter }
     }
 
     // Canonical (smallest) state of the period-2 blinker, plus its rows.
@@ -227,9 +246,10 @@ mod tests {
         pm.mint_path_from_partial_paths(l_state, d.creator);
         stop_cheat_caller_address(d.path_minter);
 
-        let data = IGolLifeFormsV2Dispatcher { contract_address: d.lifeforms }
-            .get_lifeform_data(id);
-        assert(!data.is_loop, 'path minted');
+        let data = IGolPathLifeFormsV2Dispatcher { contract_address: d.path_lifeforms }
+            .get_path_data(id);
+        assert(data.life_state == LifeState::Frozen, 'path into still life');
+        assert(data.sequence_length == 1, 'length 1');
     }
 
     // Adversarial (refutes the audit's P0): register an UNRELATED blinker as the witness (keyed at
@@ -397,9 +417,124 @@ mod tests {
         stop_cheat_caller_address(d.path_minter);
         assert(ok, 'minted path');
 
-        let data = IGolLifeFormsV2Dispatcher { contract_address: d.lifeforms }
-            .get_lifeform_data(id);
-        assert(!data.is_loop, 'path not a loop');
-        assert(data.current_state == l_state, 'path state stored');
+        let data = IGolPathLifeFormsV2Dispatcher { contract_address: d.path_lifeforms }
+            .get_path_data(id);
+        assert(data.life_state == LifeState::Frozen, 'block is frozen'); // still life
+        assert(data.start_state == l_state, 'path start stored');
+        assert(data.sequence_length == 1, 'length 1');
+    }
+
+    // -----------------------------------------------------------------------------------------
+    // Path escrow + anti-farm (challenge_burn). See docs/path-creatures-spec.md §5–§6.
+    // -----------------------------------------------------------------------------------------
+
+    // mint escrows `sequence_length` NUT into the path NFT (a sink until burned).
+    #[test]
+    fn mint_path_escrows_nut() {
+        let d = deploy_all();
+        let l_rows = grid_with(@array![(1_usize, 0b110_u64), (2_usize, 0b010_u64)]);
+        let l_state = pack(@l_rows);
+        let nut = IERC20Dispatcher { contract_address: d.nutrient };
+        let before = nut.balance_of(d.path_lifeforms);
+
+        start_cheat_caller_address(d.path_minter, d.creator);
+        IGolPathMinterV2Dispatcher { contract_address: d.path_minter }
+            .mint_path(l_state, 1, 1, d.creator);
+        stop_cheat_caller_address(d.path_minter);
+
+        // length 1 => 1 NUT escrowed into the path contract.
+        assert(nut.balance_of(d.path_lifeforms) - before == ONE_NUT, 'escrowed 1 NUT');
+    }
+
+    // Grant the creator MINTER_ROLE on the path NFT so tests can craft records directly.
+    fn grant_creator_minter(d: Deployment) {
+        start_cheat_caller_address(d.path_lifeforms, d.creator);
+        IAccessControlDispatcher { contract_address: d.path_lifeforms }
+            .grant_role(MINTER_ROLE, d.creator);
+        stop_cheat_caller_address(d.path_lifeforms);
+    }
+
+    // Mint a path record directly (creator as MINTER_ROLE), controlling start/length/target/timestamp.
+    // challenge_burn only checks the sub-path stepping + timestamps + target equality, so crafted-but-
+    // real-adjacent states exercise exactly that logic (path validity is the minter's job, tested above).
+    fn direct_mint(
+        d: Deployment, recipient: ContractAddress, id: u256, start: GridState, length: usize,
+        target: felt252, ts: u64,
+    ) {
+        let pd = PathFormData {
+            life_state: LifeState::Alive, sequence_length: length, start_state: start,
+            target_loop_id: target, target_period: 2, minted_at: 0, escrow: 0,
+        };
+        start_cheat_block_timestamp(d.path_lifeforms, ts);
+        start_cheat_caller_address(d.path_lifeforms, d.creator);
+        IGolPathLifeFormsV2Dispatcher { contract_address: d.path_lifeforms }
+            .mint(recipient, d.creator, id, pd);
+        stop_cheat_caller_address(d.path_lifeforms);
+        stop_cheat_block_timestamp(d.path_lifeforms);
+    }
+
+    #[test]
+    fn challenge_burn_burns_subpath_and_pays_bounty() {
+        let d = deploy_all();
+        grant_creator_minter(d);
+        // B = step(A): B is A's forward sub-path (k = 1).
+        let a_rows = grid_with(@array![(5_usize, 0b1110_u64)]);
+        let b_rows = step(@a_rows);
+        let (a_id, b_id) = (token_id(@a_rows), token_id(@b_rows));
+        let target: felt252 = 0x777;
+        let farmer: ContractAddress = 0x5.try_into().unwrap();
+        let hunter: ContractAddress = 0x6.try_into().unwrap();
+
+        direct_mint(d, d.creator, a_id, pack(@a_rows), 2, target, 100); // older, length 2
+        direct_mint(d, farmer, b_id, pack(@b_rows), 1, target, 200); // newer sub-path, length 1
+
+        let nut = IERC20Dispatcher { contract_address: d.nutrient };
+        let erc721 = IERC721Dispatcher { contract_address: d.path_lifeforms };
+        assert(erc721.balance_of(farmer) == 1, 'farmer holds sub-path');
+        let hunter_before = nut.balance_of(hunter);
+
+        start_cheat_caller_address(d.path_lifeforms, hunter);
+        IGolPathLifeFormsV2Dispatcher { contract_address: d.path_lifeforms }
+            .challenge_burn(a_id, b_id);
+        stop_cheat_caller_address(d.path_lifeforms);
+
+        // sub-path burned; its 1-NUT escrow paid to the challenger.
+        assert(erc721.balance_of(farmer) == 0, 'sub-path burned');
+        assert(nut.balance_of(hunter) - hunter_before == ONE_NUT, 'bounty paid');
+    }
+
+    #[test]
+    #[should_panic(expected: 'older not older')]
+    fn challenge_burn_rejects_wrong_direction() {
+        let d = deploy_all();
+        grant_creator_minter(d);
+        let a_rows = grid_with(@array![(5_usize, 0b1110_u64)]);
+        let b_rows = step(@a_rows);
+        let (a_id, b_id) = (token_id(@a_rows), token_id(@b_rows));
+        let target: felt252 = 0x777;
+        // B (the sub-path) minted FIRST; A minted later. A can't absorb an older token.
+        direct_mint(d, d.creator, b_id, pack(@b_rows), 1, target, 100);
+        direct_mint(d, d.creator, a_id, pack(@a_rows), 2, target, 200);
+        start_cheat_caller_address(d.path_lifeforms, d.creator);
+        IGolPathLifeFormsV2Dispatcher { contract_address: d.path_lifeforms }
+            .challenge_burn(a_id, b_id);
+        stop_cheat_caller_address(d.path_lifeforms);
+    }
+
+    #[test]
+    #[should_panic(expected: 'not a sub-path')]
+    fn challenge_burn_rejects_non_subpath() {
+        let d = deploy_all();
+        grant_creator_minter(d);
+        let a_rows = grid_with(@array![(5_usize, 0b1110_u64)]);
+        let u_rows = grid_with(@array![(20_usize, 0b101_u64)]); // unrelated, not step(A)
+        let (a_id, u_id) = (token_id(@a_rows), token_id(@u_rows));
+        let target: felt252 = 0x777;
+        direct_mint(d, d.creator, a_id, pack(@a_rows), 2, target, 100);
+        direct_mint(d, d.creator, u_id, pack(@u_rows), 1, target, 200);
+        start_cheat_caller_address(d.path_lifeforms, d.creator);
+        IGolPathLifeFormsV2Dispatcher { contract_address: d.path_lifeforms }
+            .challenge_burn(a_id, u_id);
+        stop_cheat_caller_address(d.path_lifeforms);
     }
 }

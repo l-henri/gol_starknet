@@ -5,7 +5,7 @@ use async_trait::async_trait;
 
 use crate::config::ContractKey;
 use crate::error::GolError;
-use crate::types::{Felt, LifeformData, OwnedLifeform, RenderParams, TokenUri, U256};
+use crate::types::{Felt, LifeformData, OwnedLifeform, OwnedPath, PathForm, RenderParams, TokenUri, U256};
 
 #[async_trait(?Send)]
 // `?Send` so the same trait compiles on wasm32, where reqwest's fetch-backed futures are !Send.
@@ -33,6 +33,15 @@ pub trait Reader {
 
     /// Per-token render params (`get_render_params`), or `None` if the token isn't minted.
     async fn render_params(&self, token_id: U256) -> Result<Option<RenderParams>, GolError>;
+
+    /// PATH creature (owner + `get_path_data`) on the path NFT, or `None` if not minted.
+    async fn path_lifeform(&self, token_id: U256) -> Result<Option<OwnedPath>, GolError>;
+
+    /// `get_path_data` on the path NFT (returns the zeroed struct for an unminted id).
+    async fn path_form(&self, token_id: U256) -> Result<Option<PathForm>, GolError>;
+
+    /// Per-token render params on the path NFT, or `None` if not minted.
+    async fn path_render_params(&self, token_id: U256) -> Result<Option<RenderParams>, GolError>;
 
     // NB: v2 exposes no on-chain step/loop-check views (v1 had iterate_life_*). That logic is the
     // pure off-chain engine in `crate::engine` (operating on `GridState`/`Rows`).

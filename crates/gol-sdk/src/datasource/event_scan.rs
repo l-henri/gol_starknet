@@ -57,6 +57,22 @@ impl EventScanDataSource {
         Ok(ids)
     }
 
+    /// Token ids of every minted PATH creature (mints = `Transfer` from the zero address on the path
+    /// NFT), most-recent first, capped at `limit` (0 = unlimited). Burned paths still appear (they were
+    /// minted); hydration via `path_lifeform` returns `None` for them, so the UI skips them.
+    pub async fn recent_path_token_ids(&self, limit: u32) -> Result<Vec<U256>, GolError> {
+        let keys = vec![vec![selector("Transfer")], vec![Felt::ZERO], vec![]];
+        let events = self.scan_all(self.addresses.path_lifeforms, keys).await?;
+        let mut ids = dedupe(events.iter().filter_map(|ev| {
+            (ev.keys.len() >= 5).then(|| U256::from_felts(&ev.keys[3], &ev.keys[4]))
+        }));
+        ids.reverse(); // getEvents returns ascending; newest mint first
+        if limit > 0 {
+            ids.truncate(limit as usize);
+        }
+        Ok(ids)
+    }
+
     /// Every minted lifeform, most-recent first, each confirmed live via the RPC reader (owner/state
     /// current even after later transfers). Convenience over [`Self::recent_token_ids`] + hydration.
     pub async fn recent_lifeforms(&self, limit: u32) -> Result<Vec<OwnedLifeform>, GolError> {

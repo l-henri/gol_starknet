@@ -130,6 +130,52 @@ pub struct OwnedLifeform {
     pub data: LifeformData,
 }
 
+/// What a PATH creature converges to (mirrors the Cairo `LifeState` enum; variant index = felt).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LifeState {
+    Alive,
+    Frozen,
+    Dead,
+}
+
+impl LifeState {
+    pub fn from_index(i: u8) -> LifeState {
+        match i {
+            1 => LifeState::Frozen,
+            2 => LifeState::Dead,
+            _ => LifeState::Alive,
+        }
+    }
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            LifeState::Alive => "alive",
+            LifeState::Frozen => "frozen",
+            LifeState::Dead => "dead",
+        }
+    }
+}
+
+/// `PathFormData` from `get_path_data` on the path NFT (docs/path-creatures-spec.md). A path is a
+/// static transient that leads into a loop; `sequence_length` is its distance to the loop.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PathForm {
+    pub life_state: LifeState,
+    pub sequence_length: u32,
+    pub start_state: GridState,
+    pub target_loop_id: Felt,
+    pub target_period: u32,
+    pub minted_at: u64,
+    pub escrow: U256,
+}
+
+/// A path creature plus its current owner.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OwnedPath {
+    pub token_id: U256,
+    pub owner: Felt,
+    pub data: PathForm,
+}
+
 /// Per-token render params (`get_render_params` / `set_render_params`): `bg`/`cell` are 0xRRGGBB
 /// colours and `speed` is generations/second (`0 < speed < SPEED_MAX`). The v2 partial-path type
 /// lives in [`crate::engine`] (it carries `GridState`s); loop/path discovery is the off-chain engine.

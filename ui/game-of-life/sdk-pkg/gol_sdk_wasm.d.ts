@@ -10,6 +10,18 @@ export class GolSdk {
      */
     breatheLifeCall(token_id: string, n: number): any;
     /**
+     * The permissionless `challenge_burn(older_id, younger_id)` call — burns a proven forward
+     * sub-path and pays its escrow to the caller.
+     */
+    challengeBurnCall(older_id: string, younger_id: string): any;
+    /**
+     * Classify what a drawing settles into: `{ kind: "loop"|"path"|"transient", … }`.
+     * - loop → `{ period, canonical: rows }` (mint a loop creature)
+     * - path → `{ sequenceLength, loopPeriod, loopCanonical: rows, loopEntry: rows, lifeState }`
+     * - transient → `{ steps }` (no loop within `max_steps`)
+     */
+    classifyFate(rows: Float64Array, max_steps: number): any;
+    /**
      * Discover the loop reachable from `rows` within `max_period`: `{ period, smallest }` (the
      * canonical state to mint) or `null` if it doesn't recur in range.
      */
@@ -37,6 +49,14 @@ export class GolSdk {
      */
     ownedLifeforms(address: string): Promise<any>;
     /**
+     * Path creature by token id (decimal or `0x` hex), or `null` if not minted (or burned).
+     */
+    pathLifeform(token_id: string): Promise<any>;
+    /**
+     * Per-token render params on the path NFT (`{ bg, cell, speed }`), or `null` if not minted.
+     */
+    pathRenderParams(token_id: string): Promise<any>;
+    /**
      * Plan the full transaction sequence to mint a loop. `rows` = the loop's canonical (smallest)
      * state; `loop_length` = its period. Short loops are a single `mint_loop` tx; long loops (whose
      * on-chain verification exceeds the wallet's per-tx gas cap) are tiled into partial-path segments
@@ -46,10 +66,21 @@ export class GolSdk {
      */
     planLoopMint(rows: Float64Array, loop_length: number, recipient: string, chunk_steps: number, single_shot_max: number, max_tx: number): any;
     /**
+     * Plan the transaction(s) to mint a PATH creature. `rows` = the path's start state; `sequence_length`
+     * = its distance to the loop; `loop_period` = the loop's period. Short paths mint in one tx; longer
+     * ones need tiling (not yet built) and come back `tooLong`. Same shape as `planLoopMint`.
+     */
+    planPathMint(rows: Float64Array, sequence_length: number, loop_period: number, recipient: string, chunk_steps: number, single_shot_max: number, max_tx: number): any;
+    /**
      * Every minted lifeform (newest first), capped at `limit` (0 = unlimited), via the RPC event
      * scan. The global gallery feed on Sepolia. Each is confirmed live (current owner + state).
      */
     recentLifeforms(limit: number): Promise<any>;
+    /**
+     * Token ids ("0x…") of recent PATH mints, newest first — the fast event scan of the path NFT.
+     * Hydrate each via `pathLifeform()`; burned paths hydrate to null and should be skipped.
+     */
+    recentPathTokenIds(limit: number): Promise<any>;
     /**
      * Token ids ("0x…") of recent mints, newest first — the FAST event scan only (no per-token
      * reads). For progressive UIs: get the ids, then hydrate each via `lifeform()` as it renders.
@@ -59,6 +90,10 @@ export class GolSdk {
      * Per-token render params (`{ bg, cell, speed }`), or `null` if unminted.
      */
     renderParams(token_id: string): Promise<any>;
+    /**
+     * The owner-only path `set_render_params` call for the wallet to sign + send.
+     */
+    setPathRenderParamsCall(token_id: string, bg: number, cell: number, speed: number): any;
     /**
      * The owner-only `set_render_params` call for the wallet to sign + send.
      */
@@ -85,6 +120,8 @@ export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_golsdk_free: (a: number, b: number) => void;
     readonly golsdk_breatheLifeCall: (a: number, b: number, c: number, d: number) => [number, number, number];
+    readonly golsdk_challengeBurnCall: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
+    readonly golsdk_classifyFate: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly golsdk_findLoop: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly golsdk_gridSize: (a: number) => any;
     readonly golsdk_lifeform: (a: number, b: number, c: number) => any;
@@ -92,10 +129,15 @@ export interface InitOutput {
     readonly golsdk_new: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly golsdk_nutBalance: (a: number, b: number, c: number) => any;
     readonly golsdk_ownedLifeforms: (a: number, b: number, c: number) => any;
+    readonly golsdk_pathLifeform: (a: number, b: number, c: number) => any;
+    readonly golsdk_pathRenderParams: (a: number, b: number, c: number) => any;
     readonly golsdk_planLoopMint: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number, number];
+    readonly golsdk_planPathMint: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => [number, number, number];
     readonly golsdk_recentLifeforms: (a: number, b: number) => any;
+    readonly golsdk_recentPathTokenIds: (a: number, b: number) => any;
     readonly golsdk_recentTokenIds: (a: number, b: number) => any;
     readonly golsdk_renderParams: (a: number, b: number, c: number) => any;
+    readonly golsdk_setPathRenderParamsCall: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
     readonly golsdk_setRenderParamsCall: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
     readonly golsdk_stepRows: (a: number, b: number, c: number) => [number, number, number];
     readonly golsdk_tokenIdForRows: (a: number, b: number, c: number) => [number, number, number];
