@@ -1,50 +1,67 @@
-# Game of Immortal Lifeforms — Web App
+# Digital Bacteria — web app
 
-Next.js frontend for the on-chain Game of Life. Draw a pattern, let it run to find
-its fate (a loop or death), connect a Starknet wallet, and mint discovered loops as
-NFTs.
+The web experience for the on-chain Game of Life (v2): a tended garden of autonomous
+Conway creatures living on Starknet (Sepolia). Browse the gallery, draw a pattern and
+watch it find its fate, spawn discovered loops as NFTs, feed creatures to earn **NUT**,
+and tune the look of the ones you own. Bilingual **FR / EN**.
 
-## Setup
+Built on the Rust **`gol-sdk`** compiled to WebAssembly: every chain read and all
+calldata come from the SDK; signing stays in the wallet (the SDK never holds a key).
+
+## Run
 
 ```bash
 npm install
-cp .env.local.example .env.local   # then fill in the contract addresses
-npm run dev                         # http://localhost:3000
+npm run dev          # http://localhost:3000   (predev builds the wasm SDK first)
 ```
 
-## Deploying the contracts (one-time)
-
-The frontend talks to four contracts. Deploy them from the repo root with a funded
-Starknet account, then paste the printed addresses into `.env.local`.
+`predev` / `prebuild` run `npm run wasm`, which compiles `crates/gol-sdk-wasm` with
+`wasm-pack` and copies `gol_sdk_wasm.js` + `gol_sdk_wasm_bg.wasm` into `public/` — the app
+loads them at runtime from there (bundler-ignored, so Next never tries to resolve the
+`.wasm` asset). Prereqs: the `wasm32-unknown-unknown` Rust target and `wasm-pack`. Rebuild
+the SDK after changing the Rust:
 
 ```bash
-# from the repo root
-scarb build
-# set DEPLOYER_ADDRESS, DEPLOYER_PRIVATE_KEY and RPC_ENDPOINT in a root .env, then:
-npx ts-node scripts/deploy_full.ts
+npm run wasm
 ```
 
-`deploy_full.ts` declares and deploys Nutrient, GolLifeforms, GolLoopMinter and
-GolPathMinter, wires up the `MINTER_ROLE` grants, and prints each address. Copy them
-into `.env.local`:
+> Heads-up: don't run `npm run build` (a production build) while `npm run dev` is live —
+> it overwrites `.next/` and breaks the running dev server (`Cannot find module './NNN.js'`).
+> If that happens: stop the dev server, `rm -rf .next`, then `npm run dev`.
+
+## Config
+
+The v2 contract addresses are **baked into the SDK** (per network) — there's nothing to
+set for them. The only env var, optional:
 
 ```
-NEXT_PUBLIC_RPC_URL=...                # same network you deployed to
-NEXT_PUBLIC_LIFEFORMS_ADDRESS=0x...
-NEXT_PUBLIC_NUTRIENT_ADDRESS=0x...
-NEXT_PUBLIC_LOOP_MINTER_ADDRESS=0x...
-NEXT_PUBLIC_PATH_MINTER_ADDRESS=0x...
+# .env.local
+NEXT_PUBLIC_GOL_RPC_URL=https://api.cartridge.gg/x/starknet/sepolia
 ```
 
-Until the addresses are set, the simulation still runs locally; on-chain actions are
-disabled with a notice.
+Browser reads need a **CORS-enabled** Sepolia RPC. The default SNF node sends no CORS
+headers, so the app defaults to the Cartridge gateway; override only with another https,
+CORS-enabled endpoint. The same URL backs both SDK reads and the wallet provider.
+
+## What's here
+
+- **`/`** — the garden: a progressive gallery of every creature minted on Sepolia. A fast
+  scan returns just the token ids; each card then hydrates itself, so creatures appear as
+  they're detected instead of after one long wait.
+- **`/create`** — draw a 41×41 pattern on the left; the right grid evolves it live via the
+  SDK's on-chain stepper (matches the contract exactly). A 90s **slot-machine score**
+  (Sequence / Loop / Amplitude) reveals *as the grid runs* — Sequence counts up, Amplitude
+  tracks the live population swing, Loop spins like a reel until the grid reaches its loop,
+  then locks. When it settles into a loop you can spawn it as an NFT.
+- **`/life/[id]`** — a creature's page: the exact on-chain render (rebuilt locally, no
+  per-view `token_uri` fetch), its traits, **feed it forward** (each generation keeps it
+  alive and mints 1 NUT — batched into a single `move_lifeform_forward_n` tx), and, if you
+  own it, **edit** its colours + speed.
+
+The **FR / EN** switch lives in the header (choice persisted to `localStorage`; the browser
+language is detected on first load).
 
 ## Architecture
 
-- `src/lib/contracts.ts` — addresses (from env), RPC provider, ABIs, contract factories.
-- `src/lib/wallet.tsx` — `WalletProvider` / `useWallet` (wallet connect via `get-starknet`).
-- `src/lib/useGol.ts` — on-chain actions: `mintLoop`, `moveForward`, `getNutBalance`.
-- `src/components/game-of-life/` — the interactive grid + fate finder.
-
-ABIs in `src/lib/abi/` are extracted from `target/dev/*.contract_class.json`; re-extract
-them after changing the contracts.
+See [`../../docs/frontend.md`](../../docs/frontend.md) for the module map, the SDK/wallet
+data flow, the i18n pattern, and how the `/create` score + on-chain render artifact work.

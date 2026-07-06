@@ -158,6 +158,80 @@ pub fn find_loop(initial: &Rows, max_period: u32) -> Option<(u32, Rows)> {
     None
 }
 
+/// What a starting state converges to. `Loop` = the start is already periodic (mint a loop);
+/// `Path` = it's a transient that enters a loop after `sequence_length` steps (mint a path);
+/// `Transient` = no loop found within `max_steps` (too long / unknown).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Fate {
+    Loop { period: u32, canonical: Rows },
+    Path(PathFate),
+    Transient { steps: u32 },
+}
+
+/// Classification of a transient path into a loop (the inputs a `mint_path` call needs).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PathFate {
+    /// distance to the loop: steps from the start until it enters the loop (>= 1).
+    pub sequence_length: u32,
+    /// the loop's period (1 for a still life / dead).
+    pub loop_period: u32,
+    /// the loop's canonical (smallest) state — the `target_loop_id` preimage.
+    pub loop_canonical: Rows,
+    /// the state where the trajectory joins the loop (`mint_path`'s loop entrypoint).
+    pub loop_entry: Rows,
+    /// alive (dynamic loop) / frozen (still life) / dead (empty).
+    pub life_state: crate::types::LifeState,
+}
+
+/// Classify what `start` settles into, stepping up to `max_steps`. Detects the first recurring state
+/// via a hash map of `token_hash` → index: the earlier index is the loop entry, the gap is the
+/// period, and the entry index is the distance-to-loop. Mirrors what the on-chain `mint_path`
+/// verification expects (a path enters its loop from outside, at `sequence_length` steps).
+pub fn classify_fate(start: &Rows, max_steps: u32) -> Fate {
+    use crate::types::LifeState;
+    use std::collections::HashMap;
+    let is_empty = |rows: &Rows| rows.iter().all(|&x| x == 0);
+
+    let mut seen: HashMap<Felt, u32> = HashMap::new();
+    let mut states: Vec<Rows> = Vec::new();
+    let mut current = *start;
+    for i in 0..=max_steps {
+        let h = token_hash(&current);
+        if let Some(&first) = seen.get(&h) {
+            let period = i - first;
+            // canonical = smallest state within the discovered cycle.
+            let mut canonical = states[first as usize];
+            for s in &states[first as usize..i as usize] {
+                if lt(s, &canonical) {
+                    canonical = *s;
+                }
+            }
+            if first == 0 {
+                return Fate::Loop { period, canonical };
+            }
+            let loop_entry = states[first as usize];
+            let life_state = if is_empty(&loop_entry) {
+                LifeState::Dead
+            } else if period == 1 {
+                LifeState::Frozen
+            } else {
+                LifeState::Alive
+            };
+            return Fate::Path(PathFate {
+                sequence_length: first,
+                loop_period: period,
+                loop_canonical: canonical,
+                loop_entry,
+                life_state,
+            });
+        }
+        seen.insert(h, i);
+        states.push(current);
+        current = step(&current);
+    }
+    Fate::Transient { steps: max_steps }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -225,5 +299,25 @@ mod tests {
         assert_eq!(find_loop(&blinker_a(), 8), Some((2, blinker_a())));
         let block = grid_with(&[(10, 0b110), (11, 0b110)]);
         assert_eq!(find_loop(&block, 8), Some((1, block)));
+    }
+
+    #[test]
+    fn classify_fate_loop_and_path() {
+        use crate::types::LifeState;
+        // A blinker is already periodic -> Loop of period 2.
+        match classify_fate(&blinker_a(), 64) {
+            Fate::Loop { period, .. } => assert_eq!(period, 2),
+            f => panic!("expected loop, got {f:?}"),
+        }
+        // L-tromino -> 2x2 block (still life) in one step -> a frozen path of length 1.
+        let l = grid_with(&[(1, 0b110), (2, 0b010)]);
+        match classify_fate(&l, 64) {
+            Fate::Path(p) => {
+                assert_eq!(p.sequence_length, 1);
+                assert_eq!(p.loop_period, 1);
+                assert_eq!(p.life_state, LifeState::Frozen);
+            }
+            f => panic!("expected path, got {f:?}"),
+        }
     }
 }

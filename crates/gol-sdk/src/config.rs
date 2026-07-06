@@ -13,6 +13,8 @@ pub enum Network {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ContractKey {
     Lifeforms,
+    /// The separate NFT for PATH creatures (transients into a loop). See docs/path-creatures-spec.md.
+    PathLifeforms,
     Nutrient,
     LoopMinter,
     PathMinter,
@@ -22,6 +24,8 @@ pub enum ContractKey {
 #[derive(Clone, Debug)]
 pub struct GolAddresses {
     pub lifeforms: Felt,
+    /// PATH-creature NFT (separate collection from loops).
+    pub path_lifeforms: Felt,
     pub nutrient: Felt,
     pub loop_minter: Felt,
     pub path_minter: Felt,
@@ -38,6 +42,7 @@ impl GolAddresses {
     pub fn get(&self, key: ContractKey) -> Result<Felt, GolError> {
         Ok(match key {
             ContractKey::Lifeforms => self.lifeforms,
+            ContractKey::PathLifeforms => self.path_lifeforms,
             ContractKey::Nutrient => self.nutrient,
             ContractKey::LoopMinter => self.loop_minter,
             ContractKey::PathMinter => self.path_minter,
@@ -57,9 +62,12 @@ pub fn deployments(net: Network) -> Option<GolAddresses> {
         // later upgraded in place (token_uri gas fix); the address is unchanged.
         Network::Sepolia => Some(GolAddresses {
             lifeforms: felt("0x040380471b403f52ac0ed6e674b391de268f83a8a1778d236bb7acc090c4e633"),
+            // Path creatures: separate NFT + its own minter (deployed 2026-07-01, docs/v2-deployment.md).
+            path_lifeforms: felt("0x0177545eec73206ea5313aa44482d02103824fca91801e32da106dbaad5e1fc"),
             nutrient: felt("0x060e0a0bd9aafec5fd0346e49eb4c5c47f9c7d6b7f26c705aaf21fd53a84e2c9"),
             loop_minter: felt("0x0024564a234b1bd49aea38efbaf99a0c6d5dc1269fa7fc5ad86ef8f924ea030"),
-            path_minter: felt("0x05a3c3aff6117aa8061aa971552c14e2502429a7a9360661daa409f2d510c29f"),
+            // NEW path minter (targets path_lifeforms); supersedes the old 0x5a3c3aff… (minted into loops).
+            path_minter: felt("0x0749695d6919cb110760acd9f63b2c9bbfcc9747139a19602c39593995219e0a"),
             // v2 has no benchmark contract; the SNIP-36 bench was a separate v1-era deploy.
             bench: None,
             // The v2 collection's first mint (the seeded blinker) landed at block 11_075_524.

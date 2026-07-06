@@ -155,6 +155,11 @@ then the B3/S23 rule is applied with bitwise logic. Result: a new 38-bit row mas
 
 ## 5. Identity & canonicalization
 
+> **Superseded (2026-07-06)** for the next collection by `docs/v3-identity-spec.md`: v3 token ids
+> are the Poseidon hash of the **symmetry-orbit canonical** (witness-assisted mint + optimistic
+> minimality with fraud-proofs), not the time-cycle canonical below. This section remains accurate
+> for the live v2 contracts.
+
 ### 5.1 What "same creature" means in v2
 
 **Time-cycle equivalence only.** Two grids are the same creature iff they belong to the same

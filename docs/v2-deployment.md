@@ -48,6 +48,49 @@ Format note (marketplace-facing): `token_uri` is now raw JSON (not base64). Stan
 after the first comma and `JSON.parse`. The `name` is `Lifeform <decimal token_id>` (77-digit) —
 cosmetic, could shorten later.
 
+## Path creatures (deployed 2026-07-01)
+
+New separate NFT for **path** creatures + a new minter that targets it (spec: `docs/path-creatures-spec.md`). The OLD `GolPathMinterV2` `0x5a3c3aff…` (which minted paths into the *loop* lifeforms) is **superseded** — the new path system is self-contained on its own NFT.
+
+| Contract | Address | class_hash |
+|---|---|---|
+| GolPathLifeformsV2 | `0x177545eec73206ea5313aa44482d02103824fca91801e32da106dbaad5e1fc` | `0x3ae1237d06f6d88095e40959c4f4c8d28a1c6bc8df770d813d4704490c6f209` |
+| GolPathMinterV2 (new) | `0x749695d6919cb110760acd9f63b2c9bbfcc9747139a19602c39593995219e0a` | `0x196ec04849eb7683da68e152925c1253867b4dd4a7c813dec35b4c09928355b` |
+
+- Constructors: `GolPathLifeformsV2(creator=admin, nutrient=NUT)`; `GolPathMinterV2(path_lifeforms)`. NUT reused (no fresh token).
+- Wiring: `GolPathLifeformsV2.grant_role(MINTER_ROLE, GolPathMinterV2)`; admin approved 1000 NUT to the path NFT (mint escrow).
+- **Live tests (Sepolia):**
+  - `mint_path` (L-tromino → 2×2 block): frozen, seq_length 1, target_period 1, minted_at stamped, **1 NUT escrowed**, owner = admin. tx `0x146faaeb068e29d508c38789ae326f6ae1c71a0dd502db4dd4744e446461f2b`.
+  - `challenge_burn` (older len-2 path burns its newer len-1 forward sub-path): sub-path **burned**, **1 NUT bounty** paid to challenger. tx `0x9b3c34c25bd3d713133480676dd6e43de0c68a52f721a291f7e01ce167ae42`.
+- **Cleanup before mainnet:** (1) admin was granted `MINTER_ROLE` on the path NFT for the challenge test (lets it forge path records bypassing the minter) — **revoke it**; (2) the challenge test left a bogus crafted path record `0x743d91e9…` (agent-owned) — testnet pollution; (3) revoke the old path minter's `MINTER_ROLE` on the loop lifeforms if fully retiring it.
+
+## Symmetry challenge-burn upgrade (2026-07-06)
+
+Both NFT contracts upgraded **in place** to the symmetry-challenge classes
+(`docs/symmetry-challenge-spec.md`): mint nonces, `apply_symmetry` witnesses, loop `challenge_burn`
+(bounty minted from nothing), generalized path `challenge_burn` (⚠️ **ABI change**: 3 new witness
+args — SDK/frontend call sites must be updated).
+
+| Contract | Address (unchanged) | new class_hash | old class_hash (revertible) |
+|---|---|---|---|
+| GolLifeformsV2 | `0x40380471…4e633` | `0x38b639480a363d8eb9f103bad8515932d4cd24a1a6971a959057360764f326f` | `0x4765cb6a…5ed0f` |
+| GolPathLifeformsV2 | `0x177545ee…5e1fc` | `0x3db4bc446b1c23f6254db4fea00f13e3f0fa2870f3f3c6cf855812432b80700` | `0x3ae1237d…6f209` |
+
+- Declares: `0x266f73073f919102669e2eadaa53c9e6cbc53c6244451de51722357f8be68ac` (lifeforms),
+  `0x5109eae778e7d62c1daccdac4722dc73e3b853fdff0284634d750dd88b6b742` (paths).
+- Upgrade + revoke multicall: `0x1da5112bf5005f2504603ee4aec7562050ffc55a4b7fa2be9f804fb3d68f4b9`
+  (SUCCEEDED, ACCEPTED_ON_L2).
+- **Cleanup #1 DONE:** admin's `MINTER_ROLE` on the path NFT revoked (verified `has_role → 0`).
+- **Cleanup #3 still open (needs sign-off):** old `GolPathMinterV2` `0x5a3c3aff…` retains
+  `MINTER_ROLE` on the loop lifeforms (`has_role → 1`).
+- Verified post-upgrade: both `getClassHashAt` match; `get_mint_nonce(seeded blinker) = 0`
+  (grandfathered oldest tier, by design).
+- strkd gotcha (new): `companion_requestPairing` identity is keyed by **(name, kind)** — omit
+  `kind:"agent"` and you silently get a parallel app-kind client with no agent-account access
+  (`-32002`). Issue reported to the strkd maintainer via `companion_reportIssue`.
+- Node gotcha (new): `sepolia.nodes.starknet.org` wants `sierra_program` as the **raw felt array**
+  in declares, not the gzip+base64 form; abi still the canonical `formatSpaces` string.
+
 ## Notes / gotchas hit during deploy
 - Declare requires the contract-class `abi` as the **canonical `formatSpaces` string** (decimal/raw array → node error `invalid type: sequence, expected a string`).
 - strkd calldata must be **hex felts** (`num.toHex`), not decimal (error `114: invalid felt`).

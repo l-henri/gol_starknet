@@ -18,7 +18,110 @@
 
 ---
 
-## 2026-06-17 (DONE) — Both ceilings re-measured live on Sepolia: on-chain 321, off-chain 89
+## 2026-07-06 — Symmetry challenge-burn LIVE on Sepolia (in-place upgrades via strkd)
+- **Goal:** finish spec item #1 — declare + upgrade both NFT contracts with the symmetry mechanism.
+- **Branch:** `experiment/frontend-redesign` · **Commits:** uncommitted WIP (contracts committed
+  state unchanged since 07-03 session; deploy artifacts from current build)
+- **Changed (on-chain, Sepolia):** declared `GolLifeformsV2` class `0x38b639…f326f` and
+  `GolPathLifeformsV2` class `0x3db4bc…80700`; one multicall upgraded both live contracts in place
+  and revoked the admin's leftover `MINTER_ROLE` on the path NFT (cleanup #1). Old classes remain
+  declared (revertible). Details + tx hashes in [v2-deployment.md](../v2-deployment.md).
+- **Verified:** `getClassHashAt` matches both new classes; `get_mint_nonce(seeded blinker) = 0`
+  (grandfathered tier); `has_role(MINTER, admin)` on path NFT = 0. Cleanup #3 (old path minter's
+  role on loop lifeforms) deliberately NOT executed — optional, needs Henri's sign-off.
+- **Decisions / findings:** strkd pairing identity is **(name, kind)** — a 3-day blocker traced to
+  pairing without `kind:"agent"` silently creating a parallel app-kind client (`-32002`, no
+  prompt). Reported upstream via `companion_reportIssue` (prefilled GitHub issue handed to Henri).
+  Node quirk: this RPC node wants raw (uncompressed) `sierra_program` in declares.
+- **Same day — SDK symmetry support + leaderboards v1 (Henri: "fix the SDK, then leaderboards"):**
+  - SDK (`gol-sdk`): `grid::{apply_d4, translate, apply_symmetry, symmetry_canonical, find_witness}`
+    (d4 table mirrors the Cairo consensus-critical convention; equivariance + group tests);
+    `writes::challenge_burn` updated to the new path ABI (+d4/dr/dc) and `challenge_burn_loop`
+    added; event scanner gains `feed_rewards()` (top-breathers aggregation from NUT faucet mints,
+    initial-supply mint excluded by size guard) and `recent_{path_}mints_with_blocks()`.
+    **42 tests green.** WASM: `challengeBurnCall` (new signature), `challengeBurnLoopCall`,
+    `symmetryCanonical`, `findWitness`, `topBreathers`, `recentMints`, `recentPathMints`.
+  - Frontend: **`/leaderboards`** page (FR/EN) — the four launch boards from
+    [leaderboards.md](../leaderboards.md): longest loops, methuselahs (length ÷ seed cells), top
+    breathers, discoveries of the week (block-window ≈ 20k blocks). Header nav link; `.board` CSS.
+    `next build` green.
+  - **Live-verified the data layer** (`examples/board_probe.rs` against Sepolia): 6 breathers (top
+    830 generations), 24 loop mints, 9 path mints — the boards have real content. The page itself
+    is ⚠️ not yet eyeballed in a browser (`npm run dev` → /leaderboards).
+- **Same day — v3 identity decided (Henri's proposal) + spec written.** Henri asked the right
+  question: if the orbit key is universal and 0.75 ms to derive, why keep two id systems? Answer:
+  don't. **`docs/v3-identity-spec.md`**: `token_id = Poseidon(orbit canonical)`, witness-assisted
+  mint (family membership verified exactly, one transform), optimistic **minimality** with
+  permanent escrow-staked fraud-proofs, drawn state stored for display, sub-path challenge kept,
+  loop symmetry challenge not carried into v3 (copies revert at mint). Locked (interview round 1):
+  escrow-staked proofs, permanent window, **fresh v3 + curated genesis reseed**. Round 2 went
+  unanswered (AFK) — sequencing (consolidate→v3→pets), naming (drop version markers), genesis to
+  original owners, ride-alongs (feeder-in-event + `feed_for`) are **PROVISIONAL in spec §3**.
+  Supersedes-notes added to symmetry-challenge-spec.md and v2-grid-redesign.md §5.
+- **Next:** Henri confirms spec §3 → consolidation (#2) → v3 build → pets on v3. Also: eyeball
+  /leaderboards in dev; decide v2 cleanup #3 (moot if v2 is superseded soon).
+- **Blockers:** §3 confirmation.
+
+## 2026-07-03 — First-principles review; symmetry-burn + leaderboard docs; doc discipline restored
+- **Goal:** review the project's reasoning trajectory against the original ask (docs, not code),
+  then act on Henri's responses.
+- **Branch:** `experiment/frontend-redesign` · **Commits:** uncommitted WIP (docs only)
+- **Changed:**
+  - Review delivered. Reframings from Henri: the project is a **WIP art piece** ("burning gas and
+    creating art"); proving is deliberately sequenced *after* v1 (accessibility first, proving for
+    enthusiasts later — the TUI's purpose); users pay their own gas (no paymaster); immutability is
+    aspirational, later; the casino `/create` was user-research-driven (the main user is an
+    8-year-old high-score hunter), leaderboards next.
+  - **`CLAUDE.md` created** (repo root): session-end doc-consistency rules — LOG entry, STATUS
+    rewrite, spec reversals recorded in the spec they reverse. (This log had silently stopped on
+    2026-06-17 while v2 shipped.)
+  - **`docs/symmetry-challenge-spec.md`** (interview-derived): witness-based challenge-burn for
+    translation/rotation/reflection copies, unified with the sub-path rule (`(g, k)` witness),
+    loops via in-place upgrade, loop bounty minted from nothing, **mint nonce replaces the
+    timestamp direction guard** (superseded-note added to `path-creatures-spec.md`),
+    grandfathered tokens = nonce 0, strict no-diptych-exemption.
+  - **`docs/leaderboards.md`**: ~20-board catalogue; key finding: no contract changes required
+    (states on-chain + Life deterministic ⇒ all pattern metrics are indexer compute); two optional
+    event/nonce deltas; recommend leaderboards = the indexer project's first product.
+  - Pet/ERC1155 parameters pinned by interview: petting **is** feeding, 1 generation per pet
+    (ceremonial), 7-day lapse, permissionless reaper rewarded with NUT minted from nothing
+    (amount TBD in the pet spec — proposed 1 NUT). Pet spec itself not yet written.
+  - Audience research completed → **`docs/audience-research.md`** (19 verified claims; synthesis:
+    position as Autoglyphs-lineage on-chain art; primary = fully-on-chain genart collectors,
+    secondary = ConwayLife/CA enthusiasts approached as a discovery census, kids/education later;
+    stay on Starknet + market chain-agnostically; Cellula = anti-model; Seed Grant + genesis
+    bestiary + manifesto essay + leaderboards-before-outreach as concrete plays).
+- **Verified:** docs only; no build/test run.
+- **Decisions:** see the spec's "Decisions locked" table and the review memory.
+- **Later same session:** Henri set the order 4→1→3→2. **`docs/pet-mechanism-spec.md` written**
+  (final interview: reap reward 1 NUT flat; bonds **transferable** — "daycare" use case — with the
+  clock carried per (creature, holder) on transfer and max 1 bond/holder/creature to close the
+  self-transfer dodge; orphaned bonds lapse naturally). Henri approved the symmetry spec **as
+  drafted** → implementation started.
+- **Symmetry mechanism IMPLEMENTED** (same session, spec approved as drafted):
+  - `gol_grid_v2`: `apply_d4` (8-element table, inverse-mapped per-cell copy), `translate`
+    (row re-index + u128 bit rotation), `apply_symmetry` = translate ∘ d4. The d4 index table is
+    consensus-critical (SDK must match).
+  - `GolLifeformsV2`: `next_nonce`/`mint_nonce` storage (new maps only — in-place-upgrade-safe;
+    unwritten = 0 = grandfathered tier), nonce stamped in `mint`, new `challenge_burn(a, b,
+    a_state, d4, dr, dc, k)` — preimage pinned by hash, equal-period + `k < period` asserts,
+    bounty = `b.sequence_length` NUT **minted from nothing**, `ChallengeBurned` event.
+  - `GolPathLifeformsV2`: same nonce plumbing; `challenge_burn` generalized with the
+    `(d4, dr, dc)` witness (`k` = length gap; identity keeps the strictly-longer + same-target
+    rules; escrow bounty unchanged); **nonce replaces `minted_at` as the direction guard**.
+  - Inline verification only for now (fine to ~450 steps at 41×41); tiled-`k` challenges via the
+    partial-path registry remain a follow-up (spec §4.2).
+- **Verified:** `scarb build` ✅; `snforge test` ✅ **81 passed, 0 failed** — new: d4 group
+  properties, translation wrap/composition, step∘g equivariance (all 8 elements), loop copy burn
+  with minted bounty (+ nonce getter), newer-cannot-burn, non-copy refused, path rot90+translate
+  copy burn (escrow paid, target pre-filter skipped), stepped-symmetry copy burn, equal-length
+  identity-witness refused; legacy sub-path tests pass under the nonce guard.
+- **Next:** **Sepolia declare + upgrade of both NFT contracts — BLOCKED on strkd (companion not
+  running)**; also revoke the leftover admin `MINTER_ROLE` on the path NFT during that deploy, and
+  update the SDK challenge_burn signature + `symmetryCanonical`/`planChallenge`. Then
+  leaderboards/indexer (#3); then repo consolidation + log backfill 2026-06-17 → 07-01 (#2).
+- **Blockers:** none.
+
 - **Goal:** get the *real* on-chain and off-chain (SNIP-36) generation ceilings for the optimized
   `step_grid`, on testnet, via strkd (signing) + dinner (proving) — no sncast, no self-run prover.
 - **Results:**

@@ -31,8 +31,8 @@ pub use client::GolClient;
 pub use config::{deployments, ContractKey, GolAddresses, GolConfig, Network};
 pub use datasource::{DataSource, EventScanDataSource, IndexerDataSource, MoveEvent};
 pub use engine::{
-    combine_partial_path, compute_partial_path, find_loop, is_single_loop,
-    is_single_loop_and_entrypoint_is_smallest, step_to, LoopInfo, PartialPathData,
+    classify_fate, combine_partial_path, compute_partial_path, find_loop, is_single_loop,
+    is_single_loop_and_entrypoint_is_smallest, step_to, Fate, LoopInfo, PartialPathData, PathFate,
 };
 pub use error::GolError;
 pub use grid::{step, token_hash, token_id, GridState, Rows, MASK, N};
@@ -40,10 +40,10 @@ pub use reader::Reader;
 pub use rpc::RpcReader;
 pub use submit::{StrkdSubmitter, SubmitOpts, SubmitResult, Submitter};
 pub use types::{
-    Call, Felt, LifeformData, MoveMessage, OwnedLifeform, RenderParams, TokenAttribute, TokenUri,
-    U256,
+    Call, Felt, LifeState, LifeformData, MoveMessage, OwnedLifeform, OwnedPath, PathForm,
+    RenderParams, TokenAttribute, TokenUri, U256,
 };
-pub use writes::{nut_cost_for_loop, nut_cost_for_path, GolWrites, Minter};
+pub use writes::{nut_cost_for_loop, nut_cost_for_path, GolWrites, MintPlan, MintStep, Minter};
 
 /// Minimal `0x…` hex for a felt (e.g. printing an owner address).
 pub fn felt_to_hex(f: &Felt) -> String {

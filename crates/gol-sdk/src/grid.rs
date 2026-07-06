@@ -133,6 +133,129 @@ pub fn token_id(rows: &Rows) -> U256 {
     U256::from_felt(&token_hash(rows))
 }
 
+// --- torus symmetries (port of gol_grid_v2 apply_d4/translate/apply_symmetry) --------------------
+//
+// The d4 index table is CONSENSUS-CRITICAL and must match `src/gol_grid_v2.cairo` exactly:
+//   0 = identity                     4 = flip horizontal (mirror columns)
+//   1 = rotate 90° clockwise         5 = flip vertical (mirror rows)
+//   2 = rotate 180°                  6 = transpose (main diagonal)
+//   3 = rotate 270° clockwise        7 = anti-transpose
+// A full symmetry g = translate(dr, dc) ∘ d4 (dihedral first, then translation).
+
+/// Source cell (sr, sc) whose content lands on output cell (r, c) under d4 element `d4`.
+fn d4_source(d4: u8, r: usize, c: usize, last: usize) -> (usize, usize) {
+    match d4 {
+        0 => (r, c),
+        1 => (last - c, r),          // forward: (r,c) -> (c, last-r)
+        2 => (last - r, last - c),   // forward: (r,c) -> (last-r, last-c)
+        3 => (c, last - r),          // forward: (r,c) -> (last-c, r)
+        4 => (r, last - c),          // forward: (r,c) -> (r, last-c)
+        5 => (last - r, c),          // forward: (r,c) -> (last-r, c)
+        6 => (c, r),                 // forward: (r,c) -> (c, r)
+        _ => (last - c, last - r),   // 7, forward: (r,c) -> (last-c, last-r)
+    }
+}
+
+/// Apply a dihedral (D4) element (per-cell copy, mirrors the Cairo implementation).
+pub fn apply_d4(d4: u8, rows: &Rows) -> Rows {
+    assert!(d4 < 8, "bad d4");
+    if d4 == 0 {
+        return *rows;
+    }
+    let last = N - 1;
+    let mut out = [0u64; N];
+    for (r, slot) in out.iter_mut().enumerate() {
+        let mut v = 0u64;
+        for c in 0..N {
+            let (sr, sc) = d4_source(d4, r, c, last);
+            if (rows[sr] >> sc) & 1 == 1 {
+                v |= 1 << c;
+            }
+        }
+        *slot = v;
+    }
+    out
+}
+
+/// Rotate a row's bits left by `dc` columns (bit c -> bit (c+dc) mod N).
+#[inline]
+fn rot_row_by(x: u64, dc: usize) -> u64 {
+    if dc == 0 {
+        return x;
+    }
+    let shifted = (x as u128) << dc;
+    (((shifted & MASK as u128) | (shifted >> N)) as u64) & MASK
+}
+
+/// Translate the torus: cell (r, c) -> ((r+dr) mod N, (c+dc) mod N).
+pub fn translate(rows: &Rows, dr: usize, dc: usize) -> Rows {
+    let (drm, dcm) = (dr % N, dc % N);
+    let mut out = [0u64; N];
+    for (r, slot) in out.iter_mut().enumerate() {
+        *slot = rot_row_by(rows[(r + N - drm) % N], dcm);
+    }
+    out
+}
+
+/// Full torus symmetry: translate(dr, dc) ∘ d4. The challenge-burn witness transform.
+pub fn apply_symmetry(d4: u8, dr: usize, dc: usize, rows: &Rows) -> Rows {
+    translate(&apply_d4(d4, rows), dr, dc)
+}
+
+/// Lexicographically smallest grid in the full 13,448-element symmetry orbit, with the witness
+/// `(d4, dr, dc)` that produces it. This is the orbit identity for copy detection (mint warnings,
+/// indexer dedup): two grids are symmetry copies iff their orbit canonicals are equal.
+pub fn symmetry_canonical(rows: &Rows) -> (Rows, u8, usize, usize) {
+    let mut best = *rows;
+    let mut witness = (0u8, 0usize, 0usize);
+    for d4 in 0..8u8 {
+        let img = apply_d4(d4, rows);
+        for dr in 0..N {
+            for dc in 0..N {
+                let cand = translate(&img, dr, dc);
+                if lt(&cand, &best) {
+                    best = cand;
+                    witness = (d4, dr, dc);
+                }
+            }
+        }
+    }
+    (best, witness.0, witness.1, witness.2)
+}
+
+/// `translate(img, dr, dc) == b`, without materializing the translated grid (early-exit compare).
+fn translated_eq(img: &Rows, dr: usize, dc: usize, b: &Rows) -> bool {
+    for r in 0..N {
+        if rot_row_by(img[(r + N - dr) % N], dc) != b[r] {
+            return false;
+        }
+    }
+    true
+}
+
+/// Search for a challenge witness: `(d4, dr, dc, k)` with `apply_symmetry(d4, dr, dc, step^k(a)) == b`,
+/// scanning `k` in `0..=max_k`. Used to plan a `challenge_burn` (for paths `max_k` = the length gap;
+/// for loops `max_k` = period − 1). Returns the first match found.
+pub fn find_witness(a: &Rows, b: &Rows, max_k: u32) -> Option<(u8, usize, usize, u32)> {
+    let mut cur = *a;
+    for k in 0..=max_k {
+        for d4 in 0..8u8 {
+            let img = apply_d4(d4, &cur);
+            for dr in 0..N {
+                for dc in 0..N {
+                    if translated_eq(&img, dr, dc, b) {
+                        return Some((d4, dr, dc, k));
+                    }
+                }
+            }
+        }
+        if k < max_k {
+            cur = step(&cur);
+        }
+    }
+    None
+}
+
 // --- storage form: 7-felt row-aligned packing ---------------------------------------------------
 
 /// The 7-felt `Store`/calldata form: 41 rows packed 6-per-felt (last 5), row `j` at bit `41*j`.
@@ -284,5 +407,84 @@ mod tests {
             .unwrap(),
         );
         assert_eq!(token_id(&blinker_a()), want);
+    }
+
+    // --- torus symmetries (must mirror the Cairo tests in src/gol_grid_v2.cairo) ---------------
+
+    fn busy_seed() -> Rows {
+        grid_with(&[
+            (1, 0b1110),
+            (2, 0b0100),
+            (7, 0x155),
+            (15, 0x3ff),
+            (16, 0x201),
+            (25, 0x12345),
+            (37, 0b111),
+        ])
+    }
+
+    #[test]
+    fn d4_group_orders() {
+        let g = busy_seed();
+        let r1 = apply_d4(1, &g);
+        let r2 = apply_d4(1, &r1);
+        let r3 = apply_d4(1, &r2);
+        assert_eq!(apply_d4(1, &r3), g, "rot90^4 = id");
+        assert_eq!(r2, apply_d4(2, &g), "rot90^2 = rot180");
+        assert_eq!(r3, apply_d4(3, &g), "rot90^3 = rot270");
+        for d in 4..8u8 {
+            assert_eq!(apply_d4(d, &apply_d4(d, &g)), g, "reflection^2 = id");
+        }
+    }
+
+    #[test]
+    fn translate_wraps_and_composes() {
+        let g = busy_seed();
+        assert_eq!(translate(&g, N, N), g);
+        assert_eq!(translate(&translate(&g, 1, 2), 3, 4), translate(&g, 4, 6));
+        assert_ne!(token_id(&translate(&g, 0, 1)), token_id(&g));
+    }
+
+    #[test]
+    fn step_commutes_with_symmetries() {
+        let g = busy_seed();
+        let stepped = step(&g);
+        for d in 0..8u8 {
+            assert_eq!(
+                step(&apply_symmetry(d, 3, 7, &g)),
+                apply_symmetry(d, 3, 7, &stepped),
+                "step must commute with g (d4={d})"
+            );
+        }
+    }
+
+    #[test]
+    fn orbit_canonical_detects_copies() {
+        let g = busy_seed();
+        let copy = apply_symmetry(5, 12, 30, &g);
+        let (ca, ..) = symmetry_canonical(&g);
+        let (cb, ..) = symmetry_canonical(&copy);
+        assert_eq!(ca, cb, "orbit canonicals of copies must match");
+        // the returned witness reproduces the canonical
+        let (c, d4, dr, dc) = symmetry_canonical(&g);
+        assert_eq!(apply_symmetry(d4, dr, dc, &g), c);
+        // an unrelated grid lands elsewhere
+        let (cu, ..) = symmetry_canonical(&grid_with(&[(20, 0b101)]));
+        assert_ne!(ca, cu);
+    }
+
+    #[test]
+    fn find_witness_recovers_transform_and_step_offset() {
+        let a = busy_seed();
+        // pure symmetry copy (k = 0)
+        let b0 = apply_symmetry(1, 2, 3, &a);
+        assert_eq!(find_witness(&a, &b0, 0), Some((1, 2, 3, 0)));
+        // stepped + transformed copy (k = 2)
+        let b2 = apply_symmetry(4, 0, 5, &step(&step(&a)));
+        let (d4, dr, dc, k) = find_witness(&a, &b2, 5).expect("witness exists");
+        assert_eq!(k, 2);
+        assert_eq!(apply_symmetry(d4, dr, dc, &step(&step(&a))), b2);
+        // unrelated grid -> no witness
+        assert_eq!(find_witness(&a, &grid_with(&[(20, 0b101)]), 3), None);
     }
 }
