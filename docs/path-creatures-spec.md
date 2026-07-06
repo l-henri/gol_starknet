@@ -1,6 +1,13 @@
 # Path Creatures — Technical Spec
 
 **Status:** draft for review (interview-derived, 2026-07-01). Human review required before implementation.
+
+> **Superseded in part (2026-07-03)** by `docs/symmetry-challenge-spec.md`: (1) the challenge-burn
+> rule is generalized to a witness `(g, k)` covering translation/rotation/reflection copies — the
+> sub-path rule below is the special case `g = identity`; (2) the **mint-timestamp direction guard
+> (§1.2, §5 rule 2) is replaced by a per-contract mint nonce** (strict `<`; fixes the same-block tie);
+> `minted_at` becomes display-only; (3) the `target_loop_id` pre-filter (§5 rule 3) only applies when
+> `g = identity`.
 **Scope:** a new mintable creature type — *paths* (transients that lead into a loop) — on a **separate NFT contract**, with a burn-based anti-farming mechanism.
 **Related:** `docs/partial-paths-mint-ux.md` (loop minting + partial-path tiling), `docs/sierra-gas-metering-discrepancy.md` (on-chain stepping gas), `docs/v2-grid-redesign.md` (GridState).
 

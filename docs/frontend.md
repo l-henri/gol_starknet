@@ -18,6 +18,8 @@ ui/game-of-life/src/
 │   ├── layout.tsx              # provider stack + header/footer + fonts + metadata
 │   ├── page.tsx                # home: hero + <Garden/> (client, for i18n)
 │   ├── create/page.tsx         # the editor: draw → live evolve → slot-machine score → spawn
+│   ├── incubator/page.tsx      # in-progress mints + localStorage bookmarks
+│   ├── leaderboards/page.tsx   # garden records: longest loops, methuselahs, top breathers, weekly (2026-07-06)
 │   └── life/[id]/page.tsx      # a creature's detail page (feed, owner-edit) + dormant bestiary route
 ├── components/
 │   ├── Garden.tsx              # progressive gallery: recentTokenIds → a lazy card per id

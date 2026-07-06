@@ -3,119 +3,66 @@
 > Snapshot of where the project stands. Keep this short and current — rewrite it each session.
 > History lives in [LOG.md](LOG.md); the plan lives in [ROADMAP.md](ROADMAP.md).
 
-**Last updated:** 2026-06-16
-**Active branch:** `perf/step-grid-modulo-removal` (built on `chore/modernize-and-prune`; neither merged to `main`, not pushed)
-**Build/test:** `scarb build` ✅ · `snforge test` ✅ (35 passing) · `npm run build` ✅
-**Tx tooling:** all on-chain transactions go through the **strkd** wallet companion — **not `sncast`** (see [development.md](../development.md#transaction--signing-tooling--use-strkd-not-sncast)).
+**Last updated:** 2026-07-06
+**Framing:** WIP **art piece**, not a commercial product — the outcome is burning gas and creating art.
+**Active branch:** `experiment/frontend-redesign` (v2 product line; see branch note below)
+**Build/test:** `scarb build` ✅ · `snforge test` ✅ (81) · `cargo test -p gol-sdk` ✅ (42) · `next build` ✅
+**Tx tooling:** all on-chain transactions via **strkd** — never sncast/raw keys ([development.md](../development.md))
 
-## Done
+## Where the product is
 
-- **Phase 0 — modernize.** Removed the dead `hdp_cairo` dep that blocked the build; bumped to
-  Scarb/Cairo 2.18, `snforge_std` 0.60, OpenZeppelin 3.0, Starknet 2.18; rewrote the test
-  suite into correct integration tests; added `.tool-versions` + CI.
-- **Repo cleanup.** Removed the stale Vite frontend and a dead duplicate component;
-  standardized on the Next.js app.
-- **Phase 1 — frontend ↔ chain (code complete).** Wallet connect, env-driven contract config,
-  `useGol` actions (mint loop/path, breathe-life, balance/lifeform reads), a reliable pure
-  fate-finder (`computeFate`, unit-verified), a "my lifeforms" view, and grid previews.
-  `next build` passes.
-- **Phase 2 — on-chain rendering.** `token_uri`/`tokenURI` now return a base64 `data:` URI with
-  ERC721 JSON and an SVG of the lifeform's grid (`src/gol_metadata.cairo` + `src/base64.cairo`);
-  verified by 6 tests (base64 vectors, exact SVG/JSON, end-to-end after mint).
-- **Phase 3 (started) — movement integrity.** `move_lifeform_forward` now reverts on phantom
-  (unminted) token ids (`'Lifeform not minted'`), so NUT is only earned by advancing real
-  lifeforms. The NUT economy itself is intentional and unchanged.
-- **Performance — the GoL step engine.** Factored the Conway step into one shared `step_grid`
-  free function and added `iterate_life_several_in_place` (unpack the u256 grid once, step in
-  place, pack once — vs re-packing every generation; ~3× cheaper per generation). Then removed
-  the four `% grid_size` ops per cell (branch-based toroidal wraps) and hoisted the row
-  snapshots out of the column loop: **−39% L2 gas** on the 20-generation in-place benchmark
-  (152.0M → 92.7M). Added equivalence + toroidal-edge + independent-reference (Python-checked)
-  tests. ⚠️ This touches consensus-critical stepping logic — **in scope for the pre-mainnet audit.**
+- **v2 is the live product** — 41×41 grid, bitboard stepper, Poseidon token ids, Art Blocks-style
+  on-chain HTML renderer. **Live on Sepolia since 2026-06-22**; addresses + class hashes in
+  [v2-deployment.md](../v2-deployment.md). v1 (15×15) remains deployed but is superseded.
+- **Path creatures** (transients into a loop, separate NFT + challenge-burn) deployed 2026-07-01
+  and live-tested (mint, burn, bounty) — spec: [path-creatures-spec.md](../path-creatures-spec.md).
+- **Frontend** (`ui/game-of-life`): v2 app with `/create` editor (high-score register — deliberate),
+  feed with per-wallet gas caps, owner render-param tuning, FR/EN — [frontend.md](../frontend.md).
+- **SDK**: Rust crate + WASM (`crates/`), lean JSON-RPC stack — [sdk-plan.md](../sdk-plan.md).
+- **Known gas facts** (measured): per-gen stepping is pattern-independent but ~5.2× more expensive
+  from legacy (Sierra < 1.7.0) wallet account classes —
+  [sierra-gas-metering-discrepancy.md](../sierra-gas-metering-discrepancy.md). FEED_CAP=82 sized
+  for the legacy worst case. Mint verification re-simulates on-chain; long sequences tile via
+  partial paths ([partial-paths-mint-ux.md](../partial-paths-mint-ux.md)).
 
-## In progress
+## In flight (2026-07-03)
 
-- Nothing actively in flight. (Partial-path machinery is now covered end-to-end and the
-  closing-segment bug is fixed — see the LOG and ROADMAP backlog.)
+- **Symmetry challenge-burn** ([spec](../symmetry-challenge-spec.md)): implemented, 81 tests green,
+  and **LIVE on Sepolia since 2026-07-06** (in-place upgrades of both NFT contracts; new class
+  hashes + txs in [v2-deployment.md](../v2-deployment.md); admin `MINTER_ROLE` on path NFT
+  revoked). **SDK updated same day** (new challenge ABI + `symmetryCanonical`/`findWitness` +
+  loop challenge builder; 42 tests). Open: cleanup #3 (old path minter's role on loop NFT) awaits
+  sign-off.
+- **Leaderboards v1 SHIPPED (code)** — `/leaderboards` page with the four launch boards (longest
+  loops, methuselahs, top breathers, weekly discoveries) over client-side event scans; data layer
+  live-verified (6 breathers / 24 loops / 9 paths on Sepolia). ⚠️ Page not yet eyeballed in a
+  browser.
+- **[pet-mechanism-spec.md](../pet-mechanism-spec.md)** — written & parameterized (petting = feeding
+  1 gen, 7-day lapse, transferable "daycare" bonds w/ carried clocks, 1-NUT reaper). Implementation
+  queued after leaderboards.
+- **[audience-research.md](../audience-research.md)** — done: Autoglyphs-lineage positioning,
+  CA-community-as-census, Cellula anti-model, leaderboards-before-outreach.
+- **[leaderboards.md](../leaderboards.md)** — board catalogue awaiting curation; the indexer is the
+  next real build (Henri's order: this is #3).
 
-## Sepolia deployment (live — 2026-06-08)
+- **v3 identity model DECIDED** ([v3-identity-spec.md](../v3-identity-spec.md)): orbit-canonical
+  token ids — copies revert at mint instead of being burned after. Witness-assisted mint, permanent
+  escrow-staked fraud-proofs, fresh v3 collections + curated genesis reseed. **Spec §3
+  (sequencing, naming, genesis owners, ride-alongs) is PROVISIONAL — awaiting Henri.**
 
-Deployed via `sncast` from the `deployer` account; roles + allowance wired in one multicall; a
-2×2-block loop NFT (token `98307`) minted to confirm the full path. `ui/game-of-life/.env.local`
-is set to these (RPC: `https://api.cartridge.gg/x/starknet/sepolia`).
+## Next up (Henri's order: 4 → 1 → 3 → 2, now extended by v3)
 
-| Contract | Address |
-|---|---|
-| Nutrient (NUT) | `0x060e3d6a6f181235e0d4993ddde5a7db7d8ff5275830bcc916969dfdbf3e1858` |
-| GolLifeforms | `0x0535f6cb8e98f78de9b4dc71b78839cd8119af301b8b300d715b32872d07494e` |
-| GolLoopMinter | `0x021f2ee4afeb2593fb957911f500c06424bb045ec64e172bd8ee0af5aefd4ffc` |
-| GolPathMinter | `0x07e46847ece8c083da4e8a3eb17bd8d3f7138b08cda3ad6a2ffa884b918d2503` |
+1. **(#1 tail)** Launch strkd → declare + upgrade both NFT contracts on Sepolia; record class
+   hashes in v2-deployment.md; revoke the path-NFT admin `MINTER_ROLE`; SDK challenge updates.
+2. **(#3)** Pick the first four leaderboards; scope + build the indexer.
+3. **(#2)** Repo consolidation (merge plan for the local branches) + backfill LOG for
+   2026-06-17 → 07-01.
+4. Pet mechanism implementation (spec ready).
+5. Pre-mainnet checklist unchanged: external audit, governance hardening (immutability is the
+   stated endgame, deliberately deferred).
 
-Verified on-chain: all three `MINTER_ROLE` grants, the nutrient-address wiring, the allowance, the
-mint (owner + `LifeFormData`), the 1-NUT charge, and that `token_uri` returns the base64 JSON+SVG.
+## Branch note
 
-## SNIP-36 proving benchmark — RE-MEASURED with the optimized step_grid (2026-06-17)
-
-Max GoL generations advanceable in one tx, on-chain vs off-chain, **re-measured live on Sepolia with
-the optimized (`perf/step-grid-modulo-removal`) code** (full detail in [LOG.md](LOG.md)). The
-optimized `GolBench` (class `0x41268542…b0da`, Sierra 1.8.0) is deployed at
-`0x05f62daf5d63c1c6c310247d2155dcc52fa4328ff7bd8ec4ace6f40f8fa3ec5`; the pre-optimization instance
-(`0x0057ac40…eb99`) stays for reference. Not part of the product.
-
-| Path | Old code | **Optimized** | Bound by |
-|---|---|---|---|
-| On-chain (single tx, in-place) | 170 | **321 gens** | 1.2e9 L2-gas-per-tx protocol cap (n=321 ok, 322 over) |
-| Off-chain (SNIP-36, **local** dinner/stwo build) | 43 | **89 gens** | that build's trace/twiddle cap — `Not enough twiddles!` at n=90 |
-
-Both ~2× the old code (1.89× on-chain, 2.07× off-chain) — matching the ~47%-cheaper-per-generation
-`step_grid`. On-chain confirmed by real broadcast `move_forward_in_place(321)` (tx `0x5307febe…`,
-**actual 1,089,490,115 L2 gas**, 8.72 STRK, `get_age` 0→321). Off-chain pinned via **dinner** (the
-local proving companion): n=89 proves (~406 KB proof), n=90 trace-caps.
-
-Round-trip validated end-to-end at n=15 and at the n=43 ceiling (strkd sign → Dinner prove →
-on-chain `verify_move_forward`). On-chain (170) and off-chain (43) are **different kinds of
-limits**: on-chain is the protocol gas cap (calibrated to the *production* prover); off-chain
-is the *local* Dinner stwo build's fixed trace/twiddle capacity. Same prover family, much
-smaller local build — raise its max log size / twiddle precompute and the off-chain ceiling
-climbs past 170 (off-chain has no 1.2e9 cap; next limits are balance ~220, then RAM). On-chain
-ceiling measured via fee estimation (`/tmp/golbench/estimate.py`) and **confirmed by a real
-broadcast of `move_forward_in_place(170)`** — tx `0x50fd2c79…bdedc`, SUCCEEDED, `get_age` 58→228,
-actual L2 gas 1,085,322,855, fee 8.68 STRK. The earlier "97" was a wrong gas-per-gen estimate.
-
-> **Lessons from getting these numbers (the "declare blocker" was self-inflicted, not infra):**
-> 1. **`compiled_class_hash` must be computed with starknet.js ≥ v9.** The frontend's pinned
->    **v7.6.4** uses the old algorithm (returned `0x7eec8e15…`); **v10** returns the correct
->    `0x581b62…` the network expects. A wrong hash is rejected as a `compiled_class_hash` mismatch
->    that *looks* like toolchain/compiler skew but isn't. scarb 2.18 / Sierra 1.8.0 declares fine.
-> 2. **Class hash needs the canonical abi serialization** (`formatSpaces`, not plain
->    `JSON.stringify`) or the node derives a different class_hash → "invalid signature" on declare.
-> 3. **The SNF nodes rate-limit heavy proof state-fetches.** Solved with a local loopback reverse
->    proxy injecting the `X-SNF-Nodes-Key` header (key in a `/tmp` chmod-600 file, never logged/
->    committed); dinner + strkd point their RPC URL at it. Earlier "Sierra 1.7 / mainnet gate" worry
->    was a red herring — Cairo 2.18 (Sierra 1.8.0) is the supported network version.
-
-At the time, strkd worked for every step except submitting the proof-carrying verify (its
-`wallet_addInvokeTransaction` had no `proof`/`proof_facts` param) — see
-[strkd-snip36-feature-request.md](../strkd-snip36-feature-request.md); that verify used `sncast`.
-**That gap is now closed** — strkd's `wallet_addInvokeTransaction` accepts `proof_facts`/`proof`,
-so the whole flow (including verify) runs through strkd and `sncast` is retired.
-
-## Blocked
-
-- Nothing blocked. (The frontend's wallet/mint/event paths are still **build-verified**; the
-  next step is a manual click-through against this deployment — see Next up.)
-
-## Next up
-
-Recommended order (see [ROADMAP.md](ROADMAP.md) for detail):
-
-1. **Manual frontend smoke test** — `cd ui/game-of-life && npm run dev`, connect a Sepolia wallet,
-   confirm the NUT balance, the minted lifeform (`98307`) in "my lifeforms", and a fresh mint.
-2. **Independent security review** before mainnet (access control, upgrade auth, minter validation,
-   and the partial-path semantic change). The NUT economy is intentional, not a bug.
-3. **Phase 4 — indexer/gallery, then mainnet.**
-
-## Merge state
-
-The branch `chore/modernize-and-prune` holds all work to date. To bring it to `main`:
-`git checkout main && git merge --ff-only chore/modernize-and-prune`, or open a PR.
+`main` is the trunk (modern toolchain). v2 contracts, SDK, and the current frontend live on
+long-running local branches (`experiment/frontend-redesign` is active); consolidation into `main`
+is overdue and should follow the symmetry-spec implementation.

@@ -64,6 +64,33 @@ New separate NFT for **path** creatures + a new minter that targets it (spec: `d
   - `challenge_burn` (older len-2 path burns its newer len-1 forward sub-path): sub-path **burned**, **1 NUT bounty** paid to challenger. tx `0x9b3c34c25bd3d713133480676dd6e43de0c68a52f721a291f7e01ce167ae42`.
 - **Cleanup before mainnet:** (1) admin was granted `MINTER_ROLE` on the path NFT for the challenge test (lets it forge path records bypassing the minter) — **revoke it**; (2) the challenge test left a bogus crafted path record `0x743d91e9…` (agent-owned) — testnet pollution; (3) revoke the old path minter's `MINTER_ROLE` on the loop lifeforms if fully retiring it.
 
+## Symmetry challenge-burn upgrade (2026-07-06)
+
+Both NFT contracts upgraded **in place** to the symmetry-challenge classes
+(`docs/symmetry-challenge-spec.md`): mint nonces, `apply_symmetry` witnesses, loop `challenge_burn`
+(bounty minted from nothing), generalized path `challenge_burn` (⚠️ **ABI change**: 3 new witness
+args — SDK/frontend call sites must be updated).
+
+| Contract | Address (unchanged) | new class_hash | old class_hash (revertible) |
+|---|---|---|---|
+| GolLifeformsV2 | `0x40380471…4e633` | `0x38b639480a363d8eb9f103bad8515932d4cd24a1a6971a959057360764f326f` | `0x4765cb6a…5ed0f` |
+| GolPathLifeformsV2 | `0x177545ee…5e1fc` | `0x3db4bc446b1c23f6254db4fea00f13e3f0fa2870f3f3c6cf855812432b80700` | `0x3ae1237d…6f209` |
+
+- Declares: `0x266f73073f919102669e2eadaa53c9e6cbc53c6244451de51722357f8be68ac` (lifeforms),
+  `0x5109eae778e7d62c1daccdac4722dc73e3b853fdff0284634d750dd88b6b742` (paths).
+- Upgrade + revoke multicall: `0x1da5112bf5005f2504603ee4aec7562050ffc55a4b7fa2be9f804fb3d68f4b9`
+  (SUCCEEDED, ACCEPTED_ON_L2).
+- **Cleanup #1 DONE:** admin's `MINTER_ROLE` on the path NFT revoked (verified `has_role → 0`).
+- **Cleanup #3 still open (needs sign-off):** old `GolPathMinterV2` `0x5a3c3aff…` retains
+  `MINTER_ROLE` on the loop lifeforms (`has_role → 1`).
+- Verified post-upgrade: both `getClassHashAt` match; `get_mint_nonce(seeded blinker) = 0`
+  (grandfathered oldest tier, by design).
+- strkd gotcha (new): `companion_requestPairing` identity is keyed by **(name, kind)** — omit
+  `kind:"agent"` and you silently get a parallel app-kind client with no agent-account access
+  (`-32002`). Issue reported to the strkd maintainer via `companion_reportIssue`.
+- Node gotcha (new): `sepolia.nodes.starknet.org` wants `sierra_program` as the **raw felt array**
+  in declares, not the gzip+base64 form; abi still the canonical `formatSpaces` string.
+
 ## Notes / gotchas hit during deploy
 - Declare requires the contract-class `abi` as the **canonical `formatSpaces` string** (decimal/raw array → node error `invalid type: sequence, expected a string`).
 - strkd calldata must be **hex felts** (`num.toHex`), not decimal (error `114: invalid felt`).
