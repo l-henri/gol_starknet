@@ -7,6 +7,7 @@
 **Framing:** WIP **art piece**, not a commercial product — the outcome is burning gas and creating art.
 **Active branch:** `main` (single trunk since the 2026-07-06 consolidation; pushed to origin)
 **Build/test:** `scarb build` ✅ · `snforge test` ✅ (91) · `cargo test -p gol-sdk` ✅ (43) · `next build` ✅
+**Live site:** https://gol-starknet.vercel.app — Vercel git integration auto-deploys every push to `main` (verified current 2026-07-06)
 **Tx tooling:** all on-chain transactions via **strkd** — pair with `kind:"agent"`; never sncast/raw keys
 
 ## Where the product is
