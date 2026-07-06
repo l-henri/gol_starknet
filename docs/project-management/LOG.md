@@ -18,6 +18,29 @@
 
 ---
 
+## 2026-07-06 (later) — v3 BUILT AND LIVE: orbit-canonical identity on Sepolia
+- **Goal:** execute the approved v3-identity-spec end to end (Henri: "untrack the pdf, push, do v3").
+- **Branch:** `main` · **Commits:** b58a140 (+ this docs commit) · pushed to origin
+- **Changed:**
+  - **Contracts:** `GolLifeformsV3` (BACT) + `GolWanderersV3` (WNDR) + two witness-assisted
+    minters. Witness mint (family membership verified, one transform, anchored on the walk's
+    time-lex-min), drawn state preserved for display, per-token mint escrow, `prove_malformed`
+    on both, `feed_for` + feeder-in-event ride-alongs, sub-path challenge carried to Wanderers.
+    **91 Cairo tests green** (10 new: witness mints, copy-collision reverts, fraud proofs both
+    directions, feed_for, sub-path regression).
+  - **SDK:** `grid::loop_family_canonical` (orbit × phase min returning the contract-matching
+    witness); `v3_seed` example emits genesis calldata. 43 SDK tests green.
+  - **Deployed to Sepolia** (addresses/classes/txs in [v3-deployment.md](../v3-deployment.md)):
+    4 declares, 4 UDC deploys, one wiring multicall, genesis blinker seeded with its TRUE orbit
+    canonical — **the on-chain witness check passing is the Rust↔Cairo convention proof.**
+- **Verified:** owner/escrow(2 NUT)/canonical/nonce read back correctly; suites green.
+- **Findings:** declare fee BOUNDS (~156 STRK) exceeded the agent's balance though actuals are
+  ~50 — funded +300 STRK; `companion_requestFunding` is sign-only by default (`submit:true`
+  needed) and always prompts. strkd was locked at first attempt (operator unlock).
+- **Next:** SDK v3 write-builders + WASM; frontend repoint (env, witness through useMint,
+  duplicate-mint UX); exercise the tiled phase-segment mint on-chain; then pets on v3.
+- **Blockers:** none.
+
 ## 2026-07-06 — Symmetry challenge-burn LIVE on Sepolia (in-place upgrades via strkd)
 - **Goal:** finish spec item #1 — declare + upgrade both NFT contracts with the symmetry mechanism.
 - **Branch:** `experiment/frontend-redesign` · **Commits:** uncommitted WIP (contracts committed

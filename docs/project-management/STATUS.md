@@ -11,9 +11,13 @@
 
 ## Where the product is
 
-- **v2 is the live product** — 41×41 grid, bitboard stepper, Poseidon token ids, Art Blocks-style
-  on-chain HTML renderer. **Live on Sepolia since 2026-06-22**; addresses + class hashes in
-  [v2-deployment.md](../v2-deployment.md). v1 (15×15) remains deployed but is superseded.
+- **v3 is the live product line** — the **orbit-canonical identity model**
+  ([v3-identity-spec.md](../v3-identity-spec.md)): copies revert at mint, witness-assisted minting,
+  escrowed fraud-proofs. **Live on Sepolia since 2026-07-06** with a genesis blinker; addresses in
+  [v3-deployment.md](../v3-deployment.md). Collections: "Digital Bacteria"/BACT +
+  "Digital Wanderers"/WNDR. ⚠️ Frontend/SDK write-paths still point at v2 (repoint pending).
+- **v2** remains deployed ([v2-deployment.md](../v2-deployment.md)) and is superseded; v1 (15×15)
+  likewise.
 - **Path creatures** (transients into a loop, separate NFT + challenge-burn) deployed 2026-07-01
   and live-tested (mint, burn, bounty) — spec: [path-creatures-spec.md](../path-creatures-spec.md).
 - **Frontend** (`ui/game-of-life`): v2 app with `/create` editor (high-score register — deliberate),
