@@ -28,18 +28,47 @@ export class GolSdk {
         return takeFromExternrefTable0(ret[0]);
     }
     /**
-     * The permissionless `challenge_burn(older_id, younger_id)` call — burns a proven forward
-     * sub-path and pays its escrow to the caller.
+     * The permissionless path `challenge_burn(older_id, younger_id, d4, dr, dc)` call — burns a
+     * proven forward sub-path OR symmetry copy and pays its escrow to the caller. `(0,0,0)` is
+     * the plain sub-path witness; get a symmetry witness from `findWitness`.
      * @param {string} older_id
      * @param {string} younger_id
+     * @param {number} d4
+     * @param {number} dr
+     * @param {number} dc
      * @returns {any}
      */
-    challengeBurnCall(older_id, younger_id) {
+    challengeBurnCall(older_id, younger_id, d4, dr, dc) {
         const ptr0 = passStringToWasm0(older_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
         const ptr1 = passStringToWasm0(younger_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len1 = WASM_VECTOR_LEN;
-        const ret = wasm.golsdk_challengeBurnCall(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        const ret = wasm.golsdk_challengeBurnCall(this.__wbg_ptr, ptr0, len0, ptr1, len1, d4, dr, dc);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
+     * The LOOP-side `challenge_burn(a_id, b_id, a_state, d4, dr, dc, k)` call. `a_rows` is A's
+     * canonical state (checked on-chain against its token id); `k` the phase within A's cycle.
+     * @param {string} a_id
+     * @param {string} b_id
+     * @param {Float64Array} a_rows
+     * @param {number} d4
+     * @param {number} dr
+     * @param {number} dc
+     * @param {number} k
+     * @returns {any}
+     */
+    challengeBurnLoopCall(a_id, b_id, a_rows, d4, dr, dc, k) {
+        const ptr0 = passStringToWasm0(a_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(b_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passArrayF64ToWasm0(a_rows, wasm.__wbindgen_malloc);
+        const len2 = WASM_VECTOR_LEN;
+        const ret = wasm.golsdk_challengeBurnLoopCall(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2, d4, dr, dc, k);
         if (ret[2]) {
             throw takeFromExternrefTable0(ret[1]);
         }
@@ -74,6 +103,26 @@ export class GolSdk {
         const ptr0 = passArrayF64ToWasm0(rows, wasm.__wbindgen_malloc);
         const len0 = WASM_VECTOR_LEN;
         const ret = wasm.golsdk_findLoop(this.__wbg_ptr, ptr0, len0, max_period);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
+     * Search for a challenge witness relating two start states:
+     * `{ d4, dr, dc, k }` with `apply_symmetry(g, step^k(a)) == b`, or `null`. For paths pass
+     * `max_k` = the sequence-length gap; for loops `max_k` = period − 1.
+     * @param {Float64Array} a_rows
+     * @param {Float64Array} b_rows
+     * @param {number} max_k
+     * @returns {any}
+     */
+    findWitness(a_rows, b_rows, max_k) {
+        const ptr0 = passArrayF64ToWasm0(a_rows, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArrayF64ToWasm0(b_rows, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.golsdk_findWitness(this.__wbg_ptr, ptr0, len0, ptr1, len1, max_k);
         if (ret[2]) {
             throw takeFromExternrefTable0(ret[1]);
         }
@@ -239,6 +288,24 @@ export class GolSdk {
         return ret;
     }
     /**
+     * Loop mints with their block numbers, newest first: `[{ token_id, block }]` — the recency
+     * source for time-windowed leaderboards ("discovery of the week").
+     * @returns {Promise<any>}
+     */
+    recentMints() {
+        const ret = wasm.golsdk_recentMints(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * Path mints with their block numbers, newest first (burned paths still listed — hydrate to
+     * filter): `[{ token_id, block }]`.
+     * @returns {Promise<any>}
+     */
+    recentPathMints() {
+        const ret = wasm.golsdk_recentPathMints(this.__wbg_ptr);
+        return ret;
+    }
+    /**
      * Token ids ("0x…") of recent PATH mints, newest first — the fast event scan of the path NFT.
      * Hydrate each via `pathLifeform()`; burned paths hydrate to null and should be skipped.
      * @param {number} limit
@@ -319,6 +386,22 @@ export class GolSdk {
         return takeFromExternrefTable0(ret[0]);
     }
     /**
+     * Lexicographically smallest grid in the full 13,448-element symmetry orbit —
+     * `{ canonical: rows, d4, dr, dc }`. Two grids are symmetry copies iff their orbit canonicals
+     * match: the copy-detection key for mint warnings and indexer dedup.
+     * @param {Float64Array} rows
+     * @returns {any}
+     */
+    symmetryCanonical(rows) {
+        const ptr0 = passArrayF64ToWasm0(rows, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.golsdk_symmetryCanonical(this.__wbg_ptr, ptr0, len0);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
      * The token id (`0x` hex) for a grid given as 41 row bitmasks — the off-chain Poseidon identity
      * the contract uses; lets the frontend look up or pre-compute a token before minting.
      * @param {Float64Array} rows
@@ -344,11 +427,24 @@ export class GolSdk {
         const ret = wasm.golsdk_tokenUri(this.__wbg_ptr, ptr0, len0);
         return ret;
     }
+    /**
+     * Total generations breathed per account, descending: `[{ address, generations }]` — the
+     * "top breathers" board (NUT faucet mints aggregated; the initial-supply mint excluded).
+     * @returns {Promise<any>}
+     */
+    topBreathers() {
+        const ret = wasm.golsdk_topBreathers(this.__wbg_ptr);
+        return ret;
+    }
 }
 if (Symbol.dispose) GolSdk.prototype[Symbol.dispose] = GolSdk.prototype.free;
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,
+        __wbg_Error_fdd633d4bb5dd76a: function(arg0, arg1) {
+            const ret = Error(getStringFromWasm0(arg0, arg1));
+            return ret;
+        },
         __wbg_String_8564e559799eccda: function(arg0, arg1) {
             const ret = String(arg1);
             const ptr1 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
@@ -626,12 +722,12 @@ function __wbg_get_imports() {
             return ret;
         },
         __wbindgen_cast_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 259, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 271, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__h74bcc3753d680b42);
             return ret;
         },
         __wbindgen_cast_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [], shim_idx: 231, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [], shim_idx: 243, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__hc0e1ada004448962);
             return ret;
         },
@@ -643,6 +739,11 @@ function __wbg_get_imports() {
         __wbindgen_cast_0000000000000004: function(arg0, arg1) {
             // Cast intrinsic for `Ref(String) -> Externref`.
             const ret = getStringFromWasm0(arg0, arg1);
+            return ret;
+        },
+        __wbindgen_cast_0000000000000005: function(arg0) {
+            // Cast intrinsic for `U64 -> Externref`.
+            const ret = BigInt.asUintN(64, arg0);
             return ret;
         },
         __wbindgen_init_externref_table: function() {

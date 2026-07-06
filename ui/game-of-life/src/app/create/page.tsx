@@ -9,6 +9,7 @@ import { useWallet } from "@/lib/wallet";
 import { useMint } from "@/lib/useMint";
 import { useGasCaps, plannedTxCount, plannedPathTxCount, MAX_TX } from "@/lib/gasCaps";
 import { N, type Cells, fromRows, rowsFromCells, liveCountRows } from "@/lib/creatures";
+import { formatNut } from "@/lib/format";
 import { explorerTxUrl } from "@/lib/config";
 import { useT } from "@/lib/i18n";
 import { addBookmark, removeBookmark, isBookmarked, getMintProgress } from "@/lib/incubator";
@@ -143,7 +144,7 @@ function SpawnButton({
 export default function CreatePage() {
   const { t } = useT();
   const { sdk } = useGolSdk();
-  const { address, connect, onSepolia, switchToSepolia } = useWallet();
+  const { address, connect, onSepolia, switchToSepolia, txEpoch } = useWallet();
   const { status, txHash, error: mintError, progress, mint, mintPath, reset } = useMint();
   const caps = useGasCaps();
   const router = useRouter();
@@ -168,6 +169,7 @@ export default function CreatePage() {
   const [activeKind, setActiveKind] = useState<"loop" | "path" | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [bmTick, setBmTick] = useState(0); // bump to re-read bookmark state after a toggle
+  const [nutHex, setNutHex] = useState<string | null>(null); // connected NUT balance (for affordability)
 
   const paint = useCallback((i: number, value: boolean) => {
     setLeft((prev) => (prev[i] === value ? prev : prev.map((v, k) => (k === i ? value : v))));
@@ -303,10 +305,30 @@ export default function CreatePage() {
     }
   }, [status, activeId, tokenId, router]);
 
+  // Connected NUT balance — spawning charges the creature's length in NUT, so we gate the button on it
+  // instead of letting the user start a mint they can't pay for. Refetch on txEpoch (feeding earns NUT).
+  useEffect(() => {
+    let cancelled = false;
+    if (sdk && address) {
+      sdk.nutBalance(address).then((hex: string) => !cancelled && setNutHex(hex)).catch(() => !cancelled && setNutHex(null));
+    } else {
+      setNutHex(null);
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [sdk, address, txEpoch]);
+
   const rightCells = useMemo(() => fromRows(rightRows), [rightRows]);
   const busy = status === "signing" || status === "pending";
   const loop = fate.kind === "loop" ? fate : null;
   const dead = fate.kind === "dead" ? fate : null;
+
+  // NUT affordability: a spawn costs the creature's length (loop period / path sequence_length) in NUT.
+  // Unknown balance (loading / read failed) → don't block; the tx-time error is the fallback.
+  const nutWei = nutHex !== null ? BigInt(nutHex) : null;
+  const nutDisplay = nutHex !== null ? formatNut(nutHex) : "…";
+  const affordable = (nut: number) => nutWei === null || nutWei >= BigInt(nut) * 10n ** 18n;
 
   // The drawing can offer up to two spawns: the PATH it is (its start state) and/or the LOOP it
   // settles into. A drawing already on a loop (steps 0) offers only the loop; a dying drawing offers
@@ -379,6 +401,11 @@ export default function CreatePage() {
           <button className="btn primary" onClick={switchToSepolia}>{t({ fr: "Passez sur Sepolia", en: "Switch to Sepolia" })}</button>
         ) : tooLong ? (
           <span className="note">{t({ fr: `${base} : trop long (~${desc.tx} tx, max ${MAX_TX}).`, en: `${base}: too long (~${desc.tx} txs, max ${MAX_TX}).` })}</span>
+        ) : !affordable(desc.nut) ? (
+          <span className="note">
+            {t({ fr: `Pas assez de $NUT : il en faut ${desc.nut}, vous en avez ${nutDisplay}. `, en: `Not enough $NUT: needs ${desc.nut}, you have ${nutDisplay}. ` })}
+            <Link href="/" className="tx-link">{t({ fr: "nourrissez des créatures pour en gagner →", en: "feed creatures to earn some →" })}</Link>
+          </span>
         ) : (
           <SpawnButton
             status={active ? status : "idle"}

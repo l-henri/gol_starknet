@@ -10,10 +10,16 @@ export class GolSdk {
      */
     breatheLifeCall(token_id: string, n: number): any;
     /**
-     * The permissionless `challenge_burn(older_id, younger_id)` call — burns a proven forward
-     * sub-path and pays its escrow to the caller.
+     * The permissionless path `challenge_burn(older_id, younger_id, d4, dr, dc)` call — burns a
+     * proven forward sub-path OR symmetry copy and pays its escrow to the caller. `(0,0,0)` is
+     * the plain sub-path witness; get a symmetry witness from `findWitness`.
      */
-    challengeBurnCall(older_id: string, younger_id: string): any;
+    challengeBurnCall(older_id: string, younger_id: string, d4: number, dr: number, dc: number): any;
+    /**
+     * The LOOP-side `challenge_burn(a_id, b_id, a_state, d4, dr, dc, k)` call. `a_rows` is A's
+     * canonical state (checked on-chain against its token id); `k` the phase within A's cycle.
+     */
+    challengeBurnLoopCall(a_id: string, b_id: string, a_rows: Float64Array, d4: number, dr: number, dc: number, k: number): any;
     /**
      * Classify what a drawing settles into: `{ kind: "loop"|"path"|"transient", … }`.
      * - loop → `{ period, canonical: rows }` (mint a loop creature)
@@ -26,6 +32,12 @@ export class GolSdk {
      * canonical state to mint) or `null` if it doesn't recur in range.
      */
     findLoop(rows: Float64Array, max_period: number): any;
+    /**
+     * Search for a challenge witness relating two start states:
+     * `{ d4, dr, dc, k }` with `apply_symmetry(g, step^k(a)) == b`, or `null`. For paths pass
+     * `max_k` = the sequence-length gap; for loops `max_k` = period − 1.
+     */
+    findWitness(a_rows: Float64Array, b_rows: Float64Array, max_k: number): any;
     gridSize(): Promise<any>;
     /**
      * Lifeform by token id (decimal or `0x` hex), or `null` if unminted.
@@ -77,6 +89,16 @@ export class GolSdk {
      */
     recentLifeforms(limit: number): Promise<any>;
     /**
+     * Loop mints with their block numbers, newest first: `[{ token_id, block }]` — the recency
+     * source for time-windowed leaderboards ("discovery of the week").
+     */
+    recentMints(): Promise<any>;
+    /**
+     * Path mints with their block numbers, newest first (burned paths still listed — hydrate to
+     * filter): `[{ token_id, block }]`.
+     */
+    recentPathMints(): Promise<any>;
+    /**
      * Token ids ("0x…") of recent PATH mints, newest first — the fast event scan of the path NFT.
      * Hydrate each via `pathLifeform()`; burned paths hydrate to null and should be skipped.
      */
@@ -104,6 +126,12 @@ export class GolSdk {
      */
     stepRows(rows: Float64Array): any;
     /**
+     * Lexicographically smallest grid in the full 13,448-element symmetry orbit —
+     * `{ canonical: rows, d4, dr, dc }`. Two grids are symmetry copies iff their orbit canonicals
+     * match: the copy-detection key for mint warnings and indexer dedup.
+     */
+    symmetryCanonical(rows: Float64Array): any;
+    /**
      * The token id (`0x` hex) for a grid given as 41 row bitmasks — the off-chain Poseidon identity
      * the contract uses; lets the frontend look up or pre-compute a token before minting.
      */
@@ -112,6 +140,11 @@ export class GolSdk {
      * Decoded `token_uri` (name/description/animation_url/attributes), or `null`.
      */
     tokenUri(token_id: string): Promise<any>;
+    /**
+     * Total generations breathed per account, descending: `[{ address, generations }]` — the
+     * "top breathers" board (NUT faucet mints aggregated; the initial-supply mint excluded).
+     */
+    topBreathers(): Promise<any>;
 }
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
@@ -120,9 +153,11 @@ export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_golsdk_free: (a: number, b: number) => void;
     readonly golsdk_breatheLifeCall: (a: number, b: number, c: number, d: number) => [number, number, number];
-    readonly golsdk_challengeBurnCall: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
+    readonly golsdk_challengeBurnCall: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number];
+    readonly golsdk_challengeBurnLoopCall: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => [number, number, number];
     readonly golsdk_classifyFate: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly golsdk_findLoop: (a: number, b: number, c: number, d: number) => [number, number, number];
+    readonly golsdk_findWitness: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
     readonly golsdk_gridSize: (a: number) => any;
     readonly golsdk_lifeform: (a: number, b: number, c: number) => any;
     readonly golsdk_mintLoopCalls: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
@@ -134,14 +169,18 @@ export interface InitOutput {
     readonly golsdk_planLoopMint: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number, number];
     readonly golsdk_planPathMint: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => [number, number, number];
     readonly golsdk_recentLifeforms: (a: number, b: number) => any;
+    readonly golsdk_recentMints: (a: number) => any;
+    readonly golsdk_recentPathMints: (a: number) => any;
     readonly golsdk_recentPathTokenIds: (a: number, b: number) => any;
     readonly golsdk_recentTokenIds: (a: number, b: number) => any;
     readonly golsdk_renderParams: (a: number, b: number, c: number) => any;
     readonly golsdk_setPathRenderParamsCall: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
     readonly golsdk_setRenderParamsCall: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
     readonly golsdk_stepRows: (a: number, b: number, c: number) => [number, number, number];
+    readonly golsdk_symmetryCanonical: (a: number, b: number, c: number) => [number, number, number];
     readonly golsdk_tokenIdForRows: (a: number, b: number, c: number) => [number, number, number];
     readonly golsdk_tokenUri: (a: number, b: number, c: number) => any;
+    readonly golsdk_topBreathers: (a: number) => any;
     readonly wasm_bindgen__convert__closures_____invoke__h74bcc3753d680b42: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen__convert__closures_____invoke__h3fd1d41b9588f30c: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen__convert__closures_____invoke__hc0e1ada004448962: (a: number, b: number) => void;

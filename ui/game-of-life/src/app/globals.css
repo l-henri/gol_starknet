@@ -271,3 +271,19 @@ canvas.creature { display: block; width: 100%; height: 100%; }
   .detail .stage, .detail .stage.inhaling { transition: none; transform: none; }
   .nut-float { animation: none; opacity: 1; }
 }
+
+/* --- leaderboards ------------------------------------------------------------------------- */
+.board { list-style: none; margin: 1em 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.board-row {
+  display: flex; align-items: center; gap: 16px;
+  padding: 10px 14px; border: 1px solid var(--line); border-radius: 14px;
+  background: var(--bg-dish); color: var(--ink); text-decoration: none;
+  transition: border-color var(--dur-fast) var(--ease-quiet), background var(--dur-fast) var(--ease-quiet);
+}
+a.board-row:hover { border-color: var(--accent); background: var(--bg-dish-raised); }
+.board-rank { color: var(--ink-faint); font-size: 0.84rem; min-width: 1.6em; text-align: right; }
+.board li:first-child .board-rank { color: var(--life-old); }
+.board-thumb { width: 48px; height: 48px; border-radius: 10px; overflow: hidden; background: var(--bg-void); flex: none; }
+.board-thumb canvas { width: 100%; height: 100%; display: block; }
+.board-what { font-size: 0.92rem; color: var(--ink-dim); }
+.board-what strong { color: var(--ink); font-weight: 600; }
