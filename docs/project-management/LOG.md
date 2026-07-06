@@ -18,6 +18,25 @@
 
 ---
 
+## 2026-07-06 (night) — First real v3 usage: two UX bugs found by Henri, fixed
+- **Goal:** Henri minted loops + a path on v3 (works), then hit: (1) long-wanderer multi-tx mints
+  stall after 1-2 txs (/create AND incubator resume); (2) spawning one of two discoveries loses
+  the other on redirect.
+- **Branch:** `main` · **Commits:** (this one) · pushed
+- **Diagnosis (1):** live probe with the app's exact starknet.js against the app's RPC shows fresh
+  txs go PRE_CONFIRMED → ACCEPTED_ON_L2 in ~3s — the acceptance poll is innocent. The stall is the
+  NEXT wallet request: Ready silently drops a programmatic `wallet_addInvokeTransaction` that
+  doesn't originate from a user gesture; the execute() promise never settles.
+- **Fix (1):** useMint watchdogs each wallet request (25s) → "wallet showing nothing? re-request
+  step k/N" button in /create + incubator, re-firing the SAME step from the click
+  (first-settle-wins, late duplicates harmless). Progress persisted at step start.
+- **Fix (2):** the confirmed-redirect bookmarks the un-spawned sibling discovery into the
+  incubator before leaving.
+- **Verified:** next build green; ⚠️ the stall fix needs Henri's retry of the long wanderer mint
+  (wallet-side behavior can't be driven headlessly). His partial progress resumes.
+- **Next:** Henri retries the long mint; pets on v3; tiled phase-segment mint on-chain.
+- **Blockers:** none.
+
 ## 2026-07-06 (evening) — SDK + frontend repointed to v3; the app speaks orbit ids
 - **Goal:** close the v3 gap ("go"): write-builders, WASM, frontend id derivation.
 - **Branch:** `main` · **Commits:** 373e287 · pushed
