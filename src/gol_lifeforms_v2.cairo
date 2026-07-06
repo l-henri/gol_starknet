@@ -19,6 +19,7 @@ pub mod GolLifeformsV2 {
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
     use core::num::traits::Zero;
     use gol_starknet::gol_grid_v2;
+    use gol_starknet::gol_grid_v2::GridState;
     use gol_starknet::gol_metadata_v2;
     use gol_starknet::interfaces_v2::{IGolLifeFormsV2, LifeFormData, RenderParams, SPEED_MAX};
     use gol_starknet::interfaces::{
@@ -89,6 +90,10 @@ pub mod GolLifeformsV2 {
         pub nutrient_token_contract: ContractAddress,
         // Per-token render params (A: derived at mint; C: owner-overridable). speed==0 => unset.
         pub render_params: Map<u256, RenderParams>,
+        // Mint-order nonce (symmetry-challenge-spec §3). New maps only — safe for the in-place
+        // upgrade. Unwritten slots read 0: pre-upgrade tokens are the grandfathered oldest tier.
+        pub next_nonce: u64,
+        pub mint_nonce: Map<u256, u64>,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -113,6 +118,17 @@ pub mod GolLifeformsV2 {
         cell: u32,
         speed: u16,
     }
+    #[derive(Drop, starknet::Event)]
+    struct ChallengeBurnedEvent {
+        a_token_id: u256,
+        b_token_id: u256,
+        challenger: ContractAddress,
+        d4: u8,
+        dr: u32,
+        dc: u32,
+        k: u32,
+        bounty: u256,
+    }
     #[event]
     #[derive(Drop, starknet::Event)]
     enum Event {
@@ -128,6 +144,7 @@ pub mod GolLifeformsV2 {
         NewMove: NewMoveEvent,
         NutrientContractUpdated: NutrientContractUpdatedEvent,
         RenderParamsUpdated: RenderParamsUpdatedEvent,
+        ChallengeBurned: ChallengeBurnedEvent,
     }
 
     #[constructor]
@@ -160,6 +177,14 @@ pub mod GolLifeformsV2 {
             // never pass 0 (they assert length > 0), but enforce it here too.
             assert(lifeform_data.sequence_length > 0, 'sequence_length_zero');
             self.erc721.mint(recipient, token_id);
+            // Stamp the mint-order nonce (challenge direction guard). Starts at 1 so that 0
+            // remains the grandfathered pre-upgrade tier (unwritten slots read 0).
+            let mut nonce = self.next_nonce.read();
+            if nonce == 0 {
+                nonce = 1;
+            }
+            self.mint_nonce.write(token_id, nonce);
+            self.next_nonce.write(nonce + 1);
             let sequence_length = lifeform_data.sequence_length;
             self.lifeform_data.write(token_id, lifeform_data);
             // A: derive this token's render params from its token_id and store them.
@@ -248,6 +273,69 @@ pub mod GolLifeformsV2 {
                         RenderParamsUpdatedEvent { token_id, bg, cell, speed },
                     ),
                 );
+        }
+
+        fn get_mint_nonce(self: @ContractState, token_id: u256) -> u64 {
+            self.mint_nonce.read(token_id)
+        }
+
+        fn challenge_burn(
+            ref self: ContractState,
+            a_token_id: u256,
+            b_token_id: u256,
+            a_state: GridState,
+            d4: u8,
+            dr: u32,
+            dc: u32,
+            k: u32,
+        ) {
+            // Intentionally PUBLIC: the witness verification IS the gate. Burns loop B iff loop A
+            // is strictly older and B's canonical is a symmetry copy of a phase of A's cycle.
+            // See docs/symmetry-challenge-spec.md §4.
+            assert(a_token_id != b_token_id, 'same token');
+            assert(self.erc721.exists(a_token_id), 'A not minted');
+            assert(self.erc721.exists(b_token_id), 'B not minted');
+            // The stored state mutates as the loop is fed, so the challenger supplies A's
+            // canonical preimage and we pin it against A's token id (the hash IS the identity).
+            let a_rows = gol_grid_v2::unpack(@a_state);
+            assert(gol_grid_v2::token_id(@a_rows) == a_token_id, 'A preimage mismatch');
+            // Direction guard: strict mint order. Pre-upgrade tokens (nonce 0) are the tied
+            // oldest tier: they can burn any later copy but never each other.
+            assert(
+                self.mint_nonce.read(a_token_id) < self.mint_nonce.read(b_token_id), 'A not older',
+            );
+            let a_data = self.lifeform_data.read(a_token_id);
+            let b_data = self.lifeform_data.read(b_token_id);
+            // Symmetry preserves the period; k selects the phase within A's cycle.
+            assert(a_data.sequence_length == b_data.sequence_length, 'periods differ');
+            assert(k < a_data.sequence_length.into(), 'k out of range');
+            // candidate = apply_symmetry(g, step^k(A_canonical)); must hash to B's id.
+            let mut rows = a_rows;
+            let mut i: u32 = 0;
+            while i < k {
+                rows = gol_grid_v2::step(@rows);
+                i += 1;
+            };
+            let cand = gol_grid_v2::apply_symmetry(d4, dr.into(), dc.into(), @rows);
+            assert(gol_grid_v2::token_id(@cand) == b_token_id, 'not a copy');
+            // Burn B; bounty = B's mint price (sequence_length NUT), freshly minted to the
+            // challenger (loops escrow nothing — decided 2026-07-03; supply-neutral vs the sink).
+            let bounty: u256 = b_data.sequence_length.into() * NUT_DECIMALS;
+            self.erc721.burn(b_token_id);
+            self.total_supply.write(self.total_supply.read() - 1);
+            let challenger = get_caller_address();
+            self
+                .emit(
+                    Event::ChallengeBurned(
+                        ChallengeBurnedEvent {
+                            a_token_id, b_token_id, challenger, d4, dr, dc, k, bounty,
+                        },
+                    ),
+                );
+            let nutrient_token = IGolNutrientTokenDispatcher {
+                contract_address: self.nutrient_token_contract.read(),
+            };
+            nutrient_token.mint(challenger, bounty);
         }
     }
 

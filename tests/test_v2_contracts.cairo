@@ -14,7 +14,9 @@ mod tests {
         IERC721MetadataDispatcher, IERC721MetadataDispatcherTrait, IERC721Dispatcher,
         IERC721DispatcherTrait,
     };
-    use gol_starknet::gol_grid_v2::{GridState, grid_with, step, lt, pack, token_id};
+    use gol_starknet::gol_grid_v2::{
+        GridState, grid_with, step, lt, pack, token_id, translate, apply_symmetry,
+    };
     use gol_starknet::interfaces_v2::{
         IGolLifeFormsV2Dispatcher, IGolLifeFormsV2DispatcherTrait, IGolLoopMinterV2Dispatcher,
         IGolLoopMinterV2DispatcherTrait, IGolPathMinterV2Dispatcher,
@@ -495,7 +497,7 @@ mod tests {
 
         start_cheat_caller_address(d.path_lifeforms, hunter);
         IGolPathLifeFormsV2Dispatcher { contract_address: d.path_lifeforms }
-            .challenge_burn(a_id, b_id);
+            .challenge_burn(a_id, b_id, 0, 0, 0);
         stop_cheat_caller_address(d.path_lifeforms);
 
         // sub-path burned; its 1-NUT escrow paid to the challenger.
@@ -517,7 +519,7 @@ mod tests {
         direct_mint(d, d.creator, a_id, pack(@a_rows), 2, target, 200);
         start_cheat_caller_address(d.path_lifeforms, d.creator);
         IGolPathLifeFormsV2Dispatcher { contract_address: d.path_lifeforms }
-            .challenge_burn(a_id, b_id);
+            .challenge_burn(a_id, b_id, 0, 0, 0);
         stop_cheat_caller_address(d.path_lifeforms);
     }
 
@@ -534,7 +536,172 @@ mod tests {
         direct_mint(d, d.creator, u_id, pack(@u_rows), 1, target, 200);
         start_cheat_caller_address(d.path_lifeforms, d.creator);
         IGolPathLifeFormsV2Dispatcher { contract_address: d.path_lifeforms }
-            .challenge_burn(a_id, u_id);
+            .challenge_burn(a_id, u_id, 0, 0, 0);
+        stop_cheat_caller_address(d.path_lifeforms);
+    }
+
+    // -----------------------------------------------------------------------------------------
+    // Symmetry-copy challenge-burn (docs/symmetry-challenge-spec.md) — loops and paths.
+    // -----------------------------------------------------------------------------------------
+
+    /// Canonical rows of the blinker's cycle translated by (dr, dc), plus the phase witness k
+    /// such that translate(step^k(canonical), dr, dc) == that canonical (lex-min may land on
+    /// either phase — symmetry doesn't commute with lex-min).
+    fn translated_blinker_canonical(rows: @Array<u64>, dr: usize, dc: usize) -> (Array<u64>, u32) {
+        let c0 = translate(rows, dr, dc);
+        let c1 = translate(@step(rows), dr, dc);
+        if lt(@c0, @c1) {
+            (c0, 0)
+        } else {
+            (c1, 1)
+        }
+    }
+
+    #[test]
+    fn loop_symmetry_copy_burn_pays_minted_bounty() {
+        let d = deploy_all();
+        let (a_state, a_rows) = blinker_canonical();
+        let a_id = token_id(@a_rows);
+        let farmer: ContractAddress = 0x5.try_into().unwrap();
+        let hunter: ContractAddress = 0x6.try_into().unwrap();
+
+        // A: the original blinker (nonce 1). B: the same blinker shifted one row down (nonce 2).
+        let minter = IGolLoopMinterV2Dispatcher { contract_address: d.loop_minter };
+        start_cheat_caller_address(d.loop_minter, d.creator);
+        minter.mint_loop(a_state, 2, d.creator);
+        stop_cheat_caller_address(d.loop_minter);
+        let (b_rows, k) = translated_blinker_canonical(@a_rows, 1, 0);
+        let b_id = token_id(@b_rows);
+        start_cheat_caller_address(d.loop_minter, d.creator);
+        minter.mint_loop(pack(@b_rows), 2, farmer);
+        stop_cheat_caller_address(d.loop_minter);
+
+        let lifeforms = IGolLifeFormsV2Dispatcher { contract_address: d.lifeforms };
+        assert(lifeforms.get_mint_nonce(a_id) == 1, 'A nonce 1');
+        assert(lifeforms.get_mint_nonce(b_id) == 2, 'B nonce 2');
+
+        let nut = IERC20Dispatcher { contract_address: d.nutrient };
+        let erc721 = IERC721Dispatcher { contract_address: d.lifeforms };
+        assert(erc721.balance_of(farmer) == 1, 'farmer holds copy');
+        let hunter_before = nut.balance_of(hunter);
+
+        start_cheat_caller_address(d.lifeforms, hunter);
+        lifeforms.challenge_burn(a_id, b_id, a_state, 0, 1, 0, k);
+        stop_cheat_caller_address(d.lifeforms);
+
+        // copy burned; bounty = B's mint price (2 NUT), freshly minted to the challenger.
+        assert(erc721.balance_of(farmer) == 0, 'copy burned');
+        assert(nut.balance_of(hunter) - hunter_before == 2 * ONE_NUT, 'minted bounty paid');
+    }
+
+    #[test]
+    #[should_panic(expected: 'A not older')]
+    fn loop_challenge_rejects_newer_challenger() {
+        let d = deploy_all();
+        let (a_state, a_rows) = blinker_canonical();
+        let a_id = token_id(@a_rows);
+        let minter = IGolLoopMinterV2Dispatcher { contract_address: d.loop_minter };
+        start_cheat_caller_address(d.loop_minter, d.creator);
+        minter.mint_loop(a_state, 2, d.creator);
+        stop_cheat_caller_address(d.loop_minter);
+        let (b_rows, _) = translated_blinker_canonical(@a_rows, 1, 0);
+        let b_id = token_id(@b_rows);
+        start_cheat_caller_address(d.loop_minter, d.creator);
+        minter.mint_loop(pack(@b_rows), 2, d.creator);
+        stop_cheat_caller_address(d.loop_minter);
+        // The NEWER copy tries to burn the original: direction guard must refuse.
+        IGolLifeFormsV2Dispatcher { contract_address: d.lifeforms }
+            .challenge_burn(b_id, a_id, pack(@b_rows), 0, 40, 0, 0);
+    }
+
+    #[test]
+    #[should_panic(expected: 'not a copy')]
+    fn loop_challenge_rejects_non_copy() {
+        let d = deploy_all();
+        let (a_state, a_rows) = blinker_canonical();
+        let a_id = token_id(@a_rows);
+        let minter = IGolLoopMinterV2Dispatcher { contract_address: d.loop_minter };
+        start_cheat_caller_address(d.loop_minter, d.creator);
+        minter.mint_loop(a_state, 2, d.creator);
+        stop_cheat_caller_address(d.loop_minter);
+        // A DOUBLE blinker (two bars in one row): also period 2, but not a symmetry copy.
+        let pair0 = grid_with(@array![(5_usize, 0b1110_u64 | 0x380000_u64)]);
+        let pair1 = step(@pair0);
+        let pair_rows = if lt(@pair0, @pair1) {
+            pair0
+        } else {
+            pair1
+        };
+        let pair_id = token_id(@pair_rows);
+        start_cheat_caller_address(d.loop_minter, d.creator);
+        minter.mint_loop(pack(@pair_rows), 2, d.creator);
+        stop_cheat_caller_address(d.loop_minter);
+        IGolLifeFormsV2Dispatcher { contract_address: d.lifeforms }
+            .challenge_burn(a_id, pair_id, a_state, 0, 0, 0, 0);
+    }
+
+    #[test]
+    fn path_symmetry_copy_burn_pays_escrow() {
+        let d = deploy_all();
+        grant_creator_minter(d);
+        let farmer: ContractAddress = 0x5.try_into().unwrap();
+        let hunter: ContractAddress = 0x6.try_into().unwrap();
+        // B = rot90 + translate(2,3) of A: an equal-length symmetry copy (different terminal id,
+        // so the target pre-filter must be skipped for non-identity witnesses).
+        let a_rows = grid_with(@array![(5_usize, 0b1110_u64)]);
+        let b_rows = apply_symmetry(1, 2, 3, @a_rows);
+        let (a_id, b_id) = (token_id(@a_rows), token_id(@b_rows));
+        direct_mint(d, d.creator, a_id, pack(@a_rows), 2, 0x777, 100);
+        direct_mint(d, farmer, b_id, pack(@b_rows), 2, 0x778, 200);
+
+        let nut = IERC20Dispatcher { contract_address: d.nutrient };
+        let erc721 = IERC721Dispatcher { contract_address: d.path_lifeforms };
+        let hunter_before = nut.balance_of(hunter);
+
+        start_cheat_caller_address(d.path_lifeforms, hunter);
+        IGolPathLifeFormsV2Dispatcher { contract_address: d.path_lifeforms }
+            .challenge_burn(a_id, b_id, 1, 2, 3);
+        stop_cheat_caller_address(d.path_lifeforms);
+
+        assert(erc721.balance_of(farmer) == 0, 'copy burned');
+        // bounty = B's escrow (length 2 => 2 NUT).
+        assert(nut.balance_of(hunter) - hunter_before == 2 * ONE_NUT, 'escrow paid');
+    }
+
+    #[test]
+    fn path_stepped_symmetry_copy_burn() {
+        let d = deploy_all();
+        grant_creator_minter(d);
+        // B = flip-h(step(A)): stepped AND transformed — evades both single checks, caught by the
+        // unified rule (k = 1, g = flip-h).
+        let a_rows = grid_with(@array![(5_usize, 0b1110_u64)]);
+        let b_rows = apply_symmetry(4, 0, 5, @step(@a_rows));
+        let (a_id, b_id) = (token_id(@a_rows), token_id(@b_rows));
+        direct_mint(d, d.creator, a_id, pack(@a_rows), 2, 0x777, 100);
+        direct_mint(d, d.creator, b_id, pack(@b_rows), 1, 0x779, 200);
+        let erc721 = IERC721Dispatcher { contract_address: d.path_lifeforms };
+        start_cheat_caller_address(d.path_lifeforms, d.creator);
+        IGolPathLifeFormsV2Dispatcher { contract_address: d.path_lifeforms }
+            .challenge_burn(a_id, b_id, 4, 0, 5);
+        stop_cheat_caller_address(d.path_lifeforms);
+        assert(erc721.balance_of(d.creator) == 1, 'only A remains');
+    }
+
+    #[test]
+    #[should_panic(expected: 'older not longer')]
+    fn path_identity_witness_requires_strictly_longer() {
+        let d = deploy_all();
+        grant_creator_minter(d);
+        // Equal lengths with an IDENTITY witness must be refused (a symmetry witness is required
+        // to burn an equal-length copy).
+        let a_rows = grid_with(@array![(5_usize, 0b1110_u64)]);
+        let b_rows = translate(@a_rows, 1, 0);
+        let (a_id, b_id) = (token_id(@a_rows), token_id(@b_rows));
+        direct_mint(d, d.creator, a_id, pack(@a_rows), 2, 0x777, 100);
+        direct_mint(d, d.creator, b_id, pack(@b_rows), 2, 0x777, 200);
+        start_cheat_caller_address(d.path_lifeforms, d.creator);
+        IGolPathLifeFormsV2Dispatcher { contract_address: d.path_lifeforms }
+            .challenge_burn(a_id, b_id, 0, 0, 0);
         stop_cheat_caller_address(d.path_lifeforms);
     }
 }

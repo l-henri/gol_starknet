@@ -215,6 +215,126 @@ pub fn grid_hash(gs: @GridState) -> felt252 {
 }
 
 // ---------------------------------------------------------------------------
+// Torus symmetries (challenge-burn witnesses — see docs/symmetry-challenge-spec.md)
+//
+// A symmetry g decomposes as translate(dr, dc) ∘ d4[i] (dihedral first, then translation).
+// The d4 index table is CONSENSUS-CRITICAL: the SDK and any indexer must match it exactly.
+//   0 = identity                     4 = flip horizontal (mirror columns)
+//   1 = rotate 90° clockwise         5 = flip vertical (mirror rows)
+//   2 = rotate 180°                  6 = transpose (main diagonal)
+//   3 = rotate 270° clockwise        7 = anti-transpose
+// Life commutes with all of these on the square torus: step(g(s)) == g(step(s)).
+// ---------------------------------------------------------------------------
+
+/// Column-bit powers 2^0..2^(N-1), for per-cell reads/writes.
+fn pow2_table() -> Array<u64> {
+    let mut t: Array<u64> = ArrayTrait::new();
+    let mut p: u64 = 1;
+    let mut i: usize = 0;
+    while i < N {
+        t.append(p);
+        if i != N - 1 {
+            p = p * 2;
+        }
+        i += 1;
+    };
+    t
+}
+
+fn pow2_128(e: usize) -> u128 {
+    let mut p: u128 = 1;
+    let mut i: usize = 0;
+    while i < e {
+        p = p * 2;
+        i += 1;
+    };
+    p
+}
+
+/// Source cell (sr, sc) whose content lands on output cell (r, c) under d4 element `d4`
+/// (i.e. the inverse mapping, so callers can build the output cell-by-cell).
+fn d4_source(d4: u8, r: usize, c: usize, last: usize) -> (usize, usize) {
+    if d4 == 0 {
+        (r, c)
+    } else if d4 == 1 { // forward: (r,c) -> (c, last-r)
+        (last - c, r)
+    } else if d4 == 2 { // forward: (r,c) -> (last-r, last-c)
+        (last - r, last - c)
+    } else if d4 == 3 { // forward: (r,c) -> (last-c, r)
+        (c, last - r)
+    } else if d4 == 4 { // forward: (r,c) -> (r, last-c)
+        (r, last - c)
+    } else if d4 == 5 { // forward: (r,c) -> (last-r, c)
+        (last - r, c)
+    } else if d4 == 6 { // forward: (r,c) -> (c, r)
+        (c, r)
+    } else { // 7, forward: (r,c) -> (last-c, last-r)
+        (last - c, last - r)
+    }
+}
+
+/// Apply a dihedral (D4) element. O(N^2) per-cell copy — fine for the rare challenge tx;
+/// the identity is a plain row copy.
+pub fn apply_d4(d4: u8, rows: @Array<u64>) -> Array<u64> {
+    assert(d4 < 8, 'bad d4');
+    let last = N - 1;
+    let pow = pow2_table();
+    let mut out: Array<u64> = ArrayTrait::new();
+    let mut r: usize = 0;
+    while r < N {
+        let mut v: u64 = 0;
+        if d4 == 0 {
+            v = *rows[r];
+        } else {
+            let mut c: usize = 0;
+            while c < N {
+                let (sr, sc) = d4_source(d4, r, c, last);
+                if (*rows[sr] / *pow[sc]) & 1 == 1 {
+                    v = v | *pow[c];
+                }
+                c += 1;
+            };
+        }
+        out.append(v);
+        r += 1;
+    };
+    out
+}
+
+/// Rotate a row's bits left by `dc` columns (bit c -> bit (c+dc) mod N), via u128 headroom.
+fn rot_row_by(x: u64, dc: usize) -> u64 {
+    if dc == 0 {
+        return x;
+    }
+    let mask128: u128 = MASK.into();
+    let pow41: u128 = 0x20000000000; // 2^41
+    let shifted: u128 = x.into() * pow2_128(dc);
+    let lo: u128 = shifted & mask128;
+    let hi: u128 = shifted / pow41; // bits >= 41 wrap around to the low end
+    (lo | hi).try_into().unwrap()
+}
+
+/// Translate the torus: cell (r, c) -> ((r+dr) mod N, (c+dc) mod N). O(N).
+pub fn translate(rows: @Array<u64>, dr: usize, dc: usize) -> Array<u64> {
+    let drm = dr % N;
+    let dcm = dc % N;
+    let mut out: Array<u64> = ArrayTrait::new();
+    let mut r: usize = 0;
+    while r < N {
+        let src = (r + N - drm) % N;
+        out.append(rot_row_by(*rows[src], dcm));
+        r += 1;
+    };
+    out
+}
+
+/// Full torus symmetry: translate(dr, dc) ∘ d4. The challenge-burn witness transform.
+pub fn apply_symmetry(d4: u8, dr: usize, dc: usize, rows: @Array<u64>) -> Array<u64> {
+    assert(dr < N && dc < N, 'bad shift');
+    translate(@apply_d4(d4, rows), dr, dc)
+}
+
+// ---------------------------------------------------------------------------
 // Naive reference stepper (cheap O(N^2) oracle for tests) — v1-style bool grid
 // ---------------------------------------------------------------------------
 
@@ -394,7 +514,10 @@ pub fn is_empty(rows: @Array<u64>) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{step, step_naive, lt, token_id, grid_with, eq, pack, unpack, N};
+    use super::{
+        step, step_naive, lt, token_id, grid_with, eq, pack, unpack, N, apply_d4, translate,
+        apply_symmetry,
+    };
 
     fn seed() -> Array<u64> {
         grid_with(
@@ -495,6 +618,61 @@ mod tests {
         let blinker_a = grid_with(@array![(5_usize, 0b1110_u64)]);
         let blinker_b = grid_with(@array![(6_usize, 0b1110_u64)]);
         assert(token_id(@blinker_a) != token_id(@blinker_b), 'shift is distinct');
+    }
+
+    // ------------------------------------------------------------------
+    // Torus symmetries (docs/symmetry-challenge-spec.md)
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn d4_group_involutions_and_orders() {
+        let g = seed();
+        // rot90 has order 4
+        let r1 = apply_d4(1, @g);
+        let r2 = apply_d4(1, @r1);
+        let r3 = apply_d4(1, @r2);
+        let r4 = apply_d4(1, @r3);
+        assert(!eq(@r1, @g), 'rot90 changes');
+        assert(eq(@r4, @g), 'rot90^4 = id');
+        // rot90 twice = rot180; three times = rot270
+        assert(eq(@r2, @apply_d4(2, @g)), 'rot90^2 = rot180');
+        assert(eq(@r3, @apply_d4(3, @g)), 'rot90^3 = rot270');
+        // the four reflections are involutions
+        let mut d: u8 = 4;
+        while d < 8 {
+            let once = apply_d4(d, @g);
+            assert(eq(@apply_d4(d, @once), @g), 'reflection^2 = id');
+            d += 1;
+        };
+        // identity is a copy
+        assert(eq(@apply_d4(0, @g), @g), 'id is id');
+    }
+
+    #[test]
+    fn translate_wraps_and_composes() {
+        let g = seed();
+        // full wrap = identity
+        assert(eq(@translate(@g, N, N), @g), 'translate N = id');
+        // composition: (1,2) then (3,4) = (4,6)
+        let t1 = translate(@translate(@g, 1, 2), 3, 4);
+        assert(eq(@t1, @translate(@g, 4, 6)), 'translation composes');
+        // a shifted copy is a different grid (and a distinct token)
+        assert(!eq(@translate(@g, 1, 0), @g), 'shift changes grid');
+        assert(token_id(@translate(@g, 0, 1)) != token_id(@g), 'shift changes id');
+    }
+
+    #[test]
+    fn step_commutes_with_symmetries() {
+        // Equivariance step(g(s)) == g(step(s)) — the property the challenge-burn relies on.
+        let g = seed();
+        let stepped = step(@g);
+        let mut d: u8 = 0;
+        while d < 8 {
+            let a = step(@apply_symmetry(d, 3, 7, @g));
+            let b = apply_symmetry(d, 3, 7, @stepped);
+            assert(eq(@a, @b), 'step commutes with g');
+            d += 1;
+        };
     }
 
     // P5 gas probes: per-generation step cost at 41x41 = (gas(bench_step_101) - gas(bench_step_1))

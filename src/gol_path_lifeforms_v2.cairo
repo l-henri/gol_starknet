@@ -87,6 +87,11 @@ pub mod GolPathLifeformsV2 {
         pub total_supply: u256,
         pub nutrient_token_contract: ContractAddress,
         pub render_params: Map<u256, RenderParams>,
+        // Mint-order nonce (symmetry-challenge-spec §3): the challenge direction guard, replacing
+        // `minted_at` (kept for display). New maps only — safe for the in-place upgrade; unwritten
+        // slots read 0 = the grandfathered pre-upgrade tier.
+        pub next_nonce: u64,
+        pub mint_nonce: Map<u256, u64>,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -101,6 +106,10 @@ pub mod GolPathLifeformsV2 {
         younger_id: u256,
         challenger: ContractAddress,
         bounty: u256,
+        // The symmetry witness ((0,0,0) = plain forward sub-path).
+        d4: u8,
+        dr: u32,
+        dc: u32,
     }
     #[derive(Drop, starknet::Event)]
     struct NutrientContractUpdatedEvent {
@@ -155,6 +164,14 @@ pub mod GolPathLifeformsV2 {
             self.accesscontrol.assert_only_role(MINTER_ROLE);
             assert(path_data.sequence_length > 0, 'sequence_length_zero');
             self.erc721.mint(recipient, token_id);
+            // Stamp the mint-order nonce (challenge direction guard; starts at 1 so 0 stays the
+            // grandfathered pre-upgrade tier).
+            let mut nonce = self.next_nonce.read();
+            if nonce == 0 {
+                nonce = 1;
+            }
+            self.mint_nonce.write(token_id, nonce);
+            self.next_nonce.write(nonce + 1);
             // The contract stamps the timestamp + escrow (ignoring any values passed in) so they can't
             // be forged: `minted_at` is the sub-path direction guard; `escrow` funds the bounty.
             let escrow: u256 = path_data.sequence_length.into() * NUT_DECIMALS;
@@ -201,31 +218,53 @@ pub mod GolPathLifeformsV2 {
                 );
         }
 
-        fn challenge_burn(ref self: ContractState, older_id: u256, younger_id: u256) {
-            // Intentionally PUBLIC: the on-chain stepping proof IS the gate. Anyone may submit it and
-            // claim the bounty. Burns `younger_id` iff `older_id` is a proper, earlier-minted forward
-            // ancestor of it (older leads to younger). See spec §5.
+        fn get_mint_nonce(self: @ContractState, token_id: u256) -> u64 {
+            self.mint_nonce.read(token_id)
+        }
+
+        fn challenge_burn(
+            ref self: ContractState, older_id: u256, younger_id: u256, d4: u8, dr: u32, dc: u32,
+        ) {
+            // Intentionally PUBLIC: the on-chain verification IS the gate. Anyone may submit it and
+            // claim the bounty. Generalized rule (docs/symmetry-challenge-spec.md §1.2): burns
+            // `younger_id` iff `older_id` was minted strictly earlier and
+            //   token_id(apply_symmetry(g, step^k(older.start))) == younger_id,
+            // with k = the length gap. (g = identity, k > 0) is the original sub-path rule;
+            // (g != identity, k = 0) is a pure symmetry copy; (g != identity, k > 0) a stepped one.
             assert(older_id != younger_id, 'same token');
             assert(self.erc721.exists(older_id), 'older not minted');
             assert(self.erc721.exists(younger_id), 'younger not minted');
             let older = self.path_data.read(older_id);
             let younger = self.path_data.read(younger_id);
-            // (2) direction guard: only an OLDER path may absorb a newer one.
-            assert(older.minted_at < younger.minted_at, 'older not older');
-            // (3) same terminal — cheap pre-filter (a real sub-path always shares the loop).
-            assert(older.target_loop_id == younger.target_loop_id, 'different target loop');
-            // (4) older is strictly further from the loop; k = the gap between them.
-            assert(older.sequence_length > younger.sequence_length, 'older not longer');
+            // Direction guard: strict mint order (nonce replaces `minted_at`, which had same-block
+            // ties; pre-upgrade tokens read 0 = tied oldest tier). Spec §3.
+            assert(
+                self.mint_nonce.read(older_id) < self.mint_nonce.read(younger_id), 'older not older',
+            );
+            let identity = d4 == 0 && dr == 0 && dc == 0;
+            if identity {
+                // Same-terminal pre-filter only applies untransformed (a symmetry copy's terminal
+                // is the transformed loop — a different id).
+                assert(older.target_loop_id == younger.target_loop_id, 'different target loop');
+                // Identity witness with k = 0 would mean the same start state — impossible to mint
+                // twice — so require a strictly longer older path.
+                assert(older.sequence_length > younger.sequence_length, 'older not longer');
+            } else {
+                // A symmetry copy has the same length (k = 0 allowed).
+                assert(older.sequence_length >= younger.sequence_length, 'older not longer');
+            }
             let k = older.sequence_length - younger.sequence_length;
-            // (5) step older's start forward k generations and check it reaches younger's start.
+            // Step older's start forward k generations, apply the witness symmetry, and check the
+            // result IS younger's start (by identity hash).
             let mut rows = gol_grid_v2::unpack(@older.start_state);
             let mut i: usize = 0;
             while i < k {
                 rows = gol_grid_v2::step(@rows);
                 i += 1;
             };
-            assert(gol_grid_v2::token_id(@rows) == younger_id, 'not a sub-path');
-            // Burn the sub-path and pay its escrow to the challenger.
+            let cand = gol_grid_v2::apply_symmetry(d4, dr.into(), dc.into(), @rows);
+            assert(gol_grid_v2::token_id(@cand) == younger_id, 'not a sub-path');
+            // Burn the copy and pay its escrow to the challenger.
             let bounty = younger.escrow;
             self.erc721.burn(younger_id);
             self.total_supply.write(self.total_supply.read() - 1);
@@ -233,7 +272,7 @@ pub mod GolPathLifeformsV2 {
             self
                 .emit(
                     Event::PathBurned(
-                        PathBurnedEvent { older_id, younger_id, challenger, bounty },
+                        PathBurnedEvent { older_id, younger_id, challenger, bounty, d4, dr, dc },
                     ),
                 );
             let nutrient_token = IERC20Dispatcher {

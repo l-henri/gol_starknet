@@ -90,6 +90,24 @@ pub trait IGolLifeFormsV2<TContractState> {
     fn set_render_params(
         ref self: TContractState, token_id: u256, bg: u32, cell: u32, speed: u16,
     );
+    /// Mint order (strictly increasing from 1). 0 = minted before the nonce upgrade
+    /// ("grandfathered": tied oldest tier — cannot burn each other, can burn any later copy).
+    fn get_mint_nonce(self: @TContractState, token_id: u256) -> u64;
+    /// Permissionless anti-copy burn (docs/symmetry-challenge-spec.md). Burns loop `b_token_id`
+    /// iff loop `a_token_id` is strictly older (mint nonce) and the witness relates them:
+    /// `token_id(apply_symmetry(d4, dr, dc, step^k(a_state))) == b_token_id`, where `a_state`
+    /// is A's canonical state (checked against A's token id) and `k < period` selects the phase.
+    /// Bounty: `b.sequence_length` NUT freshly minted to the caller.
+    fn challenge_burn(
+        ref self: TContractState,
+        a_token_id: u256,
+        b_token_id: u256,
+        a_state: GridState,
+        d4: u8,
+        dr: u32,
+        dc: u32,
+        k: u32,
+    );
 }
 
 #[starknet::interface]
@@ -150,8 +168,15 @@ pub trait IGolPathLifeFormsV2<TContractState> {
     fn get_render_params(self: @TContractState, token_id: u256) -> RenderParams;
     /// Owner-only: customise a token's render params. Asserts bg != cell and 0 < speed < SPEED_MAX.
     fn set_render_params(ref self: TContractState, token_id: u256, bg: u32, cell: u32, speed: u16);
-    /// Permissionless anti-farm: prove `older_id` is a proper forward ancestor of `younger_id`
-    /// (older leads to younger) and was minted earlier; on success burn `younger_id` and pay its
-    /// escrowed NUT to the caller. Verification (on-chain stepping) is the gate.
-    fn challenge_burn(ref self: TContractState, older_id: u256, younger_id: u256);
+    /// Mint order (strictly increasing from 1). 0 = minted before the nonce upgrade
+    /// ("grandfathered": tied oldest tier — cannot burn each other, can burn any later copy).
+    fn get_mint_nonce(self: @TContractState, token_id: u256) -> u64;
+    /// Permissionless anti-farm/anti-copy burn (generalized per docs/symmetry-challenge-spec.md):
+    /// burn `younger_id` iff `older_id` was minted strictly earlier (mint nonce) and the witness
+    /// relates them: `token_id(apply_symmetry(d4, dr, dc, step^k(older.start))) == younger_id`
+    /// with `k = older.sequence_length - younger.sequence_length`. `(0,0,0)` witness = the
+    /// original forward sub-path rule. Pays the burned path's escrowed NUT to the caller.
+    fn challenge_burn(
+        ref self: TContractState, older_id: u256, younger_id: u256, d4: u8, dr: u32, dc: u32,
+    );
 }
