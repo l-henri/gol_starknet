@@ -18,6 +18,26 @@
 
 ---
 
+## 2026-07-06 (later still) — Pet UI shipped: wards, clocks, the reaper's rounds
+- **Goal:** the client side of the caretaker layer ("go ahead on the pet UI"). Also: Henri
+  confirmed the multi-tx stall fix — **the long wanderer mint worked**.
+- **Branch:** `main` · **Commits:** (this one) · pushed
+- **Changed:**
+  - SDK: `pets` address in the book, `RpcReader::bond_status` (held/last_pet/reapable in one
+    shot), `pet_pairs()` event scan (the caretaker graph), `pet`/`reap`/`transfer_bond` builders;
+    WASM `petCall`/`reapCall`/`transferBondCall`/`petPairs`/`bondStatus`.
+  - `/life/[id]`: 🤲 pet button (adopt/pet, one ceremonial breath) + the bond clock ("X days
+    before it wilts" / "your bond has wilted — anyone can reap it").
+  - **`/pets`** ("Mes protégés / My wards"): your bonded creatures with clocks + pet actions, and
+    the reaper's rounds (all wilted bonds, reap = 1 NUT). Header nav link.
+  - `/leaderboards`: **Caretakers** board (active bonds per holder).
+- **Verified:** 43 SDK tests; `next build`; live probe reads the real caretaker graph (the
+  agent's genesis bond: held, clock stamped, not reapable). ⚠️ Pages not yet eyeballed in a
+  browser (same caveat as /leaderboards).
+- **Next:** Henri's browser pass (/pets, /leaderboards, a pet from the UI); then the outreach
+  package (essay, bestiary, share loop, Seed Grant).
+- **Blockers:** none.
+
 ## 2026-07-06 (late) — GolPetBonds built + tested; deploy queued on strkd unlock
 - **Goal:** the pet/caretaker layer per pet-mechanism-spec.md, against v3 ("go do the pet contracts").
 - **Branch:** `main` · **Commits:** f7888af · pushed

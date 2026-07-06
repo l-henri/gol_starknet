@@ -18,6 +18,8 @@ pub enum ContractKey {
     Nutrient,
     LoopMinter,
     PathMinter,
+    /// The caretaker-bond ERC-1155 (pets). See docs/pet-mechanism-spec.md.
+    Pets,
     Bench,
 }
 
@@ -29,6 +31,8 @@ pub struct GolAddresses {
     pub nutrient: Felt,
     pub loop_minter: Felt,
     pub path_minter: Felt,
+    /// Caretaker bonds (pets) ERC-1155.
+    pub pets: Felt,
     /// Benchmark contract — only where a `GolBench` is deployed (proofs).
     pub bench: Option<Felt>,
     /// Block at/before which this deployment first emitted events. Event scans start here instead
@@ -50,6 +54,7 @@ impl GolAddresses {
             ContractKey::Nutrient => self.nutrient,
             ContractKey::LoopMinter => self.loop_minter,
             ContractKey::PathMinter => self.path_minter,
+            ContractKey::Pets => self.pets,
             ContractKey::Bench => self
                 .bench
                 .ok_or_else(|| GolError::Config("no bench address for this network".into()))?,
@@ -73,6 +78,8 @@ pub fn deployments(net: Network) -> Option<GolAddresses> {
             nutrient: felt("0x060e0a0bd9aafec5fd0346e49eb4c5c47f9c7d6b7f26c705aaf21fd53a84e2c9"),
             loop_minter: felt("0x0351576a60a9f0423784e0bd2d5e4e630f4b21f49a0b55cf89045e8e1006f3ba"),
             path_minter: felt("0x06d00789bc1808e41fe708aad5f76c978585f184f9a7931f7bb6300c52f23573"),
+            // Pet bonds (caretaker layer), deployed 2026-07-06 — docs/v3-deployment.md.
+            pets: felt("0x059878490847be8f32e539e60d9cbe849b2b6c77f750ae381236242388f6e337"),
             bench: None,
             // The v3 genesis seed landed at block 11_642_283.
             deploy_block: 11_642_000,

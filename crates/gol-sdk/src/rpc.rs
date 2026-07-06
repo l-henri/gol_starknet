@@ -89,6 +89,24 @@ impl RpcReader {
         Ok(Some(felts))
     }
 
+    /// Pet-bond status for (creature, holder): `(held, last_pet, reapable)` in one shot.
+    pub async fn bond_status(
+        &self,
+        creature: U256,
+        holder: Felt,
+    ) -> Result<(bool, u64, bool), GolError> {
+        let pets = self.addr(ContractKey::Pets)?;
+        let mut bal_cd = vec![holder];
+        bal_cd.extend_from_slice(&creature.to_calldata());
+        let bal = self.call_raw(pets, selector("balance_of"), &bal_cd).await?;
+        let held = felt_to_u128(at(&bal, 0)?) == 1;
+        let mut cd = creature.to_calldata().to_vec();
+        cd.push(holder);
+        let last = self.call_raw(pets, selector("last_pet_of"), &cd).await?;
+        let reap = self.call_raw(pets, selector("is_reapable"), &cd).await?;
+        Ok((held, felt_to_u128(at(&last, 0)?) as u64, felt_to_u128(at(&reap, 0)?) == 1))
+    }
+
     async fn call_raw(&self, to: Felt, sel: Felt, calldata: &[Felt]) -> Result<Vec<Felt>, GolError> {
         Ok(self
             .call_inner(to, sel, calldata, false)

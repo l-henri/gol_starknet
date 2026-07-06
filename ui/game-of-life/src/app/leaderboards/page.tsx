@@ -40,6 +40,7 @@ export default function LeaderboardsPage() {
   const [loops, setLoops] = useState<JsLifeform[] | null>(null);
   const [paths, setPaths] = useState<JsPathLite[] | null>(null);
   const [breathers, setBreathers] = useState<Breather[] | null>(null);
+  const [caretakers, setCaretakers] = useState<Breather[] | null>(null); // address + active bonds
   const [loopMints, setLoopMints] = useState<Mint[] | null>(null);
   const [pathMints, setPathMints] = useState<Mint[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -59,6 +60,26 @@ export default function LeaderboardsPage() {
       })
       .catch(() => guard(setPaths)([]));
     sdk.topBreathers().then(guard(setBreathers)).catch(() => guard(setBreathers)([]));
+    // caretakers: active bonds per holder (petPairs deduped, filtered by live bond status)
+    sdk
+      .petPairs()
+      .then(async (pairs: { creature_id: string; holder: string }[]) => {
+        const counts = new Map<string, number>();
+        const seen = new Set<string>();
+        for (const p of pairs) {
+          const key = `${p.creature_id}:${p.holder}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          const b = (await sdk.bondStatus(p.creature_id, p.holder)) as { held: boolean };
+          if (b.held) counts.set(p.holder, (counts.get(p.holder) ?? 0) + 1);
+        }
+        guard(setCaretakers)(
+          Array.from(counts, ([address, generations]) => ({ address, generations })).sort(
+            (a, b) => b.generations - a.generations,
+          ),
+        );
+      })
+      .catch(() => guard(setCaretakers)([]));
     sdk.recentMints().then(guard(setLoopMints)).catch(() => guard(setLoopMints)([]));
     sdk.recentPathMints().then(guard(setPathMints)).catch(() => guard(setPathMints)([]));
     return () => {
@@ -196,6 +217,32 @@ export default function LeaderboardsPage() {
                 <span className="board-what mono">{shortAddr(b.address)}</span>
                 <span className="board-what">
                   <strong>{b.generations.toLocaleString()}</strong> {t({ fr: "générations", en: "generations" })}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section className="garden-section wrap">
+        <span className="section-label">{t({ fr: "Gardiens", en: "Caretakers" })}</span>
+        <p className="dim">
+          {t({
+            fr: "Liens de caresse entretenus en ce moment — les créatures qu'ils gardent en vie, semaine après semaine.",
+            en: "Caretaker bonds tended right now — the creatures they keep alive, week after week.",
+          })}
+        </p>
+        {caretakers === null && <p className="dim">{loading}</p>}
+        {caretakers !== null && caretakers.length === 0 && <p className="dim">{nobody}</p>}
+        <ol className="board">
+          {caretakers?.slice(0, TOP).map((c, i) => (
+            <li key={c.address}>
+              <span className="board-row">
+                <span className="board-rank mono">{i + 1}</span>
+                <span className="board-what mono">{shortAddr(c.address)}</span>
+                <span className="board-what">
+                  <strong>{c.generations}</strong>{" "}
+                  {t({ fr: c.generations === 1 ? "protégé" : "protégés", en: c.generations === 1 ? "ward" : "wards" })}
                 </span>
               </span>
             </li>

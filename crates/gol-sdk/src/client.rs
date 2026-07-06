@@ -29,6 +29,11 @@ impl GolClient {
         &self.reader
     }
 
+    /// The concrete RPC reader, for reads not on the `Reader` trait (e.g. pet-bond status).
+    pub fn rpc(&self) -> &crate::rpc::RpcReader {
+        &self.reader
+    }
+
     /// Pure call-builders (no signer required).
     pub fn writes(&self) -> GolWrites<'_> {
         GolWrites::new(&self.config.addresses, self.config.nut_decimals)

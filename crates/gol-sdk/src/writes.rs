@@ -149,6 +149,38 @@ impl<'a> GolWrites<'a> {
         }
     }
 
+    /// `pets.pet(creature_id)` — one ceremonial breath: feeds the creature 1 generation (NUT to
+    /// the caller), mints/refreshes the caller's caretaker bond and its 7-day clock.
+    pub fn pet(&self, creature_id: U256) -> Call {
+        Call {
+            to: self.addresses.pets,
+            selector: selector("pet"),
+            calldata: creature_id.to_calldata().to_vec(),
+        }
+    }
+
+    /// `pets.reap(creature_id, holder)` — burn a lapsed bond; 1 NUT minted to the caller.
+    pub fn reap(&self, creature_id: U256, holder: Felt) -> Call {
+        let mut calldata = creature_id.to_calldata().to_vec();
+        calldata.push(holder);
+        Call {
+            to: self.addresses.pets,
+            selector: selector("reap"),
+            calldata,
+        }
+    }
+
+    /// `pets.transfer_bond(creature_id, to)` — the daycare hand-off (clock rides along).
+    pub fn transfer_bond(&self, creature_id: U256, to: Felt) -> Call {
+        let mut calldata = creature_id.to_calldata().to_vec();
+        calldata.push(to);
+        Call {
+            to: self.addresses.pets,
+            selector: selector("transfer_bond"),
+            calldata,
+        }
+    }
+
     /// `minter.mint_partial_path(path_start, path_length, trigger_state)` — registers a segment
     /// (no NUT, no NFT; assembled later via [`Self::combine_partial_path`] + a `*_from_partial_paths`).
     pub fn mint_partial_path(

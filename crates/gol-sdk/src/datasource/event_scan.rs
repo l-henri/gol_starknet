@@ -136,6 +136,25 @@ impl EventScanDataSource {
         Ok(totals)
     }
 
+    /// Every (creature, holder) pair that has ever petted, deduped, most-recent first. The raw
+    /// caretaker graph — filter by current `bond_status` for active bonds / reapables.
+    /// Petted event: keys = [selector], data = [creature.low, creature.high, holder, age].
+    pub async fn pet_pairs(&self) -> Result<Vec<(U256, Felt)>, GolError> {
+        let keys = vec![vec![selector("Petted")]];
+        let events = self.scan_all(self.addresses.pets, keys).await?;
+        let mut out: Vec<(U256, Felt)> = Vec::new();
+        for ev in &events {
+            if ev.data.len() >= 3 {
+                let pair = (U256::from_felts(&ev.data[0], &ev.data[1]), ev.data[2]);
+                if !out.contains(&pair) {
+                    out.push(pair);
+                }
+            }
+        }
+        out.reverse();
+        Ok(out)
+    }
+
     /// Every minted lifeform, most-recent first, each confirmed live via the RPC reader (owner/state
     /// current even after later transfers). Convenience over [`Self::recent_token_ids`] + hydration.
     pub async fn recent_lifeforms(&self, limit: u32) -> Result<Vec<OwnedLifeform>, GolError> {

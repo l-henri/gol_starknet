@@ -267,6 +267,67 @@ impl GolSdk {
         calls_to_js(&[("approve", &calls[0]), ("mint_loop", &calls[1])])
     }
 
+    /// `pets.pet(creature_id)` — the ceremonial breath (feeds 1 gen, NUT to caller, bond+clock).
+    #[wasm_bindgen(js_name = petCall)]
+    pub fn pet_call(&self, creature_id: &str) -> Result<JsValue, JsValue> {
+        let call = self.client.writes().pet(parse_u256(creature_id)?);
+        calls_to_js(&[("pet", &call)])
+    }
+
+    /// `pets.reap(creature_id, holder)` — burn a lapsed bond, 1 NUT minted to the caller.
+    #[wasm_bindgen(js_name = reapCall)]
+    pub fn reap_call(&self, creature_id: &str, holder: &str) -> Result<JsValue, JsValue> {
+        let call = self.client.writes().reap(parse_u256(creature_id)?, parse_felt(holder)?);
+        calls_to_js(&[("reap", &call)])
+    }
+
+    /// `pets.transfer_bond(creature_id, to)` — daycare hand-off (the clock rides along).
+    #[wasm_bindgen(js_name = transferBondCall)]
+    pub fn transfer_bond_call(&self, creature_id: &str, to: &str) -> Result<JsValue, JsValue> {
+        let call = self.client.writes().transfer_bond(parse_u256(creature_id)?, parse_felt(to)?);
+        calls_to_js(&[("transfer_bond", &call)])
+    }
+
+    /// Every (creature, holder) pair that has ever petted (deduped, newest first):
+    /// `[{ creature_id, holder }]` — the caretaker graph. Filter with `bondStatus`.
+    #[wasm_bindgen(js_name = petPairs)]
+    pub async fn pet_pairs(&self) -> Result<JsValue, JsValue> {
+        let ds = EventScanDataSource::new(
+            self.client.config.rpc_url.clone(),
+            self.client.config.addresses.clone(),
+        );
+        let pairs = ds.pet_pairs().await.map_err(err)?;
+        #[derive(Serialize)]
+        struct JsPair {
+            creature_id: String,
+            holder: String,
+        }
+        to_js(
+            &pairs
+                .iter()
+                .map(|(c, h)| JsPair { creature_id: c.to_hex(), holder: felt_to_hex(h) })
+                .collect::<Vec<_>>(),
+        )
+    }
+
+    /// Current bond status for (creature, holder): `{ held, last_pet, reapable }`.
+    #[wasm_bindgen(js_name = bondStatus)]
+    pub async fn bond_status(&self, creature_id: &str, holder: &str) -> Result<JsValue, JsValue> {
+        let (held, last_pet, reapable) = self
+            .client
+            .rpc()
+            .bond_status(parse_u256(creature_id)?, parse_felt(holder)?)
+            .await
+            .map_err(err)?;
+        #[derive(Serialize)]
+        struct JsBond {
+            held: bool,
+            last_pet: f64,
+            reapable: bool,
+        }
+        to_js(&JsBond { held, last_pet: last_pet as f64, reapable })
+    }
+
     /// The v3 FAMILY token id for a drawn pattern — the id it would mint under (loops: pass the
     /// period; paths/wanderers: pass 0). Use to detect "this creature already lives" before the
     /// wallet ever opens: `lifeform(familyTokenId(...))` non-null ⇒ duplicate.

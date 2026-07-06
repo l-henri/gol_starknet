@@ -2,6 +2,7 @@
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
 export const __wbg_golsdk_free: (a: number, b: number) => void;
+export const golsdk_bondStatus: (a: number, b: number, c: number, d: number, e: number) => any;
 export const golsdk_breatheLifeCall: (a: number, b: number, c: number, d: number) => [number, number, number];
 export const golsdk_breatheLifeForCall: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
 export const golsdk_challengeBurnCall: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number];
@@ -18,10 +19,13 @@ export const golsdk_nutBalance: (a: number, b: number, c: number) => any;
 export const golsdk_ownedLifeforms: (a: number, b: number, c: number) => any;
 export const golsdk_pathLifeform: (a: number, b: number, c: number) => any;
 export const golsdk_pathRenderParams: (a: number, b: number, c: number) => any;
+export const golsdk_petCall: (a: number, b: number, c: number) => [number, number, number];
+export const golsdk_petPairs: (a: number) => any;
 export const golsdk_planLoopMint: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number, number];
 export const golsdk_planPathMint: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => [number, number, number];
 export const golsdk_proveMalformedLoopCall: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number];
 export const golsdk_proveMalformedWandererCall: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
+export const golsdk_reapCall: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
 export const golsdk_recentLifeforms: (a: number, b: number) => any;
 export const golsdk_recentMints: (a: number) => any;
 export const golsdk_recentPathMints: (a: number) => any;
@@ -35,6 +39,7 @@ export const golsdk_symmetryCanonical: (a: number, b: number, c: number) => [num
 export const golsdk_tokenIdForRows: (a: number, b: number, c: number) => [number, number, number];
 export const golsdk_tokenUri: (a: number, b: number, c: number) => any;
 export const golsdk_topBreathers: (a: number) => any;
+export const golsdk_transferBondCall: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
 export const wasm_bindgen__convert__closures_____invoke__h74bcc3753d680b42: (a: number, b: number, c: any) => [number, number];
 export const wasm_bindgen__convert__closures_____invoke__h3fd1d41b9588f30c: (a: number, b: number, c: any, d: any) => void;
 export const wasm_bindgen__convert__closures_____invoke__hc0e1ada004448962: (a: number, b: number) => void;

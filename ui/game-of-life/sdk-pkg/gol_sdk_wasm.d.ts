@@ -5,6 +5,10 @@ export class GolSdk {
     free(): void;
     [Symbol.dispose](): void;
     /**
+     * Current bond status for (creature, holder): `{ held, last_pet, reapable }`.
+     */
+    bondStatus(creature_id: string, holder: string): Promise<any>;
+    /**
      * The `move_lifeform_forward_n(token_id, n)` call for the wallet to sign + send — advances `n`
      * generations and mints `n` NUT in one tx. `n` is clamped to >= 1 (the contract asserts n > 0).
      */
@@ -80,6 +84,15 @@ export class GolSdk {
      */
     pathRenderParams(token_id: string): Promise<any>;
     /**
+     * `pets.pet(creature_id)` — the ceremonial breath (feeds 1 gen, NUT to caller, bond+clock).
+     */
+    petCall(creature_id: string): any;
+    /**
+     * Every (creature, holder) pair that has ever petted (deduped, newest first):
+     * `[{ creature_id, holder }]` — the caretaker graph. Filter with `bondStatus`.
+     */
+    petPairs(): Promise<any>;
+    /**
      * Plan the full transaction sequence to mint a loop. `rows` = the loop's canonical (smallest)
      * state; `loop_length` = its period. Short loops are a single `mint_loop` tx; long loops (whose
      * on-chain verification exceeds the wallet's per-tx gas cap) are tiled into partial-path segments
@@ -103,6 +116,10 @@ export class GolSdk {
      * v3 `prove_malformed` call for a WANDERER (no phase).
      */
     proveMalformedWandererCall(token_id_hex: string, d4: number, dr: number, dc: number): any;
+    /**
+     * `pets.reap(creature_id, holder)` — burn a lapsed bond, 1 NUT minted to the caller.
+     */
+    reapCall(creature_id: string, holder: string): any;
     /**
      * Every minted lifeform (newest first), capped at `limit` (0 = unlimited), via the RPC event
      * scan. The global gallery feed on Sepolia. Each is confirmed live (current owner + state).
@@ -165,6 +182,10 @@ export class GolSdk {
      * "top breathers" board (NUT faucet mints aggregated; the initial-supply mint excluded).
      */
     topBreathers(): Promise<any>;
+    /**
+     * `pets.transfer_bond(creature_id, to)` — daycare hand-off (the clock rides along).
+     */
+    transferBondCall(creature_id: string, to: string): any;
 }
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
@@ -172,6 +193,7 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_golsdk_free: (a: number, b: number) => void;
+    readonly golsdk_bondStatus: (a: number, b: number, c: number, d: number, e: number) => any;
     readonly golsdk_breatheLifeCall: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly golsdk_breatheLifeForCall: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
     readonly golsdk_challengeBurnCall: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number];
@@ -188,10 +210,13 @@ export interface InitOutput {
     readonly golsdk_ownedLifeforms: (a: number, b: number, c: number) => any;
     readonly golsdk_pathLifeform: (a: number, b: number, c: number) => any;
     readonly golsdk_pathRenderParams: (a: number, b: number, c: number) => any;
+    readonly golsdk_petCall: (a: number, b: number, c: number) => [number, number, number];
+    readonly golsdk_petPairs: (a: number) => any;
     readonly golsdk_planLoopMint: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number, number];
     readonly golsdk_planPathMint: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => [number, number, number];
     readonly golsdk_proveMalformedLoopCall: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number];
     readonly golsdk_proveMalformedWandererCall: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
+    readonly golsdk_reapCall: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
     readonly golsdk_recentLifeforms: (a: number, b: number) => any;
     readonly golsdk_recentMints: (a: number) => any;
     readonly golsdk_recentPathMints: (a: number) => any;
@@ -205,6 +230,7 @@ export interface InitOutput {
     readonly golsdk_tokenIdForRows: (a: number, b: number, c: number) => [number, number, number];
     readonly golsdk_tokenUri: (a: number, b: number, c: number) => any;
     readonly golsdk_topBreathers: (a: number) => any;
+    readonly golsdk_transferBondCall: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
     readonly wasm_bindgen__convert__closures_____invoke__h74bcc3753d680b42: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen__convert__closures_____invoke__h3fd1d41b9588f30c: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen__convert__closures_____invoke__hc0e1ada004448962: (a: number, b: number) => void;

@@ -7,6 +7,7 @@ import Creature from "@/components/Creature";
 import { useGolSdk } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
 import { useBreathe } from "@/lib/useBreathe";
+import { usePet, useBond, daysLeft } from "@/lib/usePet";
 import { useMint } from "@/lib/useMint";
 import { useGasCaps } from "@/lib/gasCaps";
 import { findBeast } from "@/lib/bestiary";
@@ -85,6 +86,8 @@ function LoopDetail({ id }: { id: string }) {
   const { address, onSepolia, switchToSepolia, execute, waitForTx } = useWallet();
   const { feedCap, tier } = useGasCaps();
   const { status, txHash, error: breatheError, breathe, reset, connected } = useBreathe();
+  const { status: petStatus, error: petError, pet, reset: petReset } = usePet();
+  const bond = useBond(id); // route id (hex or decimal) — parsed by the SDK
   const [lf, setLf] = useState<JsLifeform | null>(null);
   const [rp, setRp] = useState<{ bg: number; cell: number; speed: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -326,6 +329,57 @@ function LoopDetail({ id }: { id: string }) {
                 </a>
               )}
               {status === "error" && breatheError && <p className="breathe-err">{breatheError}</p>}
+              {connected && onSepolia && (
+                <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
+                  <button
+                    className="btn breathe-btn"
+                    onClick={() => (petStatus === "error" ? petReset() : pet(decId))}
+                    disabled={petStatus === "signing" || petStatus === "pending" || busy}
+                  >
+                    {petStatus === "signing"
+                      ? t({ fr: "Confirmez dans votre portefeuille…", en: "Confirm in your wallet…" })
+                      : petStatus === "pending"
+                        ? t({ fr: "Caresse… (tx en attente)", en: "Petting… (tx pending)" })
+                        : petStatus === "confirmed"
+                          ? t({ fr: "✓ Caressée — le lien est ravivé", en: "✓ Petted — the bond is renewed" })
+                          : petStatus === "error"
+                            ? t({ fr: "Réessayer la caresse", en: "Retry the pet" })
+                            : bond?.held
+                              ? t({ fr: "🤲 Caresser · un souffle", en: "🤲 Pet · one breath" })
+                              : t({ fr: "🤲 L'adopter · un souffle", en: "🤲 Adopt it · one breath" })}
+                  </button>
+                  {(() => {
+                    const left = daysLeft(bond);
+                    if (left === null)
+                      return (
+                        <p className="breathe-hint">
+                          {t({
+                            fr: "caressez-la pour tisser un lien : un souffle par caresse, et revenez sous 7 jours — sinon le lien fane.",
+                            en: "pet it to form a bond: one breath per pet, and come back within 7 days — or the bond wilts.",
+                          })}
+                        </p>
+                      );
+                    if (left <= 0)
+                      return (
+                        <p className="breathe-err">
+                          {t({
+                            fr: "votre lien a fané — n'importe qui peut le récolter. Une caresse le ravive.",
+                            en: "your bond has wilted — anyone can reap it. A pet revives it.",
+                          })}
+                        </p>
+                      );
+                    return (
+                      <p className="breathe-hint">
+                        {t({
+                          fr: `votre lien : encore ${left >= 1 ? `${Math.floor(left)} j` : `${Math.max(1, Math.round(left * 24))} h`} avant qu'il ne fane.`,
+                          en: `your bond: ${left >= 1 ? `${Math.floor(left)} days` : `${Math.max(1, Math.round(left * 24))} hours`} before it wilts.`,
+                        })}
+                      </p>
+                    );
+                  })()}
+                  {petStatus === "error" && petError && <p className="breathe-err">{petError}</p>}
+                </div>
+              )}
               {status === "idle" && connected && (
                 <p className="breathe-hint">{t({ fr: "nourrissez-la — chaque génération la garde en vie et vous rapporte 1 $NUT.", en: "feed it forward — each generation keeps it alive and earns you 1 $NUT." })}</p>
               )}

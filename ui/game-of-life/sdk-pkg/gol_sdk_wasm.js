@@ -12,6 +12,20 @@ export class GolSdk {
         wasm.__wbg_golsdk_free(ptr, 0);
     }
     /**
+     * Current bond status for (creature, holder): `{ held, last_pet, reapable }`.
+     * @param {string} creature_id
+     * @param {string} holder
+     * @returns {Promise<any>}
+     */
+    bondStatus(creature_id, holder) {
+        const ptr0 = passStringToWasm0(creature_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(holder, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.golsdk_bondStatus(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        return ret;
+    }
+    /**
      * The `move_lifeform_forward_n(token_id, n)` call for the wallet to sign + send — advances `n`
      * generations and mints `n` NUT in one tx. `n` is clamped to >= 1 (the contract asserts n > 0).
      * @param {string} token_id
@@ -264,6 +278,29 @@ export class GolSdk {
         return ret;
     }
     /**
+     * `pets.pet(creature_id)` — the ceremonial breath (feeds 1 gen, NUT to caller, bond+clock).
+     * @param {string} creature_id
+     * @returns {any}
+     */
+    petCall(creature_id) {
+        const ptr0 = passStringToWasm0(creature_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.golsdk_petCall(this.__wbg_ptr, ptr0, len0);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
+     * Every (creature, holder) pair that has ever petted (deduped, newest first):
+     * `[{ creature_id, holder }]` — the caretaker graph. Filter with `bondStatus`.
+     * @returns {Promise<any>}
+     */
+    petPairs() {
+        const ret = wasm.golsdk_petPairs(this.__wbg_ptr);
+        return ret;
+    }
+    /**
      * Plan the full transaction sequence to mint a loop. `rows` = the loop's canonical (smallest)
      * state; `loop_length` = its period. Short loops are a single `mint_loop` tx; long loops (whose
      * on-chain verification exceeds the wallet's per-tx gas cap) are tiled into partial-path segments
@@ -344,6 +381,23 @@ export class GolSdk {
         const ptr0 = passStringToWasm0(token_id_hex, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
         const ret = wasm.golsdk_proveMalformedWandererCall(this.__wbg_ptr, ptr0, len0, d4, dr, dc);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
+     * `pets.reap(creature_id, holder)` — burn a lapsed bond, 1 NUT minted to the caller.
+     * @param {string} creature_id
+     * @param {string} holder
+     * @returns {any}
+     */
+    reapCall(creature_id, holder) {
+        const ptr0 = passStringToWasm0(creature_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(holder, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.golsdk_reapCall(this.__wbg_ptr, ptr0, len0, ptr1, len1);
         if (ret[2]) {
             throw takeFromExternrefTable0(ret[1]);
         }
@@ -507,6 +561,23 @@ export class GolSdk {
     topBreathers() {
         const ret = wasm.golsdk_topBreathers(this.__wbg_ptr);
         return ret;
+    }
+    /**
+     * `pets.transfer_bond(creature_id, to)` — daycare hand-off (the clock rides along).
+     * @param {string} creature_id
+     * @param {string} to
+     * @returns {any}
+     */
+    transferBondCall(creature_id, to) {
+        const ptr0 = passStringToWasm0(creature_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(to, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.golsdk_transferBondCall(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
     }
 }
 if (Symbol.dispose) GolSdk.prototype[Symbol.dispose] = GolSdk.prototype.free;
@@ -794,12 +865,12 @@ function __wbg_get_imports() {
             return ret;
         },
         __wbindgen_cast_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 270, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 284, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__h74bcc3753d680b42);
             return ret;
         },
         __wbindgen_cast_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [], shim_idx: 242, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [], shim_idx: 256, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__hc0e1ada004448962);
             return ret;
         },

@@ -19,7 +19,8 @@ ui/game-of-life/src/
 │   ├── page.tsx                # home: hero + <Garden/> (client, for i18n)
 │   ├── create/page.tsx         # the editor: draw → live evolve → slot-machine score → spawn
 │   ├── incubator/page.tsx      # in-progress mints + localStorage bookmarks
-│   ├── leaderboards/page.tsx   # garden records: longest loops, methuselahs, top breathers, weekly (2026-07-06)
+│   ├── leaderboards/page.tsx   # garden records: longest loops, methuselahs, top breathers, caretakers, weekly
+│   ├── pets/page.tsx           # caretaker page: your wards (bond clocks + pet) and the reaper's rounds (2026-07-06)
 │   └── life/[id]/page.tsx      # a creature's detail page (feed, owner-edit) + dormant bestiary route
 ├── components/
 │   ├── Garden.tsx              # progressive gallery: recentTokenIds → a lazy card per id

@@ -30,11 +30,17 @@
   `feed_for`); [leaderboards.md](../leaderboards.md) backlog; [audience-research.md](../audience-research.md)
   plays (Seed Grant, genesis bestiary, essay — leaderboards-before-outreach).
 
+## Pets (LIVE, 2026-07-06)
+
+**The full caretaker loop is on-chain and in the app**: GolPetBonds deployed + smoke-tested
+([v3-deployment.md](../v3-deployment.md)); `/pets` page (wards with bond clocks, the reaper's
+rounds), 🤲 pet button on `/life/[id]`, Caretakers leaderboard. Multi-tx mint stall FIXED and
+confirmed by Henri (long wanderer minted). 99 Cairo + 43 SDK tests.
+
 ## Next up
 
-1. Manual click-through: `npm run dev` → /create → mint on v3; eyeball /leaderboards.
-2. **Pets on v3** (spec ready; `feed_for` is live on-chain).
-3. Exercise the tiled phase-segment loop mint on-chain; genesis reseed of notable v2 creatures
-   (deferred by Henri — possible any time, v2 stays live).
-4. Audience plays once the app points at v3: Seed Grant, bestiary drop, essay.
-5. Pre-mainnet checklist: external audit, governance hardening (immutability endgame).
+1. Henri's browser pass: /pets, /leaderboards, a pet from the UI.
+2. Outreach package (audience-research plays): manifesto essay, genesis bestiary, no-wallet share
+   loop, Seed Grant (check SNF conflict-of-interest).
+3. Exercise the tiled phase-segment loop mint on-chain; genesis reseed whenever Henri wants.
+4. Pre-mainnet checklist: external audit, governance hardening (immutability endgame).
