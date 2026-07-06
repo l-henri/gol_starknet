@@ -26,12 +26,13 @@
   1 NUT from nothing; daycare `transfer_bond` with the clock riding along — invariants in the
   ERC-1155 hook so raw transfers obey them too; orphaned bonds age out naturally) +
   `IGolPetBonds` + 8 integration tests.
-- **Verified:** full suite **99 Cairo tests green** (91 + 8). ⚠️ Sepolia deploy NOT done — strkd
-  auto-locked; `petsdeploy.mjs` (scratchpad) is idempotent and ready: declare, UDC deploy,
-  NUT MINTER_ROLE grant, live pet of the genesis blinker, verification reads.
-- **Next:** Henri unlocks strkd → run the deploy; then SDK/WASM pet bindings + the garden/pet UI
-  (loss-aversion clocks, reaper feed); leaderboard "caretakers" board once events flow.
-- **Blockers:** strkd locked (operator).
+- **Verified:** full suite **99 Cairo tests green** (91 + 8). **DEPLOYED to Sepolia after Henri's
+  unlock**: GolPetBonds `0x59878490…6e337` (class `0x7b82f4fc…cb1a2`), NUT MINTER granted, and a
+  live smoke test — the agent petted the genesis blinker (bond 1, clock stamped, creature aged).
+  Details in [v3-deployment.md](../v3-deployment.md).
+- **Next:** SDK/WASM pet bindings + the garden/pet UI (loss-aversion clocks, reaper feed);
+  caretakers leaderboard; Henri's validation pass (stall fix, /leaderboards, long-wanderer resume).
+- **Blockers:** none.
 
 ## 2026-07-06 (night) — First real v3 usage: two UX bugs found by Henri, fixed
 - **Goal:** Henri minted loops + a path on v3 (works), then hit: (1) long-wanderer multi-tx mints

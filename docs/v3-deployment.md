@@ -32,7 +32,23 @@ Deploy script: scratchpad `goldeploy/v3deploy.mjs` (strkd-driven; UDC salt `gol_
   though actuals are far lower; funded +300 STRK via `companion_requestFunding` (needs
   `submit: true` — sign-only is the default; it always prompts the operator).
 
+## Pet bonds (deployed 2026-07-06)
+
+The caretaker layer ([pet-mechanism-spec.md](pet-mechanism-spec.md)) — petting = one ceremonial
+feed with NUT to the petter, 7-day lapse, permissionless 1-NUT reaper, daycare transfers with the
+clock riding along.
+
+| Contract | Address | class_hash |
+|---|---|---|
+| GolPetBonds | `0x59878490847be8f32e539e60d9cbe849b2b6c77f750ae381236242388f6e337` | `0x7b82f4fc5bd7da93940d0a6f27d538273d7a34043c8fc035137e265f55cb1a2` |
+
+- Wiring: `NUT.grant_role(MINTER_ROLE, GolPetBonds)` (the reap reward), tx `0x338e5d31…2e60f`.
+- **Live smoke test:** the agent petted the genesis blinker (tx `0x585e3d12…8c6db`) —
+  bond balance 1, `last_pet` stamped, creature breathed one generation.
+
 ## Remaining v3 work
 - SDK: v3 write-builders (witness mints, `prove_malformed`) + WASM; address book entry.
 - Frontend: repoint `.env`/config to v3, thread the witness through `useMint`, duplicate-mint UX.
 - The tiled long-loop mint's phase-segment flow is implemented but not yet exercised on-chain.
+- Pets: SDK/WASM bindings (pet/reap/transfer_bond, lapsed-bond scan), garden UI clocks + reaper
+  feed, caretakers leaderboard.
