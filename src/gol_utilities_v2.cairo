@@ -24,7 +24,7 @@ pub struct PartialPathData {
 }
 
 /// Owned copy of a rows snapshot.
-fn clone_rows(a: @Array<u64>) -> Array<u64> {
+pub fn clone_rows(a: @Array<u64>) -> Array<u64> {
     let mut out: Array<u64> = ArrayTrait::new();
     let mut i: usize = 0;
     while i < a.len() {

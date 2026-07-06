@@ -223,6 +223,42 @@ pub fn symmetry_canonical(rows: &Rows) -> (Rows, u8, usize, usize) {
     (best, witness.0, witness.1, witness.2)
 }
 
+/// The v3 LOOP family canonical: the lex-min over the full symmetry orbit of EVERY phase of the
+/// cycle, with the witness the v3 minter verifies — `(canonical, d4, dr, dc, k)` such that
+/// `apply_symmetry(d4, dr, dc, step^k(time_smallest)) == canonical`, `k < period`, anchored on the
+/// cycle's TIME-lex-min (which the contract derives while proving the loop). `member` may be any
+/// state on the cycle.
+pub fn loop_family_canonical(member: &Rows, period: u32) -> (Rows, u8, usize, usize, u32) {
+    // find the time-lex-min anchor
+    let mut anchor = *member;
+    let mut cur = *member;
+    for _ in 1..period {
+        cur = step(&cur);
+        if lt(&cur, &anchor) {
+            anchor = cur;
+        }
+    }
+    // global min over orbit × phase, tracking the witness from the anchor
+    let mut phase = anchor;
+    let (mut best, mut bd4, mut bdr, mut bdc) = {
+        let (c, d4, dr, dc) = symmetry_canonical(&phase);
+        (c, d4, dr, dc)
+    };
+    let mut bk = 0u32;
+    for k in 1..period {
+        phase = step(&phase);
+        let (c, d4, dr, dc) = symmetry_canonical(&phase);
+        if lt(&c, &best) {
+            best = c;
+            bd4 = d4;
+            bdr = dr;
+            bdc = dc;
+            bk = k;
+        }
+    }
+    (best, bd4, bdr, bdc, bk)
+}
+
 /// `translate(img, dr, dc) == b`, without materializing the translated grid (early-exit compare).
 fn translated_eq(img: &Rows, dr: usize, dc: usize, b: &Rows) -> bool {
     for r in 0..N {
@@ -471,6 +507,29 @@ mod tests {
         // an unrelated grid lands elsewhere
         let (cu, ..) = symmetry_canonical(&grid_with(&[(20, 0b101)]));
         assert_ne!(ca, cu);
+    }
+
+    #[test]
+    fn loop_family_canonical_is_family_invariant_and_witnessed() {
+        let a = blinker_a();
+        let (canon, d4, dr, dc, k) = loop_family_canonical(&a, 2);
+        // witness verifies exactly as the v3 minter does: from the time-lex-min anchor
+        let b = step(&a);
+        let anchor = if lt(&b, &a) { b } else { a };
+        let mut phase = anchor;
+        for _ in 0..k {
+            phase = step(&phase);
+        }
+        assert_eq!(apply_symmetry(d4, dr, dc, &phase), canon);
+        // any family member yields the same canonical
+        let shifted = translate(&blinker_a(), 12, 30);
+        let (canon2, ..) = loop_family_canonical(&shifted, 2);
+        assert_eq!(canon, canon2, "family invariant");
+        let rotated = apply_d4(1, &blinker_a());
+        let (canon3, ..) = loop_family_canonical(&rotated, 2);
+        assert_eq!(canon, canon3, "rotation invariant");
+        // and it's minimal within the family members we can easily enumerate
+        assert!(!lt(&translate(&canon, 1, 1), &canon) || lt(&canon, &translate(&canon, 1, 1)));
     }
 
     #[test]
