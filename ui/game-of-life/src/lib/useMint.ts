@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useGolSdk } from "./sdk";
 import { useWallet } from "./wallet";
 import { useT, type Dict } from "./i18n";
@@ -61,10 +61,64 @@ export function useMint() {
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<MintProgressState>(null);
   const [tooLong, setTooLong] = useState(false);
+  // Some wallets silently drop a signing request that doesn't originate from a user gesture — the
+  // execute() promise then never settles and a multi-tx sequence stalls on "signing". After
+  // STALL_MS without the wallet answering, `stalled` turns on and the UI offers a Continue button;
+  // `continueMint` re-fires the SAME step from the click (a fresh gesture the wallet honors).
+  const [stalled, setStalled] = useState(false);
+  const pendingStepRef = useRef<null | { calls: unknown[]; deliver: (p: Promise<string>) => void }>(
+    null
+  );
+  const STALL_MS = 25_000;
 
   // Run a built plan: refuse if too long, short-circuit if already minted, else fire each step with a
   // silent retry + resume. `alreadyMinted` reads the relevant NFT (loop or path) to self-heal an
   // interrupted mint. `meta` is persisted per step so the Incubator can resume the right kind.
+  // Fire one step's wallet request, first-settle-wins: the automatic attempt and any number of
+  // user-gesture re-fires (continueMint) race; late duplicates are ignored (a re-broadcast segment
+  // rewrites the same registry entry; a duplicate final mint reverts harmlessly on-chain).
+  const fireStep = useCallback(
+    (calls: unknown[]): Promise<string> =>
+      new Promise<string>((resolve, reject) => {
+        let settled = false;
+        const deliver = (p: Promise<string>) => {
+          p.then(
+            (h) => {
+              if (!settled) {
+                settled = true;
+                pendingStepRef.current = null;
+                setStalled(false);
+                resolve(h);
+              }
+            },
+            (e) => {
+              if (!settled) {
+                settled = true;
+                pendingStepRef.current = null;
+                setStalled(false);
+                reject(e);
+              }
+            }
+          );
+        };
+        pendingStepRef.current = { calls, deliver };
+        deliver(execute(calls));
+        setTimeout(() => {
+          if (!settled) setStalled(true);
+        }, STALL_MS);
+      }),
+    [execute]
+  );
+
+  // Re-request the current step's signature from a user click (see `stalled`).
+  const continueMint = useCallback(() => {
+    const pending = pendingStepRef.current;
+    if (pending) {
+      setStalled(false);
+      pending.deliver(execute(pending.calls));
+    }
+  }, [execute]);
+
   const runPlan = useCallback(
     async (
       plan: Plan,
@@ -122,10 +176,11 @@ export function useMint() {
         const step = plan.steps[i];
         setProgress(multi ? { current: i + 1, total, label: step.label } : null);
         setStatus("signing");
+        if (multi) persist(i); // record the step we're ON, so closing the tab mid-step resumes here
         let ok = false;
         for (let attempt = 0; attempt < 2 && !ok; attempt++) {
           try {
-            const hash = await execute(step.calls);
+            const hash = await fireStep(step.calls);
             setTxHash(hash);
             setStatus("pending");
             // Wait for L2 acceptance (not just pre-confirmed): a later step reads this tx's writes,
@@ -151,7 +206,7 @@ export function useMint() {
       setStatus("confirmed");
       return true;
     },
-    [execute, waitForTxAccepted, t]
+    [fireStep, waitForTxAccepted, t]
   );
 
   const prep = useCallback(async (): Promise<boolean> => {
@@ -226,7 +281,21 @@ export function useMint() {
     setTxHash(null);
     setProgress(null);
     setTooLong(false);
+    setStalled(false);
+    pendingStepRef.current = null;
   }, []);
 
-  return { status, txHash, error, progress, tooLong, mint, mintPath, reset, connected: !!address };
+  return {
+    status,
+    txHash,
+    error,
+    progress,
+    tooLong,
+    stalled,
+    continueMint,
+    mint,
+    mintPath,
+    reset,
+    connected: !!address,
+  };
 }

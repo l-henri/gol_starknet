@@ -145,7 +145,7 @@ export default function CreatePage() {
   const { t } = useT();
   const { sdk } = useGolSdk();
   const { address, connect, onSepolia, switchToSepolia, txEpoch } = useWallet();
-  const { status, txHash, error: mintError, progress, mint, mintPath, reset } = useMint();
+  const { status, txHash, error: mintError, progress, stalled, continueMint, mint, mintPath, reset } = useMint();
   const caps = useGasCaps();
   const router = useRouter();
 
@@ -169,6 +169,7 @@ export default function CreatePage() {
   const [activeKind, setActiveKind] = useState<"loop" | "path" | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [bmTick, setBmTick] = useState(0); // bump to re-read bookmark state after a toggle
+  const optionsRef = useRef<{ tokenId: string | null; rows: number[]; nut: number; kind: "loop" | "path"; loopPeriod?: number; already: boolean }[]>([]);
   const [nutHex, setNutHex] = useState<string | null>(null); // connected NUT balance (for affordability)
 
   const paint = useCallback((i: number, value: boolean) => {
@@ -296,10 +297,28 @@ export default function CreatePage() {
     };
   }, [sdk, pathMintable, leftRows]);
 
-  // on a confirmed mint, send them to their newborn creature (the one just spawned — loop or path)
+  // on a confirmed mint, send them to their newborn creature (the one just spawned — loop or path).
+  // Before leaving, BOOKMARK the sibling discovery (the loop/path that was NOT spawned): the drawing
+  // is gone after the redirect, and an unsaved discovery would be lost.
   useEffect(() => {
     const target = activeId ?? tokenId;
     if (status === "confirmed" && target) {
+      try {
+        for (const desc of optionsRef.current) {
+          if (desc.tokenId && desc.tokenId !== target && !desc.already && !isBookmarked(desc.tokenId)) {
+            addBookmark({
+              id: desc.tokenId,
+              rows: desc.rows,
+              period: desc.nut,
+              kind: desc.kind,
+              loopPeriod: desc.loopPeriod,
+              savedAt: Date.now(),
+            });
+          }
+        }
+      } catch {
+        // bookmarking is best-effort; never block the redirect
+      }
       const t = setTimeout(() => router.push(`/life/${target}`), 1200);
       return () => clearTimeout(t);
     }
@@ -368,6 +387,7 @@ export default function CreatePage() {
     : null;
   type SpawnDesc = NonNullable<typeof pathSpawn> | NonNullable<typeof loopSpawn>;
   const options: SpawnDesc[] = [pathSpawn, loopSpawn].filter(Boolean) as SpawnDesc[];
+  optionsRef.current = options; // latest discoveries, readable from effects without dep churn
   const anyMulti = options.some((o) => !o.already && o.tx > 1 && o.tx <= MAX_TX);
 
   // One spawn option row: its own button (status only when it's the in-flight one) + bookmark. `bmTick`
@@ -415,6 +435,14 @@ export default function CreatePage() {
             idleLabel={idle}
             t={t}
           />
+        )}
+        {active && stalled && status === "signing" && (
+          <button className="btn primary" onClick={continueMint}>
+            {t({
+              fr: `Le portefeuille n'affiche rien ? Relancer l'étape${progress ? ` ${progress.current}/${progress.total}` : ""}`,
+              en: `Wallet showing nothing? Re-request step${progress ? ` ${progress.current}/${progress.total}` : ""}`,
+            })}
+          </button>
         )}
         {!desc.already && desc.tokenId && (
           <button

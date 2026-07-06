@@ -25,7 +25,7 @@ export default function IncubatorPage() {
   const { t } = useT();
   const { sdk } = useGolSdk();
   const { address, connect, onSepolia, switchToSepolia, txEpoch } = useWallet();
-  const { status, txHash, error, progress, mint, mintPath, reset } = useMint();
+  const { status, txHash, error, progress, stalled, continueMint, mint, mintPath, reset } = useMint();
   const router = useRouter();
 
   const [pending, setPending] = useState<MintProgress[]>([]);
@@ -208,6 +208,14 @@ export default function IncubatorPage() {
                   {nutWarning(p.period)}
                 </>
               )}
+              {activeId === p.id && stalled && status === "signing" && (
+                <button className="btn primary" onClick={continueMint}>
+                  {t({
+                    fr: `Le portefeuille n'affiche rien ? Relancer l'étape${progress ? ` ${progress.current}/${progress.total}` : ""}`,
+                    en: `Wallet showing nothing? Re-request step${progress ? ` ${progress.current}/${progress.total}` : ""}`,
+                  })}
+                </button>
+              )}
               {activeId === p.id && status === "error" && error && <p className="breathe-err">{error}</p>}
             </div>
           ))}
@@ -244,6 +252,14 @@ export default function IncubatorPage() {
                   </div>
                   {nutWarning(b.period)}
                 </>
+              )}
+              {activeId === b.id && stalled && status === "signing" && (
+                <button className="btn primary" onClick={continueMint}>
+                  {t({
+                    fr: `Le portefeuille n'affiche rien ? Relancer l'étape${progress ? ` ${progress.current}/${progress.total}` : ""}`,
+                    en: `Wallet showing nothing? Re-request step${progress ? ` ${progress.current}/${progress.total}` : ""}`,
+                  })}
+                </button>
               )}
               {activeId === b.id && status === "error" && error && <p className="breathe-err">{error}</p>}
             </div>
