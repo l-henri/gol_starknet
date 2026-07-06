@@ -47,8 +47,8 @@ clock riding along.
   bond balance 1, `last_pet` stamped, creature breathed one generation.
 
 ## Remaining v3 work
-- SDK: v3 write-builders (witness mints, `prove_malformed`) + WASM; address book entry.
-- Frontend: repoint `.env`/config to v3, thread the witness through `useMint`, duplicate-mint UX.
+- ~~SDK write-builders + WASM; frontend repoint~~ — **done 2026-07-06 evening** (witness mints
+  from drawn rows, `familyTokenId` everywhere; see LOG).
 - The tiled long-loop mint's phase-segment flow is implemented but not yet exercised on-chain.
 - Pets: SDK/WASM bindings (pet/reap/transfer_bond, lapsed-bond scan), garden UI clocks + reaper
   feed, caretakers leaderboard.
