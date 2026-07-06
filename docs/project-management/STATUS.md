@@ -18,8 +18,10 @@
   since 2026-07-06** with a genesis blinker (its on-chain witness check doubles as the Rust↔Cairo
   convention proof); addresses in [v3-deployment.md](../v3-deployment.md). Collections:
   **"Digital Bacteria"/BACT** (loops) + **"Digital Wanderers"/WNDR** (paths).
-- **⚠️ Frontend/SDK write-paths still point at v2** — the repoint (config addresses, witness
-  threading through `useMint`, duplicate-mint UX, v3 write-builders + WASM) is the top open item.
+- **Frontend/SDK repointed to v3 (2026-07-06 evening):** witness mints built internally from
+  drawn rows, `familyTokenId` everywhere, duplicate-family detection via the existing
+  already-minted check, breathing history preserved across versions. ⚠️ Still to do: a manual
+  /create → v3 mint click-through, /leaderboards eyeballing, tiled phase-segment mint on-chain.
 - **v2** (and v1) remain deployed but superseded — [v2-deployment.md](../v2-deployment.md); the v2
   symmetry challenge-burn stays live there for its collection.
 - **Frontend** (`ui/game-of-life`): garden, `/create` editor, incubator, `/leaderboards` (4 boards,
@@ -30,8 +32,7 @@
 
 ## Next up
 
-1. **v3 repoint:** SDK write-builders (witness mints, `prove_malformed`) + WASM; frontend env +
-   `useMint` witness threading + duplicate-mint UX; then eyeball /leaderboards in dev.
+1. Manual click-through: `npm run dev` → /create → mint on v3; eyeball /leaderboards.
 2. **Pets on v3** (spec ready; `feed_for` is live on-chain).
 3. Exercise the tiled phase-segment loop mint on-chain; genesis reseed of notable v2 creatures
    (deferred by Henri — possible any time, v2 stays live).

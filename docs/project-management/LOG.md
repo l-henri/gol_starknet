@@ -18,6 +18,25 @@
 
 ---
 
+## 2026-07-06 (evening) — SDK + frontend repointed to v3; the app speaks orbit ids
+- **Goal:** close the v3 gap ("go"): write-builders, WASM, frontend id derivation.
+- **Branch:** `main` · **Commits:** 373e287 · pushed
+- **Changed:** v3 address book (NUT keeps its own deploy block so breathing history spans
+  collection versions — top breathers survived the reset); mint builders compute the orbit
+  canonical + witness internally (callers pass drawn rows, drawn orientation preserved);
+  `prove_malformed_{loop,wanderer}` + `breathe_life_for` builders; `plan_loop_mint` chunks a
+  phase segment when the witness phase exceeds one tx; WASM `familyTokenId` /
+  `proveMalformed*Call` / `breatheLifeForCall`; every UI mint-facing id derivation switched to
+  `familyTokenId` (the existing already-minted check thereby becomes the duplicate-family check);
+  renderer template ref token → the v3 genesis blinker.
+- **Verified:** 91 Cairo + 43 SDK tests; `next build`; live board probe reads v3 (1 genesis loop)
+  AND the cross-version breather history (6 breathers, top 830). ⚠️ Not yet exercised: a real v3
+  mint from the UI (manual click-through), the tiled phase-segment flow on-chain, /leaderboards
+  eyeballing.
+- **Next:** manual click-through of /create → v3 mint on Sepolia; pets on v3; genesis reseed
+  whenever Henri wants it.
+- **Blockers:** none.
+
 ## 2026-07-06 (later) — v3 BUILT AND LIVE: orbit-canonical identity on Sepolia
 - **Goal:** execute the approved v3-identity-spec end to end (Henri: "untrack the pdf, push, do v3").
 - **Branch:** `main` · **Commits:** b58a140 (+ this docs commit) · pushed to origin
