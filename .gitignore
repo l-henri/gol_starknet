@@ -8,3 +8,4 @@ keystore.json
 node*
 .env*
 package-lock.json
+docs/*.pdf
