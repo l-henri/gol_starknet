@@ -157,3 +157,22 @@ pub trait IGolWandererMinterV3<TContractState> {
         recipient: ContractAddress,
     );
 }
+
+#[starknet::interface]
+pub trait IGolPetBonds<TContractState> {
+    /// Pet a living loop creature: feeds it ONE generation (the ceremonial breath — the NUT reward
+    /// lands on the caller via `move_lifeform_forward_n_for`), mints the caller's bond for it if
+    /// absent, and refreshes the caller's 7-day clock. Public.
+    fn pet(ref self: TContractState, creature_id: u256);
+    /// Permissionless reaper: burn `holder`'s bond on `creature_id` if it has lapsed (no pet for
+    /// LAPSE_SECONDS). Reward: REAP_REWARD NUT freshly minted to the caller.
+    fn reap(ref self: TContractState, creature_id: u256, holder: ContractAddress);
+    /// Daycare hand-off: move the caller's bond to `to` WITHOUT resetting the clock (the sitter
+    /// inherits the remaining time; their pets refresh it). Skips the ERC-1155 acceptance check so
+    /// plain wallet accounts can receive. Reverts if `to` already holds a bond on this creature.
+    fn transfer_bond(ref self: TContractState, creature_id: u256, to: ContractAddress);
+    fn last_pet_of(self: @TContractState, creature_id: u256, holder: ContractAddress) -> u64;
+    fn is_reapable(self: @TContractState, creature_id: u256, holder: ContractAddress) -> bool;
+    fn lapse_seconds(self: @TContractState) -> u64;
+    fn reap_reward(self: @TContractState) -> u256;
+}

@@ -20,3 +20,4 @@ pub mod gol_lifeforms_v3;
 pub mod gol_wanderers_v3;
 pub mod gol_loop_minter_v3;
 pub mod gol_wanderer_minter_v3;
+pub mod gol_pet_bonds;
