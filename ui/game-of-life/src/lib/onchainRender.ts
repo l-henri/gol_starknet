@@ -20,7 +20,7 @@ let tplA = htmlA;
 let tplB = htmlB;
 
 /** A permanently-minted token to read the live renderer from on boot (the seeded blinker). */
-export const REF_TOKEN_ID = "0x743d91e948cc844ef3e08dc46ede35fe5ea085981a0176d3203810da80d9416";
+export const REF_TOKEN_ID = "0x7d4eec5dea95c8a4cf6c781f7c8a7d75c3f05a384bb710a10bcc3ff7ddc4b9";
 
 /** Re-derive the template from a live token's decoded animation HTML so it tracks the DEPLOYED
  *  renderer. Splits on `ROWS=` … `SPEED=<n>`; keeps the bundled default if the markers aren't found

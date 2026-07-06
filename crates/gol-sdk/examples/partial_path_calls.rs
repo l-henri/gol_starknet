@@ -37,7 +37,7 @@ fn main() {
     let seg1 = w.mint_partial_path(Minter::Loop, &a_state, 2, &a_state);
     let seg2 = w.mint_partial_path(Minter::Loop, &b_state, 1, &a_state);
     let combine = w.combine_partial_path(Minter::Loop, id_a, id_b);
-    let mint = w.mint_loop_from_partial_paths(&a_state, 2, agent); // [approve, mint]
+    let mint = w.mint_loop_from_partial_paths(&a, 2, agent); // [approve, mint]
 
     let out = json!({
         "token_id": token_id(&a).to_hex(),

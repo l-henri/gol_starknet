@@ -249,8 +249,9 @@ impl GolSdk {
         )
     }
 
-    /// `[approve, mint_loop]` calls for the wallet to sign + send. `rows` is the loop's canonical
-    /// (smallest) state as 41 row bitmasks.
+    /// `[approve, mint_loop]` calls for the wallet to sign + send. v3: `rows` may be ANY state of
+    /// the loop (the drawn orientation is preserved for display); the orbit canonical + witness
+    /// are computed here and ride in the calldata.
     #[wasm_bindgen(js_name = mintLoopCalls)]
     pub fn mint_loop_calls(
         &self,
@@ -258,12 +259,75 @@ impl GolSdk {
         loop_length: u32,
         recipient: &str,
     ) -> Result<JsValue, JsValue> {
-        let state = GridState::pack(&rows_from_js(rows)?);
+        let drawn = rows_from_js(rows)?;
         let calls = self
             .client
             .writes()
-            .mint_loop(&state, loop_length, parse_felt(recipient)?);
+            .mint_loop(&drawn, loop_length, parse_felt(recipient)?);
         calls_to_js(&[("approve", &calls[0]), ("mint_loop", &calls[1])])
+    }
+
+    /// The v3 FAMILY token id for a drawn pattern — the id it would mint under (loops: pass the
+    /// period; paths/wanderers: pass 0). Use to detect "this creature already lives" before the
+    /// wallet ever opens: `lifeform(familyTokenId(...))` non-null ⇒ duplicate.
+    #[wasm_bindgen(js_name = familyTokenId)]
+    pub fn family_token_id(&self, rows: Vec<f64>, period: u32) -> Result<JsValue, JsValue> {
+        let r = rows_from_js(rows)?;
+        let canonical = if period > 1 {
+            grid::loop_family_canonical(&r, period).0
+        } else {
+            grid::symmetry_canonical(&r).0
+        };
+        Ok(JsValue::from_str(&token_id(&canonical).to_hex()))
+    }
+
+    /// v3 `prove_malformed` call for a LOOP (witness `(d4, dr, dc, k)` exhibits a smaller family
+    /// member; bounty = the token's escrow).
+    #[wasm_bindgen(js_name = proveMalformedLoopCall)]
+    pub fn prove_malformed_loop_call(
+        &self,
+        token_id_hex: &str,
+        d4: u8,
+        dr: u8,
+        dc: u8,
+        k: u32,
+    ) -> Result<JsValue, JsValue> {
+        let call = self
+            .client
+            .writes()
+            .prove_malformed_loop(parse_u256(token_id_hex)?, d4, dr, dc, k);
+        calls_to_js(&[("prove_malformed", &call)])
+    }
+
+    /// v3 `prove_malformed` call for a WANDERER (no phase).
+    #[wasm_bindgen(js_name = proveMalformedWandererCall)]
+    pub fn prove_malformed_wanderer_call(
+        &self,
+        token_id_hex: &str,
+        d4: u8,
+        dr: u8,
+        dc: u8,
+    ) -> Result<JsValue, JsValue> {
+        let call = self
+            .client
+            .writes()
+            .prove_malformed_wanderer(parse_u256(token_id_hex)?, d4, dr, dc);
+        calls_to_js(&[("prove_malformed", &call)])
+    }
+
+    /// v3 feed-for: `move_lifeform_forward_n_for(token, n, beneficiary)` — the pet hook.
+    #[wasm_bindgen(js_name = breatheLifeForCall)]
+    pub fn breathe_life_for_call(
+        &self,
+        token_id_hex: &str,
+        n: u32,
+        beneficiary: &str,
+    ) -> Result<JsValue, JsValue> {
+        let call = self
+            .client
+            .writes()
+            .breathe_life_for(parse_u256(token_id_hex)?, n, parse_felt(beneficiary)?);
+        calls_to_js(&[("move_lifeform_forward_n_for", &call)])
     }
 
     /// Plan the full transaction sequence to mint a loop. `rows` = the loop's canonical (smallest)

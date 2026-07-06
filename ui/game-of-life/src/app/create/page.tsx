@@ -263,7 +263,7 @@ export default function CreatePage() {
       return;
     }
     let cancelled = false;
-    const id = sdk.tokenIdForRows(new Float64Array(fate.canonical)) as string;
+    const id = sdk.familyTokenId(new Float64Array(fate.canonical), fate.period) as string;
     setTokenId(id);
     setAlreadyMinted(false);
     sdk.lifeform(id).then((lf) => {
@@ -285,7 +285,7 @@ export default function CreatePage() {
       return;
     }
     let cancelled = false;
-    const id = sdk.tokenIdForRows(new Float64Array(leftRows)) as string;
+    const id = sdk.familyTokenId(new Float64Array(leftRows), 0) as string;
     setPathTokenId(id);
     setPathMinted(false);
     sdk.pathLifeform(id).then((p) => {

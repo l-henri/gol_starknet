@@ -174,7 +174,7 @@ export function useMint() {
       let id: string;
       try {
         const r = new Float64Array(rows);
-        id = sdk.tokenIdForRows(r) as string;
+        id = sdk.familyTokenId(r, period) as string; // v3: the orbit-family id
         plan = sdk.planLoopMint(r, period, address, chunkSteps, singleShotMax, MAX_TX) as Plan;
       } catch (e) {
         setError(humanize(e, t));
@@ -195,7 +195,7 @@ export function useMint() {
       let id: string;
       try {
         const r = new Float64Array(rows);
-        id = sdk.tokenIdForRows(r) as string;
+        id = sdk.familyTokenId(r, 0) as string; // v3: orbit of the start
         plan = sdk.planPathMint(
           r,
           sequenceLength,

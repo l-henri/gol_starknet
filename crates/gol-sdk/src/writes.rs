@@ -56,14 +56,21 @@ impl<'a> GolWrites<'a> {
         }
     }
 
-    /// `[approve(loop_length NUT → lifeforms), loop_minter.mint_loop(loop_state, loop_length, recipient)]`.
-    /// `loop_state` must be the loop's canonical (smallest) state — see
-    /// [`crate::engine::is_single_loop_and_entrypoint_is_smallest`].
-    pub fn mint_loop(&self, loop_state: &GridState, loop_length: u32, recipient: Felt) -> Vec<Call> {
+    /// v3 witness-assisted loop mint: `[approve(loop_length NUT → lifeforms),
+    /// loop_minter.mint_loop(drawn, loop_length, canonical, g, k, recipient)]`. `drawn` may be ANY
+    /// state of the loop (the artist's orientation is preserved for display); the orbit canonical
+    /// + witness are computed here ([`crate::grid::loop_family_canonical`]).
+    pub fn mint_loop(&self, drawn: &Rows, loop_length: u32, recipient: Felt) -> Vec<Call> {
+        let (canonical, d4, dr, dc, k) = crate::grid::loop_family_canonical(drawn, loop_length);
         let approve = self
             .approve_nut(self.addresses.lifeforms, nut_cost_for_loop(loop_length, self.nut_decimals));
-        let mut calldata = loop_state.to_calldata().to_vec();
+        let mut calldata = GridState::pack(drawn).to_calldata().to_vec();
         calldata.push(Felt::from(loop_length));
+        calldata.extend_from_slice(&GridState::pack(&canonical).to_calldata());
+        calldata.push(Felt::from(d4));
+        calldata.push(Felt::from(dr as u32));
+        calldata.push(Felt::from(dc as u32));
+        calldata.push(Felt::from(k));
         calldata.push(recipient);
         vec![
             approve,
@@ -71,28 +78,75 @@ impl<'a> GolWrites<'a> {
         ]
     }
 
-    /// `[approve(length_to_loop NUT → lifeforms), path_minter.mint_path(path_start,
-    /// length_to_loop_entrypoint, loop_length, recipient)]`.
+    /// v3 witness-assisted wanderer (path) mint: `[approve(length NUT → wanderers),
+    /// minter.mint_path(start, length, loop_length, canonical, g, recipient)]`. The path family is
+    /// the orbit of the START — no phase, so the witness is one symmetry.
     pub fn mint_path(
         &self,
-        path_start: &GridState,
+        drawn_start: &Rows,
         length_to_loop_entrypoint: u32,
         loop_length: u32,
         recipient: Felt,
     ) -> Vec<Call> {
-        // Paths escrow NUT into the PATH NFT (not the loop lifeforms) — that contract charges + holds it.
+        let (canonical, d4, dr, dc) = crate::grid::symmetry_canonical(drawn_start);
+        // Wanderers escrow NUT into the WNDR NFT — that contract charges + holds it.
         let approve = self.approve_nut(
             self.addresses.path_lifeforms,
             nut_cost_for_path(length_to_loop_entrypoint, self.nut_decimals),
         );
-        let mut calldata = path_start.to_calldata().to_vec();
+        let mut calldata = GridState::pack(drawn_start).to_calldata().to_vec();
         calldata.push(Felt::from(length_to_loop_entrypoint));
         calldata.push(Felt::from(loop_length));
+        calldata.extend_from_slice(&GridState::pack(&canonical).to_calldata());
+        calldata.push(Felt::from(d4));
+        calldata.push(Felt::from(dr as u32));
+        calldata.push(Felt::from(dc as u32));
         calldata.push(recipient);
         vec![
             approve,
             Call { to: self.addresses.path_minter, selector: selector("mint_path"), calldata },
         ]
+    }
+
+    /// v3 `lifeforms.prove_malformed(token_id, d4, dr, dc, k)` — burn a non-minimal loop id and
+    /// claim its escrow. Get the witness from [`crate::grid::symmetry_canonical`] over the phases.
+    pub fn prove_malformed_loop(&self, token_id: U256, d4: u8, dr: u8, dc: u8, k: u32) -> Call {
+        let mut calldata = token_id.to_calldata().to_vec();
+        calldata.push(Felt::from(d4));
+        calldata.push(Felt::from(dr));
+        calldata.push(Felt::from(dc));
+        calldata.push(Felt::from(k));
+        Call {
+            to: self.addresses.lifeforms,
+            selector: selector("prove_malformed"),
+            calldata,
+        }
+    }
+
+    /// v3 `wanderers.prove_malformed(token_id, d4, dr, dc)` — the path variant (no phase).
+    pub fn prove_malformed_wanderer(&self, token_id: U256, d4: u8, dr: u8, dc: u8) -> Call {
+        let mut calldata = token_id.to_calldata().to_vec();
+        calldata.push(Felt::from(d4));
+        calldata.push(Felt::from(dr));
+        calldata.push(Felt::from(dc));
+        Call {
+            to: self.addresses.path_lifeforms,
+            selector: selector("prove_malformed"),
+            calldata,
+        }
+    }
+
+    /// v3 `lifeforms.move_lifeform_forward_n_for(token_id, n, beneficiary)` — feed with the NUT
+    /// reward landing on `beneficiary` (the pet-contract hook, callable by anyone).
+    pub fn breathe_life_for(&self, token_id: U256, n: u32, beneficiary: Felt) -> Call {
+        let mut calldata = token_id.to_calldata().to_vec();
+        calldata.push(Felt::from(n));
+        calldata.push(beneficiary);
+        Call {
+            to: self.addresses.lifeforms,
+            selector: selector("move_lifeform_forward_n_for"),
+            calldata,
+        }
     }
 
     /// `minter.mint_partial_path(path_start, path_length, trigger_state)` — registers a segment
@@ -123,17 +177,26 @@ impl<'a> GolWrites<'a> {
         }
     }
 
-    /// `[approve(sequence_length NUT → lifeforms), loop_minter.mint_loop_from_partial_paths(loop_state,
-    /// recipient)]`. `sequence_length` is the assembled loop's length (the registered segment's length).
+    /// v3 tiled-loop finalization: `[approve, mint_loop_from_partial_paths(anchor, canonical, g, k,
+    /// recipient)]`. `anchor` is the loop's TIME-lex-min (the walk key the registry accumulated
+    /// under); the orbit canonical + witness are computed here. When the witness phase `k` exceeds
+    /// the inline budget, [`Self::plan_loop_mint`] pre-registers a phase segment the contract prefers.
     pub fn mint_loop_from_partial_paths(
         &self,
-        loop_state: &GridState,
+        anchor: &Rows,
         sequence_length: u32,
         recipient: Felt,
     ) -> Vec<Call> {
+        let (canonical, d4, dr, dc, k) =
+            crate::grid::loop_family_canonical(anchor, sequence_length);
         let approve =
             self.approve_nut(self.addresses.lifeforms, unit_cost(sequence_length, self.nut_decimals));
-        let mut calldata = loop_state.to_calldata().to_vec();
+        let mut calldata = GridState::pack(anchor).to_calldata().to_vec();
+        calldata.extend_from_slice(&GridState::pack(&canonical).to_calldata());
+        calldata.push(Felt::from(d4));
+        calldata.push(Felt::from(dr as u32));
+        calldata.push(Felt::from(dc as u32));
+        calldata.push(Felt::from(k));
         calldata.push(recipient);
         vec![
             approve,
@@ -145,17 +208,22 @@ impl<'a> GolWrites<'a> {
         ]
     }
 
-    /// `[approve(sequence_length NUT → lifeforms), path_minter.mint_path_from_partial_paths(path_start,
-    /// recipient)]`.
+    /// v3 tiled-wanderer finalization: `[approve, mint_path_from_partial_paths(start, canonical,
+    /// g, recipient)]` — the orbit witness on the drawn start (no phase).
     pub fn mint_path_from_partial_paths(
         &self,
-        path_start: &GridState,
+        drawn_start: &Rows,
         sequence_length: u32,
         recipient: Felt,
     ) -> Vec<Call> {
+        let (canonical, d4, dr, dc) = crate::grid::symmetry_canonical(drawn_start);
         let approve = self
             .approve_nut(self.addresses.path_lifeforms, unit_cost(sequence_length, self.nut_decimals));
-        let mut calldata = path_start.to_calldata().to_vec();
+        let mut calldata = GridState::pack(drawn_start).to_calldata().to_vec();
+        calldata.extend_from_slice(&GridState::pack(&canonical).to_calldata());
+        calldata.push(Felt::from(d4));
+        calldata.push(Felt::from(dr as u32));
+        calldata.push(Felt::from(dc as u32));
         calldata.push(recipient);
         vec![
             approve,
@@ -287,13 +355,12 @@ impl<'a> GolWrites<'a> {
         single_shot_max: u32,
         max_tx: u32,
     ) -> MintPlan {
-        let start_state = GridState::pack(start);
         // mint_path re-steps the transient AND walks the loop once, so cost ∝ sequence_length + period.
         if sequence_length + loop_period <= single_shot_max {
             return MintPlan {
                 steps: vec![MintStep {
                     label: "mint".into(),
-                    calls: self.mint_path(&start_state, sequence_length, loop_period, recipient),
+                    calls: self.mint_path(start, sequence_length, loop_period, recipient),
                 }],
                 tx_count: 1,
                 single_shot: true,
@@ -315,7 +382,7 @@ impl<'a> GolWrites<'a> {
         self.tile_partial(&loop_entry, loop_period, &loop_entry_state, chunk, "loop segment", &mut steps);
         steps.push(MintStep {
             label: "mint".into(),
-            calls: self.mint_path_from_partial_paths(&start_state, sequence_length, recipient),
+            calls: self.mint_path_from_partial_paths(start, sequence_length, recipient),
         });
         let tx_count = steps.len() as u32;
         MintPlan { steps, tx_count, single_shot: false, too_long: tx_count > max_tx }
@@ -383,7 +450,7 @@ impl<'a> GolWrites<'a> {
             return MintPlan {
                 steps: vec![MintStep {
                     label: "mint".into(),
-                    calls: self.mint_loop(&canon_state, loop_length, recipient),
+                    calls: self.mint_loop(canonical, loop_length, recipient),
                 }],
                 tx_count: 1,
                 single_shot: true,
@@ -420,9 +487,46 @@ impl<'a> GolWrites<'a> {
             }
             b_prev = b_next;
         }
+        // v3: if the orbit witness's phase k exceeds the chunk budget, pre-register a PHASE
+        // segment (keyed at hash(step(anchor)), length k, trigger = the orbit canonical) that the
+        // contract prefers over stepping k inline. Small k stays inline in the final tx.
+        let (orbit_canonical, _, _, _, k) =
+            crate::grid::loop_family_canonical(canonical, loop_length);
+        if k > chunk {
+            // A length-L segment spans L states = L-1 steps; combine is overlap-by-one with
+            // length = p1 + p2 - 1, so tiling (k-1) steps in chunks accumulates length exactly k —
+            // what the contract's `phase.length == k` check expects.
+            let orbit_state = GridState::pack(&orbit_canonical);
+            let phase_start_rows = step(canonical);
+            let phase_key = token_hash(&phase_start_rows);
+            let mut cur = phase_start_rows;
+            let total_steps = k - 1;
+            let mut b_prev = 0u32;
+            while b_prev < total_steps {
+                let b_next = (b_prev + chunk).min(total_steps);
+                let seg_steps = b_next - b_prev;
+                let seg_state = GridState::pack(&cur);
+                let mpp =
+                    self.mint_partial_path(Minter::Loop, &seg_state, seg_steps + 1, &orbit_state);
+                if b_prev == 0 {
+                    steps.push(MintStep { label: "phase segment".into(), calls: vec![mpp] });
+                } else {
+                    let combine =
+                        self.combine_partial_path(Minter::Loop, phase_key, token_hash(&cur));
+                    steps.push(MintStep {
+                        label: "phase segment + combine".into(),
+                        calls: vec![mpp, combine],
+                    });
+                }
+                for _ in 0..seg_steps {
+                    cur = step(&cur);
+                }
+                b_prev = b_next;
+            }
+        }
         steps.push(MintStep {
             label: "mint".into(),
-            calls: self.mint_loop_from_partial_paths(&canon_state, loop_length, recipient),
+            calls: self.mint_loop_from_partial_paths(canonical, loop_length, recipient),
         });
         let tx_count = steps.len() as u32;
         MintPlan { steps, tx_count, single_shot: false, too_long: tx_count > max_tx }
@@ -460,8 +564,8 @@ mod tests {
     fn mint_loop_is_approve_then_mint() {
         let addrs = deployments(Network::Sepolia).unwrap();
         let w = GolWrites::new(&addrs, 18);
-        let state = GridState::pack(&grid_with(&[(5, 0b1110)]));
-        let calls = w.mint_loop(&state, 2, Felt::from(0xabcu32));
+        let rows = grid_with(&[(5, 0b1110)]);
+        let calls = w.mint_loop(&rows, 2, Felt::from(0xabcu32));
         assert_eq!(calls.len(), 2);
         // call 0 = approve 2 NUT to the lifeforms contract
         assert_eq!(calls[0].to, addrs.nutrient);
@@ -469,14 +573,21 @@ mod tests {
         assert_eq!(calls[0].calldata[0], addrs.lifeforms);
         assert_eq!(calls[0].calldata[1], Felt::from(2u128 * 10u128.pow(18))); // low
         assert_eq!(calls[0].calldata[2], Felt::ZERO); // high
-        // call 1 = mint_loop on the loop minter: [w0..w6, loop_length, recipient]
+        // call 1 = v3 witness mint: [drawn w0..w6, loop_length, canonical w0..w6, d4, dr, dc, k, recipient]
         assert_eq!(calls[1].to, addrs.loop_minter);
         assert_eq!(calls[1].selector, selector("mint_loop"));
         let cd = &calls[1].calldata;
-        assert_eq!(cd.len(), 9);
-        assert_eq!(&cd[0..7], &state.to_calldata()[..]);
+        assert_eq!(cd.len(), 20);
+        assert_eq!(&cd[0..7], &GridState::pack(&rows).to_calldata()[..]);
         assert_eq!(cd[7], Felt::from(2u32));
-        assert_eq!(cd[8], Felt::from(0xabcu32));
+        // the canonical + witness must verify exactly as the contract does
+        let (canonical, d4, dr, dc, k) = crate::grid::loop_family_canonical(&rows, 2);
+        assert_eq!(&cd[8..15], &GridState::pack(&canonical).to_calldata()[..]);
+        assert_eq!(cd[15], Felt::from(d4));
+        assert_eq!(cd[16], Felt::from(dr as u32));
+        assert_eq!(cd[17], Felt::from(dc as u32));
+        assert_eq!(cd[18], Felt::from(k));
+        assert_eq!(cd[19], Felt::from(0xabcu32));
     }
 
     #[test]
@@ -540,18 +651,20 @@ mod tests {
         let addrs = deployments(Network::Sepolia).unwrap();
         let w = GolWrites::new(&addrs, 18);
         let state = GridState::pack(&grid_with(&[(5, 0b1110)]));
-        let calls = w.mint_loop_from_partial_paths(&state, 2, Felt::from(0xabcu32));
+        let calls = w.mint_loop_from_partial_paths(&grid_with(&[(5, 0b1110)]), 2, Felt::from(0xabcu32));
         assert_eq!(calls.len(), 2);
         // approve sequence_length(=2) NUT to lifeforms
         assert_eq!(calls[0].to, addrs.nutrient);
         assert_eq!(calls[0].calldata[0], addrs.lifeforms);
         assert_eq!(calls[0].calldata[1], Felt::from(2u128 * 10u128.pow(18)));
-        // mint: [loop_state(7), recipient] = 8 felts
+        // v3 mint: [anchor(7), canonical(7), d4, dr, dc, k, recipient] = 19 felts
         assert_eq!(calls[1].to, addrs.loop_minter);
         assert_eq!(calls[1].selector, selector("mint_loop_from_partial_paths"));
-        assert_eq!(calls[1].calldata.len(), 8);
+        assert_eq!(calls[1].calldata.len(), 19);
         assert_eq!(&calls[1].calldata[0..7], &state.to_calldata()[..]);
-        assert_eq!(calls[1].calldata[7], Felt::from(0xabcu32));
+        let (canonical, ..) = crate::grid::loop_family_canonical(&grid_with(&[(5, 0b1110)]), 2);
+        assert_eq!(&calls[1].calldata[7..14], &GridState::pack(&canonical).to_calldata()[..]);
+        assert_eq!(calls[1].calldata[18], Felt::from(0xabcu32));
     }
 
     #[test]
@@ -745,14 +858,15 @@ mod tests {
         let addrs = deployments(Network::Sepolia).unwrap();
         let w = GolWrites::new(&addrs, 18);
         let state = GridState::pack(&grid_with(&[(5, 0b1110)]));
-        let calls = w.mint_path_from_partial_paths(&state, 5, Felt::from(0xabcu32));
+        let calls = w.mint_path_from_partial_paths(&grid_with(&[(5, 0b1110)]), 5, Felt::from(0xabcu32));
         assert_eq!(calls.len(), 2);
         assert_eq!(calls[0].to, addrs.nutrient);
         assert_eq!(calls[0].calldata[1], Felt::from(5u128 * 10u128.pow(18))); // 5 NUT
+        // v3: [start(7), canonical(7), d4, dr, dc, recipient] = 18 felts
         assert_eq!(calls[1].to, addrs.path_minter);
         assert_eq!(calls[1].selector, selector("mint_path_from_partial_paths"));
-        assert_eq!(calls[1].calldata.len(), 8);
+        assert_eq!(calls[1].calldata.len(), 18);
         assert_eq!(&calls[1].calldata[0..7], &state.to_calldata()[..]);
-        assert_eq!(calls[1].calldata[7], Felt::from(0xabcu32));
+        assert_eq!(calls[1].calldata[17], Felt::from(0xabcu32));
     }
 }

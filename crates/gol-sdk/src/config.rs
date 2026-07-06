@@ -36,6 +36,10 @@ pub struct GolAddresses {
     /// (~82k), so a from-genesis scan on a mature chain is hundreds of empty round-trips. `0` = scan
     /// from genesis (unknown deploy block).
     pub deploy_block: u64,
+    /// The nutrient token's own deploy block — OLDER than `deploy_block` when NUT is reused across
+    /// collection versions (v3 reuses v2's NUT). Feed-reward scans start here so breathing history
+    /// survives collection upgrades.
+    pub nutrient_deploy_block: u64,
 }
 
 impl GolAddresses {
@@ -58,20 +62,22 @@ impl GolAddresses {
 /// optimized `GolBench` instance used for the SNIP-36 benchmark.
 pub fn deployments(net: Network) -> Option<GolAddresses> {
     match net {
-        // v2 deployment — a fresh collection (see docs/v2-deployment.md). The `lifeforms` class was
-        // later upgraded in place (token_uri gas fix); the address is unchanged.
+        // v3 deployment — the orbit-canonical identity collections (docs/v3-deployment.md,
+        // 2026-07-06): "Digital Bacteria"/BACT loops + "Digital Wanderers"/WNDR paths, witness-
+        // assisted minters. NUT is reused from v2. The superseded v2 addresses live in
+        // docs/v2-deployment.md if a reader ever needs the old collections.
         Network::Sepolia => Some(GolAddresses {
-            lifeforms: felt("0x040380471b403f52ac0ed6e674b391de268f83a8a1778d236bb7acc090c4e633"),
-            // Path creatures: separate NFT + its own minter (deployed 2026-07-01, docs/v2-deployment.md).
-            path_lifeforms: felt("0x0177545eec73206ea5313aa44482d02103824fca91801e32da106dbaad5e1fc"),
+            lifeforms: felt("0x001e8e1c75f960faebd6f24c4321aad2f76e54dce00d11d690cb58ff1666ceec"),
+            // Wanderers: the PATH-creature NFT (field name kept for API stability).
+            path_lifeforms: felt("0x00d43450e4cc02677b193f0a0f25daf1a85a1fcb1071d24674c1db485763042c"),
             nutrient: felt("0x060e0a0bd9aafec5fd0346e49eb4c5c47f9c7d6b7f26c705aaf21fd53a84e2c9"),
-            loop_minter: felt("0x0024564a234b1bd49aea38efbaf99a0c6d5dc1269fa7fc5ad86ef8f924ea030"),
-            // NEW path minter (targets path_lifeforms); supersedes the old 0x5a3c3aff… (minted into loops).
-            path_minter: felt("0x0749695d6919cb110760acd9f63b2c9bbfcc9747139a19602c39593995219e0a"),
-            // v2 has no benchmark contract; the SNIP-36 bench was a separate v1-era deploy.
+            loop_minter: felt("0x0351576a60a9f0423784e0bd2d5e4e630f4b21f49a0b55cf89045e8e1006f3ba"),
+            path_minter: felt("0x06d00789bc1808e41fe708aad5f76c978585f184f9a7931f7bb6300c52f23573"),
             bench: None,
-            // The v2 collection's first mint (the seeded blinker) landed at block 11_075_524.
-            deploy_block: 11_075_000,
+            // The v3 genesis seed landed at block 11_642_283.
+            deploy_block: 11_642_000,
+            // NUT is v2's token (first minted at block ~11_075_524) — feed history spans versions.
+            nutrient_deploy_block: 11_075_000,
         }),
         Network::Mainnet => None,
     }

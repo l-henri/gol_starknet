@@ -64,7 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Call-building (NOT sent — this is exactly what a wallet would sign + execute).
     let recipient =
         Felt::from_hex("0x26d87a881bc82eb038c4cc214fbccd16ea72b424b523a7b2b2551a2e495e70f").unwrap();
-    let calls = gol.writes().mint_loop(&GridState::pack(&blinker), 2, recipient);
+    let calls = gol.writes().mint_loop(&blinker, 2, recipient);
     println!("mint_loop call-building -> {} calls:", calls.len());
     for c in &calls {
         println!(

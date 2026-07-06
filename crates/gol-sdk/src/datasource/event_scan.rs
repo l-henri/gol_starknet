@@ -111,9 +111,12 @@ impl EventScanDataSource {
     pub async fn feed_rewards(&self) -> Result<Vec<(Felt, u64)>, GolError> {
         const MAX_FEED_NUT: u128 = 10_000; // whole NUT; anything larger = supply mint, not a feed
         const ONE_NUT: u128 = 1_000_000_000_000_000_000;
-        // ERC-20 Transfer: keys = [selector, from, to], data = [value.low, value.high]
+        // ERC-20 Transfer: keys = [selector, from, to], data = [value.low, value.high].
+        // NUT outlives collection versions — scan from ITS deploy block, not the collection's.
         let keys = vec![vec![selector("Transfer")], vec![Felt::ZERO], vec![]];
-        let events = self.scan_all(self.addresses.nutrient, keys).await?;
+        let events = self
+            .scan_all_from(self.addresses.nutrient, keys, self.addresses.nutrient_deploy_block)
+            .await?;
         let mut totals: Vec<(Felt, u64)> = Vec::new();
         for ev in &events {
             if ev.keys.len() < 3 || ev.data.is_empty() {
@@ -149,12 +152,21 @@ impl EventScanDataSource {
 
     /// Page through every matching event, following the continuation token.
     async fn scan_all(&self, address: Felt, keys: Vec<Vec<Felt>>) -> Result<Vec<RawEvent>, GolError> {
+        self.scan_all_from(address, keys, self.from_block).await
+    }
+
+    async fn scan_all_from(
+        &self,
+        address: Felt,
+        keys: Vec<Vec<Felt>>,
+        from_block: u64,
+    ) -> Result<Vec<RawEvent>, GolError> {
         let mut all = Vec::new();
         let mut continuation = None;
         loop {
             let (events, next) = self
                 .reader
-                .get_events(address, keys.clone(), self.from_block, 100, continuation)
+                .get_events(address, keys.clone(), from_block, 100, continuation)
                 .await?;
             all.extend(events);
             match next {

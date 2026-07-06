@@ -10,6 +10,10 @@ export class GolSdk {
      */
     breatheLifeCall(token_id: string, n: number): any;
     /**
+     * v3 feed-for: `move_lifeform_forward_n_for(token, n, beneficiary)` — the pet hook.
+     */
+    breatheLifeForCall(token_id_hex: string, n: number, beneficiary: string): any;
+    /**
      * The permissionless path `challenge_burn(older_id, younger_id, d4, dr, dc)` call — burns a
      * proven forward sub-path OR symmetry copy and pays its escrow to the caller. `(0,0,0)` is
      * the plain sub-path witness; get a symmetry witness from `findWitness`.
@@ -28,6 +32,12 @@ export class GolSdk {
      */
     classifyFate(rows: Float64Array, max_steps: number): any;
     /**
+     * The v3 FAMILY token id for a drawn pattern — the id it would mint under (loops: pass the
+     * period; paths/wanderers: pass 0). Use to detect "this creature already lives" before the
+     * wallet ever opens: `lifeform(familyTokenId(...))` non-null ⇒ duplicate.
+     */
+    familyTokenId(rows: Float64Array, period: number): any;
+    /**
      * Discover the loop reachable from `rows` within `max_period`: `{ period, smallest }` (the
      * canonical state to mint) or `null` if it doesn't recur in range.
      */
@@ -44,8 +54,9 @@ export class GolSdk {
      */
     lifeform(token_id: string): Promise<any>;
     /**
-     * `[approve, mint_loop]` calls for the wallet to sign + send. `rows` is the loop's canonical
-     * (smallest) state as 41 row bitmasks.
+     * `[approve, mint_loop]` calls for the wallet to sign + send. v3: `rows` may be ANY state of
+     * the loop (the drawn orientation is preserved for display); the orbit canonical + witness
+     * are computed here and ride in the calldata.
      */
     mintLoopCalls(rows: Float64Array, loop_length: number, recipient: string): any;
     /**
@@ -83,6 +94,15 @@ export class GolSdk {
      * ones need tiling (not yet built) and come back `tooLong`. Same shape as `planLoopMint`.
      */
     planPathMint(rows: Float64Array, sequence_length: number, loop_period: number, recipient: string, chunk_steps: number, single_shot_max: number, max_tx: number): any;
+    /**
+     * v3 `prove_malformed` call for a LOOP (witness `(d4, dr, dc, k)` exhibits a smaller family
+     * member; bounty = the token's escrow).
+     */
+    proveMalformedLoopCall(token_id_hex: string, d4: number, dr: number, dc: number, k: number): any;
+    /**
+     * v3 `prove_malformed` call for a WANDERER (no phase).
+     */
+    proveMalformedWandererCall(token_id_hex: string, d4: number, dr: number, dc: number): any;
     /**
      * Every minted lifeform (newest first), capped at `limit` (0 = unlimited), via the RPC event
      * scan. The global gallery feed on Sepolia. Each is confirmed live (current owner + state).
@@ -153,9 +173,11 @@ export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_golsdk_free: (a: number, b: number) => void;
     readonly golsdk_breatheLifeCall: (a: number, b: number, c: number, d: number) => [number, number, number];
+    readonly golsdk_breatheLifeForCall: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
     readonly golsdk_challengeBurnCall: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number];
     readonly golsdk_challengeBurnLoopCall: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => [number, number, number];
     readonly golsdk_classifyFate: (a: number, b: number, c: number, d: number) => [number, number, number];
+    readonly golsdk_familyTokenId: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly golsdk_findLoop: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly golsdk_findWitness: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
     readonly golsdk_gridSize: (a: number) => any;
@@ -168,6 +190,8 @@ export interface InitOutput {
     readonly golsdk_pathRenderParams: (a: number, b: number, c: number) => any;
     readonly golsdk_planLoopMint: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number, number];
     readonly golsdk_planPathMint: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => [number, number, number];
+    readonly golsdk_proveMalformedLoopCall: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number];
+    readonly golsdk_proveMalformedWandererCall: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
     readonly golsdk_recentLifeforms: (a: number, b: number) => any;
     readonly golsdk_recentMints: (a: number) => any;
     readonly golsdk_recentPathMints: (a: number) => any;

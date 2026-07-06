@@ -28,6 +28,24 @@ export class GolSdk {
         return takeFromExternrefTable0(ret[0]);
     }
     /**
+     * v3 feed-for: `move_lifeform_forward_n_for(token, n, beneficiary)` — the pet hook.
+     * @param {string} token_id_hex
+     * @param {number} n
+     * @param {string} beneficiary
+     * @returns {any}
+     */
+    breatheLifeForCall(token_id_hex, n, beneficiary) {
+        const ptr0 = passStringToWasm0(token_id_hex, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(beneficiary, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.golsdk_breatheLifeForCall(this.__wbg_ptr, ptr0, len0, n, ptr1, len1);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
      * The permissionless path `challenge_burn(older_id, younger_id, d4, dr, dc)` call — burns a
      * proven forward sub-path OR symmetry copy and pays its escrow to the caller. `(0,0,0)` is
      * the plain sub-path witness; get a symmetry witness from `findWitness`.
@@ -93,6 +111,23 @@ export class GolSdk {
         return takeFromExternrefTable0(ret[0]);
     }
     /**
+     * The v3 FAMILY token id for a drawn pattern — the id it would mint under (loops: pass the
+     * period; paths/wanderers: pass 0). Use to detect "this creature already lives" before the
+     * wallet ever opens: `lifeform(familyTokenId(...))` non-null ⇒ duplicate.
+     * @param {Float64Array} rows
+     * @param {number} period
+     * @returns {any}
+     */
+    familyTokenId(rows, period) {
+        const ptr0 = passArrayF64ToWasm0(rows, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.golsdk_familyTokenId(this.__wbg_ptr, ptr0, len0, period);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
      * Discover the loop reachable from `rows` within `max_period`: `{ period, smallest }` (the
      * canonical state to mint) or `null` if it doesn't recur in range.
      * @param {Float64Array} rows
@@ -147,8 +182,9 @@ export class GolSdk {
         return ret;
     }
     /**
-     * `[approve, mint_loop]` calls for the wallet to sign + send. `rows` is the loop's canonical
-     * (smallest) state as 41 row bitmasks.
+     * `[approve, mint_loop]` calls for the wallet to sign + send. v3: `rows` may be ANY state of
+     * the loop (the drawn orientation is preserved for display); the orbit canonical + witness
+     * are computed here and ride in the calldata.
      * @param {Float64Array} rows
      * @param {number} loop_length
      * @param {string} recipient
@@ -272,6 +308,42 @@ export class GolSdk {
         const ptr1 = passStringToWasm0(recipient, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len1 = WASM_VECTOR_LEN;
         const ret = wasm.golsdk_planPathMint(this.__wbg_ptr, ptr0, len0, sequence_length, loop_period, ptr1, len1, chunk_steps, single_shot_max, max_tx);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
+     * v3 `prove_malformed` call for a LOOP (witness `(d4, dr, dc, k)` exhibits a smaller family
+     * member; bounty = the token's escrow).
+     * @param {string} token_id_hex
+     * @param {number} d4
+     * @param {number} dr
+     * @param {number} dc
+     * @param {number} k
+     * @returns {any}
+     */
+    proveMalformedLoopCall(token_id_hex, d4, dr, dc, k) {
+        const ptr0 = passStringToWasm0(token_id_hex, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.golsdk_proveMalformedLoopCall(this.__wbg_ptr, ptr0, len0, d4, dr, dc, k);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
+     * v3 `prove_malformed` call for a WANDERER (no phase).
+     * @param {string} token_id_hex
+     * @param {number} d4
+     * @param {number} dr
+     * @param {number} dc
+     * @returns {any}
+     */
+    proveMalformedWandererCall(token_id_hex, d4, dr, dc) {
+        const ptr0 = passStringToWasm0(token_id_hex, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.golsdk_proveMalformedWandererCall(this.__wbg_ptr, ptr0, len0, d4, dr, dc);
         if (ret[2]) {
             throw takeFromExternrefTable0(ret[1]);
         }
@@ -722,12 +794,12 @@ function __wbg_get_imports() {
             return ret;
         },
         __wbindgen_cast_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 271, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 270, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__h74bcc3753d680b42);
             return ret;
         },
         __wbindgen_cast_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [], shim_idx: 243, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [], shim_idx: 242, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__hc0e1ada004448962);
             return ret;
         },

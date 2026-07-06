@@ -69,7 +69,7 @@ fn main() {
         assert!(!existing.contains(&tid), "{name} ({tid}) already minted");
         assert!(seen.insert(tid.clone()), "{name} ({tid}) duplicate in batch");
 
-        let calls = w.mint_loop(&GridState::pack(&smallest), period, agent);
+        let calls = w.mint_loop(&smallest, period, agent);
         mints.push(json!({
             "name": name,
             "token_id": tid,

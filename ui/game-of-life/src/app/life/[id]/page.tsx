@@ -532,7 +532,7 @@ function BeastDetail() {
       setInfo({ kind: "toolarge" });
       return;
     }
-    const tokenId = sdk.tokenIdForRows(new Float64Array(loop.smallest)) as string;
+    const tokenId = sdk.familyTokenId(new Float64Array(loop.smallest), loop.period) as string;
     sdk.lifeform(tokenId).then((lf) => {
       if (!cancelled) setInfo({ kind: "ready", period: loop.period, smallest: loop.smallest, tokenId, minted: !!lf });
     });
