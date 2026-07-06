@@ -180,13 +180,46 @@ impl<'a> GolWrites<'a> {
         }
     }
 
-    /// `path_lifeforms.challenge_burn(older_id, younger_id)` — permissionless anti-farm: burns a
-    /// proven forward sub-path (`younger`) of an older path and pays its escrow to the caller.
-    pub fn challenge_burn(&self, older_id: U256, younger_id: U256) -> Call {
+    /// `path_lifeforms.challenge_burn(older_id, younger_id, d4, dr, dc)` — permissionless
+    /// anti-farm/anti-copy: burns `younger` iff it is a forward sub-path OR symmetry copy of the
+    /// strictly older `older` (witness `(d4, dr, dc)`; `(0,0,0)` = the plain sub-path rule; the
+    /// step offset is implied by the length gap). Pays `younger`'s escrow to the caller.
+    pub fn challenge_burn(&self, older_id: U256, younger_id: U256, d4: u8, dr: u8, dc: u8) -> Call {
         let mut calldata = older_id.to_calldata().to_vec();
         calldata.extend_from_slice(&younger_id.to_calldata());
+        calldata.push(Felt::from(d4));
+        calldata.push(Felt::from(dr));
+        calldata.push(Felt::from(dc));
         Call {
             to: self.addresses.path_lifeforms,
+            selector: selector("challenge_burn"),
+            calldata,
+        }
+    }
+
+    /// `lifeforms.challenge_burn(a_id, b_id, a_state, d4, dr, dc, k)` — the LOOP-side anti-copy
+    /// burn: `a_state` is A's canonical preimage (checked on-chain against A's token id), `k` the
+    /// phase within A's cycle. Bounty = B's sequence_length NUT, freshly minted to the caller.
+    #[allow(clippy::too_many_arguments)]
+    pub fn challenge_burn_loop(
+        &self,
+        a_id: U256,
+        b_id: U256,
+        a_state: &GridState,
+        d4: u8,
+        dr: u8,
+        dc: u8,
+        k: u32,
+    ) -> Call {
+        let mut calldata = a_id.to_calldata().to_vec();
+        calldata.extend_from_slice(&b_id.to_calldata());
+        calldata.extend_from_slice(&a_state.to_calldata());
+        calldata.push(Felt::from(d4));
+        calldata.push(Felt::from(dr));
+        calldata.push(Felt::from(dc));
+        calldata.push(Felt::from(k));
+        Call {
+            to: self.addresses.lifeforms,
             selector: selector("challenge_burn"),
             calldata,
         }
@@ -674,11 +707,37 @@ mod tests {
     fn challenge_burn_calldata() {
         let addrs = deployments(Network::Sepolia).unwrap();
         let w = GolWrites::new(&addrs, 18);
-        let call = w.challenge_burn(U256::from_u128(0xa), U256::from_u128(0xb));
+        let call = w.challenge_burn(U256::from_u128(0xa), U256::from_u128(0xb), 1, 2, 3);
         assert_eq!(call.to, addrs.path_lifeforms);
         assert_eq!(call.selector, selector("challenge_burn"));
-        // [older.lo, older.hi, younger.lo, younger.hi]
-        assert_eq!(call.calldata, vec![Felt::from(0xau32), Felt::ZERO, Felt::from(0xbu32), Felt::ZERO]);
+        // [older.lo, older.hi, younger.lo, younger.hi, d4, dr, dc]
+        assert_eq!(
+            call.calldata,
+            vec![
+                Felt::from(0xau32),
+                Felt::ZERO,
+                Felt::from(0xbu32),
+                Felt::ZERO,
+                Felt::ONE,
+                Felt::from(2u32),
+                Felt::from(3u32),
+            ]
+        );
+    }
+
+    #[test]
+    fn challenge_burn_loop_calldata() {
+        let addrs = deployments(Network::Sepolia).unwrap();
+        let w = GolWrites::new(&addrs, 18);
+        let a_state = GridState::pack(&grid_with(&[(5, 0b1110)]));
+        let call =
+            w.challenge_burn_loop(U256::from_u128(0xa), U256::from_u128(0xb), &a_state, 0, 1, 0, 1);
+        assert_eq!(call.to, addrs.lifeforms);
+        assert_eq!(call.selector, selector("challenge_burn"));
+        // [a.lo, a.hi, b.lo, b.hi, w0..w6, d4, dr, dc, k] = 4 + 7 + 4
+        assert_eq!(call.calldata.len(), 15);
+        assert_eq!(&call.calldata[4..11], &a_state.to_calldata()[..]);
+        assert_eq!(call.calldata[14], Felt::ONE); // k
     }
 
     #[test]

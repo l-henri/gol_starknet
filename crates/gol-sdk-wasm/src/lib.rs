@@ -8,11 +8,19 @@
 //! Build: `wasm-pack build crates/gol-sdk-wasm --target web`.
 
 use gol_sdk::{
-    engine, felt_to_hex, step, token_id, Call, DataSource, EventScanDataSource, Felt, GolClient,
-    GolConfig, GridState, Network, OwnedLifeform, OwnedPath, RenderParams, Rows, MASK, N, U256,
+    engine, felt_to_hex, grid, step, token_id, Call, DataSource, EventScanDataSource, Felt,
+    GolClient, GolConfig, GridState, Network, OwnedLifeform, OwnedPath, RenderParams, Rows, MASK,
+    N, U256,
 };
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
+
+/// A mint event: token id + the block it landed in (recency key for windowed boards).
+#[derive(Serialize)]
+struct JsMint {
+    token_id: String,
+    block: u64,
+}
 
 /// JS-friendly lifeform (hex strings for felt/u256; small counts as numbers).
 #[derive(Serialize)]
@@ -195,6 +203,52 @@ impl GolSdk {
         to_js(&hex)
     }
 
+    /// Loop mints with their block numbers, newest first: `[{ token_id, block }]` — the recency
+    /// source for time-windowed leaderboards ("discovery of the week").
+    #[wasm_bindgen(js_name = recentMints)]
+    pub async fn recent_mints(&self) -> Result<JsValue, JsValue> {
+        let ds = EventScanDataSource::new(
+            self.client.config.rpc_url.clone(),
+            self.client.config.addresses.clone(),
+        );
+        let mints = ds.recent_mints_with_blocks().await.map_err(err)?;
+        to_js(&mints.iter().map(|(t, b)| JsMint { token_id: t.to_hex(), block: *b }).collect::<Vec<_>>())
+    }
+
+    /// Path mints with their block numbers, newest first (burned paths still listed — hydrate to
+    /// filter): `[{ token_id, block }]`.
+    #[wasm_bindgen(js_name = recentPathMints)]
+    pub async fn recent_path_mints(&self) -> Result<JsValue, JsValue> {
+        let ds = EventScanDataSource::new(
+            self.client.config.rpc_url.clone(),
+            self.client.config.addresses.clone(),
+        );
+        let mints = ds.recent_path_mints_with_blocks().await.map_err(err)?;
+        to_js(&mints.iter().map(|(t, b)| JsMint { token_id: t.to_hex(), block: *b }).collect::<Vec<_>>())
+    }
+
+    /// Total generations breathed per account, descending: `[{ address, generations }]` — the
+    /// "top breathers" board (NUT faucet mints aggregated; the initial-supply mint excluded).
+    #[wasm_bindgen(js_name = topBreathers)]
+    pub async fn top_breathers(&self) -> Result<JsValue, JsValue> {
+        let ds = EventScanDataSource::new(
+            self.client.config.rpc_url.clone(),
+            self.client.config.addresses.clone(),
+        );
+        let totals = ds.feed_rewards().await.map_err(err)?;
+        #[derive(Serialize)]
+        struct JsBreather {
+            address: String,
+            generations: u64,
+        }
+        to_js(
+            &totals
+                .iter()
+                .map(|(a, g)| JsBreather { address: felt_to_hex(a), generations: *g })
+                .collect::<Vec<_>>(),
+        )
+    }
+
     /// `[approve, mint_loop]` calls for the wallet to sign + send. `rows` is the loop's canonical
     /// (smallest) state as 41 row bitmasks.
     #[wasm_bindgen(js_name = mintLoopCalls)]
@@ -286,6 +340,47 @@ impl GolSdk {
     pub fn step_rows(&self, rows: Vec<f64>) -> Result<JsValue, JsValue> {
         let next = step(&rows_from_js(rows)?);
         to_js(&rows_to_js(&next))
+    }
+
+    /// Lexicographically smallest grid in the full 13,448-element symmetry orbit —
+    /// `{ canonical: rows, d4, dr, dc }`. Two grids are symmetry copies iff their orbit canonicals
+    /// match: the copy-detection key for mint warnings and indexer dedup.
+    #[wasm_bindgen(js_name = symmetryCanonical)]
+    pub fn symmetry_canonical_js(&self, rows: Vec<f64>) -> Result<JsValue, JsValue> {
+        let (canonical, d4, dr, dc) = grid::symmetry_canonical(&rows_from_js(rows)?);
+        #[derive(Serialize)]
+        struct Orbit {
+            canonical: Vec<f64>,
+            d4: u8,
+            dr: u32,
+            dc: u32,
+        }
+        to_js(&Orbit { canonical: rows_to_js(&canonical), d4, dr: dr as u32, dc: dc as u32 })
+    }
+
+    /// Search for a challenge witness relating two start states:
+    /// `{ d4, dr, dc, k }` with `apply_symmetry(g, step^k(a)) == b`, or `null`. For paths pass
+    /// `max_k` = the sequence-length gap; for loops `max_k` = period − 1.
+    #[wasm_bindgen(js_name = findWitness)]
+    pub fn find_witness_js(
+        &self,
+        a_rows: Vec<f64>,
+        b_rows: Vec<f64>,
+        max_k: u32,
+    ) -> Result<JsValue, JsValue> {
+        match grid::find_witness(&rows_from_js(a_rows)?, &rows_from_js(b_rows)?, max_k) {
+            Some((d4, dr, dc, k)) => {
+                #[derive(Serialize)]
+                struct Witness {
+                    d4: u8,
+                    dr: u32,
+                    dc: u32,
+                    k: u32,
+                }
+                to_js(&Witness { d4, dr: dr as u32, dc: dc as u32, k })
+            }
+            None => Ok(JsValue::NULL),
+        }
     }
 
     /// Discover the loop reachable from `rows` within `max_period`: `{ period, smallest }` (the
@@ -388,14 +483,49 @@ impl GolSdk {
         calls_to_js(&[("set_render_params", &call)])
     }
 
-    /// The permissionless `challenge_burn(older_id, younger_id)` call — burns a proven forward
-    /// sub-path and pays its escrow to the caller.
+    /// The permissionless path `challenge_burn(older_id, younger_id, d4, dr, dc)` call — burns a
+    /// proven forward sub-path OR symmetry copy and pays its escrow to the caller. `(0,0,0)` is
+    /// the plain sub-path witness; get a symmetry witness from `findWitness`.
     #[wasm_bindgen(js_name = challengeBurnCall)]
-    pub fn challenge_burn_call(&self, older_id: &str, younger_id: &str) -> Result<JsValue, JsValue> {
+    pub fn challenge_burn_call(
+        &self,
+        older_id: &str,
+        younger_id: &str,
+        d4: u8,
+        dr: u8,
+        dc: u8,
+    ) -> Result<JsValue, JsValue> {
         let call = self
             .client
             .writes()
-            .challenge_burn(parse_u256(older_id)?, parse_u256(younger_id)?);
+            .challenge_burn(parse_u256(older_id)?, parse_u256(younger_id)?, d4, dr, dc);
+        calls_to_js(&[("challenge_burn", &call)])
+    }
+
+    /// The LOOP-side `challenge_burn(a_id, b_id, a_state, d4, dr, dc, k)` call. `a_rows` is A's
+    /// canonical state (checked on-chain against its token id); `k` the phase within A's cycle.
+    #[wasm_bindgen(js_name = challengeBurnLoopCall)]
+    #[allow(clippy::too_many_arguments)]
+    pub fn challenge_burn_loop_call(
+        &self,
+        a_id: &str,
+        b_id: &str,
+        a_rows: Vec<f64>,
+        d4: u8,
+        dr: u8,
+        dc: u8,
+        k: u32,
+    ) -> Result<JsValue, JsValue> {
+        let a_state = GridState::pack(&rows_from_js(a_rows)?);
+        let call = self.client.writes().challenge_burn_loop(
+            parse_u256(a_id)?,
+            parse_u256(b_id)?,
+            &a_state,
+            d4,
+            dr,
+            dc,
+            k,
+        );
         calls_to_js(&[("challenge_burn", &call)])
     }
 

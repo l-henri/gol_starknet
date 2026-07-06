@@ -73,6 +73,66 @@ impl EventScanDataSource {
         Ok(ids)
     }
 
+    /// Loop-lifeform mints with their block numbers, most-recent first: `(token_id, block_number)`.
+    /// The block number is the recency key for time-windowed boards ("discovery of the week").
+    pub async fn recent_mints_with_blocks(&self) -> Result<Vec<(U256, u64)>, GolError> {
+        self.mints_with_blocks(self.addresses.lifeforms).await
+    }
+
+    /// Path-creature mints with their block numbers, most-recent first. Burned paths still appear.
+    pub async fn recent_path_mints_with_blocks(&self) -> Result<Vec<(U256, u64)>, GolError> {
+        self.mints_with_blocks(self.addresses.path_lifeforms).await
+    }
+
+    async fn mints_with_blocks(&self, contract: Felt) -> Result<Vec<(U256, u64)>, GolError> {
+        let keys = vec![vec![selector("Transfer")], vec![Felt::ZERO], vec![]];
+        let events = self.scan_all(contract, keys).await?;
+        let mut seen = Vec::new();
+        let mut out: Vec<(U256, u64)> = Vec::new();
+        for ev in &events {
+            if ev.keys.len() >= 5 {
+                let tid = U256::from_felts(&ev.keys[3], &ev.keys[4]);
+                if !seen.contains(&tid) {
+                    seen.push(tid);
+                    out.push((tid, ev.block_number));
+                }
+            }
+        }
+        out.reverse(); // getEvents returns ascending; newest mint first
+        Ok(out)
+    }
+
+    /// Total generations breathed per account, sorted descending — the "top breathers" board.
+    ///
+    /// Feed rewards are NUT mints (ERC-20 `Transfer` from the zero address on the nutrient token,
+    /// 1 NUT per generation). The constructor's initial-supply mint is excluded by a size guard:
+    /// no feed can mint anywhere near `MAX_FEED_NUT` in one event (the per-tx gas cap tops out at
+    /// a few hundred generations), while the initial supply is 1,000,000 NUT.
+    pub async fn feed_rewards(&self) -> Result<Vec<(Felt, u64)>, GolError> {
+        const MAX_FEED_NUT: u128 = 10_000; // whole NUT; anything larger = supply mint, not a feed
+        const ONE_NUT: u128 = 1_000_000_000_000_000_000;
+        // ERC-20 Transfer: keys = [selector, from, to], data = [value.low, value.high]
+        let keys = vec![vec![selector("Transfer")], vec![Felt::ZERO], vec![]];
+        let events = self.scan_all(self.addresses.nutrient, keys).await?;
+        let mut totals: Vec<(Felt, u64)> = Vec::new();
+        for ev in &events {
+            if ev.keys.len() < 3 || ev.data.is_empty() {
+                continue;
+            }
+            let to = ev.keys[2];
+            let nut = felt_to_u128(&ev.data[0]) / ONE_NUT; // rewards are < 2^128 wei; high felt ignored
+            if nut == 0 || nut >= MAX_FEED_NUT {
+                continue;
+            }
+            match totals.iter_mut().find(|(a, _)| *a == to) {
+                Some((_, sum)) => *sum += nut as u64,
+                None => totals.push((to, nut as u64)),
+            }
+        }
+        totals.sort_by(|a, b| b.1.cmp(&a.1));
+        Ok(totals)
+    }
+
     /// Every minted lifeform, most-recent first, each confirmed live via the RPC reader (owner/state
     /// current even after later transfers). Convenience over [`Self::recent_token_ids`] + hydration.
     pub async fn recent_lifeforms(&self, limit: u32) -> Result<Vec<OwnedLifeform>, GolError> {
