@@ -63,6 +63,7 @@
 
 ## Branch note
 
-`main` is the trunk (modern toolchain). v2 contracts, SDK, and the current frontend live on
-long-running local branches (`experiment/frontend-redesign` is active); consolidation into `main`
-is overdue and should follow the symmetry-spec implementation.
+**Consolidated 2026-07-06:** `main` is the single trunk — `experiment/frontend-redesign` fully
+merged (contracts, SDK, frontend, docs; post-merge green: 81 Cairo + 42 SDK tests, `next build`).
+`backup/experiment` is an archive. **Nothing pushed** — pushing `main`/branches (and any Vercel
+implications) is Henri's call. LOG backfilled for the 2026-06-17→07-02 gap.

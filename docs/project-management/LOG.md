@@ -58,9 +58,19 @@
   unanswered (AFK) — sequencing (consolidate→v3→pets), naming (drop version markers), genesis to
   original owners, ride-alongs (feeder-in-event + `feed_for`) are **PROVISIONAL in spec §3**.
   Supersedes-notes added to symmetry-challenge-spec.md and v2-grid-redesign.md §5.
-- **Next:** Henri confirms spec §3 → consolidation (#2) → v3 build → pets on v3. Also: eyeball
-  /leaderboards in dev; decide v2 cleanup #3 (moot if v2 is superseded soon).
-- **Blockers:** §3 confirmation.
+- **Same day — v3 spec APPROVED in full + repo consolidated.** Henri settled §3: sequencing
+  consolidate→v3→pets; genesis reseed deferred ("don't yet"); paths renamed **"Digital Wanderers"
+  / `WNDR`** (his pick over Comets/Spores); ride-alongs = both (feeder-in-event + `feed_for`).
+  Consolidation executed: session work committed in four logical commits (contracts / SDK / UI /
+  docs), **`experiment/frontend-redesign` merged into `main`** (its three stray cherry-picked
+  commits were content duplicates; resolved preferring the branch) — `main` is now the single
+  trunk, verified green post-merge (81 Cairo + 42 SDK tests, `next build`). Not pushed — remotes
+  and Vercel wiring are Henri's call. **This log backfilled** for 2026-06-17→07-02 (see notice
+  below). Stray untracked `docs/starknet-metering-census.pdf` left for Henri to place.
+- **Next:** build v3 (contracts per v3-identity-spec.md, incl. both ride-alongs) → deploy fresh
+  collections → pets on v3. Also: eyeball /leaderboards in dev; v2 cleanup #3 now moot (v2
+  superseded by v3 shortly).
+- **Blockers:** none.
 
 ## 2026-07-03 — First-principles review; symmetry-burn + leaderboard docs; doc discipline restored
 - **Goal:** review the project's reasoning trajectory against the original ask (docs, not code),
@@ -154,6 +164,59 @@
 - **Blockers:** none.
 
 ---
+
+> **Backfill notice (written 2026-07-06):** the entries from 2026-06-17/18 through 2026-07-02 below
+> were reconstructed after the fact from git history and the topic docs — the log had lapsed during
+> that stretch (see the 07-03 entry). Details live in the linked docs; these entries restore the
+> narrative, not the full session-level detail.
+
+## 2026-07-02 (backfilled) — Path creatures shipped: contracts, SDK, frontend, Sepolia
+- **Goal:** mint transients-into-a-loop as their own collection with anti-farm burning.
+- **Commits:** ddb14d0 · **Docs:** [path-creatures-spec.md](../path-creatures-spec.md), [v2-deployment.md](../v2-deployment.md)
+- **Changed:** interview-derived spec (identity = hash(start), alive/frozen/dead, escrowed mint,
+  timestamp-guarded `challenge_burn`); new `GolPathLifeformsV2` + repointed minter; SDK readers/
+  planners; `/create` path spawn + `/life` path view. **Deployed 2026-07-01** and live-tested
+  (frozen L-tromino mint; a challenge-burn paying its 1-NUT bounty).
+
+## 2026-06-30 (backfilled) — Sierra-gas metering root cause; per-wallet caps; Vercel build
+- **Goal:** explain the ~5× per-account feed-cost discrepancy.
+- **Commits:** 42fe8de, 5ee14a9, e89e181 · **Doc:** [sierra-gas-metering-discrepancy.md](../sierra-gas-metering-discrepancy.md)
+- **Found & source-confirmed:** the sender account class's **Sierra version selects the metering
+  mode** (≥1.7.0 → Sierra-gas; older → legacy Cairo-steps, ~5.2× for compute), inherited down the
+  call stack (sticky downgrade, confirmed in blockifier source). Shipped per-wallet tier detection
+  + gas caps (`gasCaps.ts`), the self-contained Vercel build, and the incubator page.
+
+## 2026-06-29 (backfilled) — Real gas measured; partial-paths mint UX spec
+- **Goal:** stop the silent feed/mint reverts with measured numbers.
+- **Commits:** 514236a · **Doc:** [partial-paths-mint-ux.md](../partial-paths-mint-ux.md)
+- **Measured (receipts, not estimateFee):** 2.7–13.9M gas/gen state-dependent; `estimateFee` 4.7×
+  under on active creatures → FEED_CAP=82, CHUNK≈60, ≤8-tx mint ceiling, preconfirmed waits,
+  incubator + bookmarks spec'd. Frontend docs rewritten for the as-built app.
+
+## 2026-06-24→26 (backfilled) — v2 frontend built out; the register shifts to high scores
+- **Commits:** 47c1abf, d8a005d, af4c9cd, ba9cd4f, b0a4968, 6edd875, 4af50b9, f90727c, b4471da
+- **Changed:** gallery wired to live v2; faithful local on-chain render + progressive loading;
+  batch feed (`move_lifeform_forward_n`, contracts + SDK — later cherry-picked to main as
+  b652d45/07b357a/5a2fa02, causing the divergence resolved in today's merge); `/create` became the
+  slot-machine score + full FR/EN; the "waiting to be discovered" bestiary section removed.
+- **Decision (recorded belatedly):** the register change away from the signed-off contemplative
+  design was **user-research-driven** — the project's most engaged user (8, hunts high scores).
+
+## 2026-06-22 (backfilled) — v2 LIVE on Sepolia; token_uri fixed in place
+- **Doc:** [v2-deployment.md](../v2-deployment.md)
+- Fresh v2 collection deployed via strkd (NUT, lifeforms, both minters, wiring, seeded blinker).
+  `token_uri` Out-of-gas fixed same day: 3.3× render-gas cut + raw-JSON URI, in-place upgrade.
+
+## 2026-06-19 (backfilled) — v2 grid implemented (41×41 bitboard); branch reorg
+- **Commits:** 132e832, 9f6a1b3 (frontend experiment starts) · **Doc:** [v2-grid-redesign.md](../v2-grid-redesign.md)
+- 41×41 / 7-felt `GridState`, SWAR bitboard stepper (~2.6M gas/gen — ~250× naive), Poseidon ids,
+  Art-Blocks-style `animation_url` renderer; deep cairo-auditor pass (P0 refuted with a PoC).
+  Repo reorg: `main` fast-forwarded to the perf line (hdp removed); redesign parked experimental.
+
+## 2026-06-17/18 (backfilled) — Rust SDK: plan, decisions, crates, live-verified reads
+- **Docs:** [sdk-plan.md](../sdk-plan.md), [sdk-decisions.md](../sdk-decisions.md)
+- One Rust crate (`gol-sdk`) + WASM bindings; three trait seams; lean hand-rolled JSON-RPC instead
+  of starknet-rs+cainome (divergences logged); reads verified against the live deployment.
 
 ## 2026-06-17 (resolved) — The "declare blocker" was a stale starknet.js hasher, not a toolchain gate
 - **Goal:** find the Cairo/scarb version matching the network's CASM (per the entry below).
