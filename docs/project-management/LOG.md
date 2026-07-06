@@ -18,6 +18,21 @@
 
 ---
 
+## 2026-07-06 (late) — GolPetBonds built + tested; deploy queued on strkd unlock
+- **Goal:** the pet/caretaker layer per pet-mechanism-spec.md, against v3 ("go do the pet contracts").
+- **Branch:** `main` · **Commits:** f7888af · pushed
+- **Changed:** `src/gol_pet_bonds.cairo` (ERC-1155 caretaker bonds; pet = one ceremonial feed via
+  `move_lifeform_forward_n_for` with NUT to the petter; 7-day lapse; permissionless reaper minted
+  1 NUT from nothing; daycare `transfer_bond` with the clock riding along — invariants in the
+  ERC-1155 hook so raw transfers obey them too; orphaned bonds age out naturally) +
+  `IGolPetBonds` + 8 integration tests.
+- **Verified:** full suite **99 Cairo tests green** (91 + 8). ⚠️ Sepolia deploy NOT done — strkd
+  auto-locked; `petsdeploy.mjs` (scratchpad) is idempotent and ready: declare, UDC deploy,
+  NUT MINTER_ROLE grant, live pet of the genesis blinker, verification reads.
+- **Next:** Henri unlocks strkd → run the deploy; then SDK/WASM pet bindings + the garden/pet UI
+  (loss-aversion clocks, reaper feed); leaderboard "caretakers" board once events flow.
+- **Blockers:** strkd locked (operator).
+
 ## 2026-07-06 (night) — First real v3 usage: two UX bugs found by Henri, fixed
 - **Goal:** Henri minted loops + a path on v3 (works), then hit: (1) long-wanderer multi-tx mints
   stall after 1-2 txs (/create AND incubator resume); (2) spawning one of two discoveries loses
