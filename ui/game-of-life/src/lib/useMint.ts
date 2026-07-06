@@ -23,18 +23,18 @@ type MintMeta = { rows: number[]; period: number; kind: CreatureKind; loopPeriod
 function humanize(e: unknown, t: (d: Dict) => string): string {
   const m = e instanceof Error ? e.message : String(e);
   if (/reject|abort|denied|cancel/i.test(m))
-    return t({ fr: "Vous avez refusé la signature.", en: "You declined the signature." });
+    return t({ fr: "Tu as refusé la signature.", en: "You declined the signature." });
   if (/max l2gas|out of gas|gas.*too low|exceeded the max|resource bounds/i.test(m))
     return t({
       fr: "Trop lourd pour cette étape : le portefeuille a sous-estimé le gas.",
       en: "This step is too heavy — the wallet under-estimated the gas.",
     });
   if (/insufficient|balance|funds|allowance/i.test(m))
-    return t({ fr: "Pas assez de gas Sepolia ou de NUT pour faire naître.", en: "Not enough Sepolia gas or NUT to mint." });
+    return t({ fr: "Pas assez de gas Sepolia ou de $NUT pour libérer.", en: "Not enough Sepolia gas or $NUT to set it free." });
   const msg = m.trim();
   if (!msg)
     return t({
-      fr: "Votre portefeuille n'a pas diffusé la transaction. Réessayez, ou utilisez un autre portefeuille Starknet (ArgentX, Braavos).",
+      fr: "Ton portefeuille n'a pas diffusé la transaction. Réessaie, ou utilise un autre portefeuille Starknet (ArgentX, Braavos).",
       en: "Your wallet didn't broadcast the transaction. Try again, or use another Starknet wallet (ArgentX, Braavos).",
     });
   return msg.length > 140 ? msg.slice(0, 137) + "…" : msg;
@@ -131,12 +131,12 @@ export function useMint() {
         setError(
           meta.kind === "path"
             ? t({
-                fr: `Ce chemin est trop long à faire naître pour l'instant (${plan.txCount} transactions, max ${MAX_TX}).`,
-                en: `This path is too long to mint right now (${plan.txCount} transactions, max ${MAX_TX}).`,
+                fr: `Cette vagabonde voyage trop loin pour l'instant (${plan.txCount} signatures, max ${MAX_TX}).`,
+                en: `This wanderer travels too far to set free right now (${plan.txCount} signatures, max ${MAX_TX}).`,
               })
             : t({
-                fr: `Cette boucle est trop longue à faire naître pour l'instant (${plan.txCount} transactions, max ${MAX_TX}).`,
-                en: `This loop is too long to mint right now (${plan.txCount} transactions, max ${MAX_TX}).`,
+                fr: `Cette boucle est trop longue à libérer pour l'instant (${plan.txCount} signatures, max ${MAX_TX}).`,
+                en: `This loop is too long to set free right now (${plan.txCount} signatures, max ${MAX_TX}).`,
               })
         );
         setStatus("error");

@@ -130,7 +130,7 @@ export default function IncubatorPage() {
   // Description for an entry: a path shows its distance-to-loop; a loop shows its period.
   const kindLabel = (e: { period: number; kind?: CreatureKind }) =>
     (e.kind ?? "loop") === "path"
-      ? t({ fr: `chemin · ${e.period} gén.`, en: `path · ${e.period} gens` })
+      ? t({ fr: `vagabonde · ${e.period} gén.`, en: `wanderer · ${e.period} gens` })
       : t({ fr: `boucle de période ${e.period}`, en: `period-${e.period} loop` });
 
   const stepLabel = (id: string) =>
@@ -144,11 +144,11 @@ export default function IncubatorPage() {
     affordable(period) ? null : (
       <p className="breathe-hint" style={{ marginTop: 2 }}>
         {t({
-          fr: `Pas assez de $NUT : il en faut ${period}, vous en avez ${nutDisplay}. `,
+          fr: `Pas assez de $NUT : il en faut ${period}, tu en as ${nutDisplay}. `,
           en: `Not enough $NUT: needs ${period}, you have ${nutDisplay}. `,
         })}
         <Link href="/" className="tx-link">
-          {t({ fr: "nourrissez des créatures pour en gagner →", en: "feed creatures to earn some →" })}
+          {t({ fr: "nourris des créatures pour en gagner →", en: "feed creatures to earn some →" })}
         </Link>
       </p>
     );
@@ -161,24 +161,24 @@ export default function IncubatorPage() {
       </div>
       <p className="dim" style={{ maxWidth: "54ch" }}>
         {t({
-          fr: "Vos naissances en cours et vos motifs gardés — stockés sur cet appareil.",
+          fr: "Tes naissances en cours et tes motifs gardés — rangés sur cet appareil.",
           en: "Your in-progress mints and saved patterns — kept on this device.",
         })}
       </p>
 
       {!address ? (
         <div className="callout" style={{ marginTop: 16 }}>
-          <button className="btn primary" onClick={connect}>{t({ fr: "Connectez-vous", en: "Connect wallet" })}</button>
+          <button className="btn primary" onClick={connect}>{t({ fr: "Connecte-toi", en: "Connect wallet" })}</button>
         </div>
       ) : !onSepolia ? (
         <div className="callout" style={{ marginTop: 16 }}>
-          <button className="btn primary" onClick={switchToSepolia}>{t({ fr: "Passez sur Sepolia", en: "Switch to Sepolia" })}</button>
+          <button className="btn primary" onClick={switchToSepolia}>{t({ fr: "Passe sur Sepolia", en: "Switch to Sepolia" })}</button>
         </div>
       ) : null}
 
       <h3 className="section-label" style={{ marginTop: 28 }}>{t({ fr: "Naissances en cours", en: "In-progress mints" })}</h3>
       {pending.length === 0 ? (
-        <p className="note">{t({ fr: "Aucune naissance en cours.", en: "Nothing in progress." })}</p>
+        <p className="note">{t({ fr: "Aucune naissance en cours.", en: "No births in progress." })}</p>
       ) : (
         <div className="garden-grid">
           {pending.map((p) => (
@@ -211,8 +211,8 @@ export default function IncubatorPage() {
               {activeId === p.id && stalled && status === "signing" && (
                 <button className="btn primary" onClick={continueMint}>
                   {t({
-                    fr: `Le portefeuille n'affiche rien ? Relancer l'étape${progress ? ` ${progress.current}/${progress.total}` : ""}`,
-                    en: `Wallet showing nothing? Re-request step${progress ? ` ${progress.current}/${progress.total}` : ""}`,
+                    fr: `Ton portefeuille s'est assoupi — frappe encore${progress ? ` ${progress.current}/${progress.total}` : ""}`,
+                    en: `Your wallet fell asleep — knock again${progress ? ` ${progress.current}/${progress.total}` : ""}`,
                   })}
                 </button>
               )}
@@ -222,9 +222,9 @@ export default function IncubatorPage() {
         </div>
       )}
 
-      <h3 className="section-label" style={{ marginTop: 28 }}>{t({ fr: "Gardées", en: "Bookmarks" })}</h3>
+      <h3 className="section-label" style={{ marginTop: 28 }}>{t({ fr: "Gardées", en: "Kept" })}</h3>
       {bookmarks.length === 0 ? (
-        <p className="note">{t({ fr: "Rien de gardé. Gardez un motif depuis Créer.", en: "Nothing saved. Bookmark a pattern from Create." })}</p>
+        <p className="note">{t({ fr: "Rien de gardé. Garde un motif depuis Créer.", en: "Nothing saved. Bookmark a pattern from Create." })}</p>
       ) : (
         <div className="garden-grid">
           {bookmarks.map((b) => (
@@ -244,7 +244,7 @@ export default function IncubatorPage() {
                 <>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <button className="btn primary" disabled={busy || !onSepolia || !affordable(b.period)} onClick={() => run(b)}>
-                      {stepLabel(b.id) ?? t({ fr: `Faire naître · ${b.period} NUT`, en: `Spawn · ${b.period} NUT` })}
+                      {stepLabel(b.id) ?? t({ fr: `Libérer · ${b.period} $NUT`, en: `Set free · ${b.period} $NUT` })}
                     </button>
                     <button className="btn" disabled={busy} onClick={() => { removeBookmark(b.id); refresh(); }}>
                       {t({ fr: "Retirer", en: "Remove" })}
@@ -256,8 +256,8 @@ export default function IncubatorPage() {
               {activeId === b.id && stalled && status === "signing" && (
                 <button className="btn primary" onClick={continueMint}>
                   {t({
-                    fr: `Le portefeuille n'affiche rien ? Relancer l'étape${progress ? ` ${progress.current}/${progress.total}` : ""}`,
-                    en: `Wallet showing nothing? Re-request step${progress ? ` ${progress.current}/${progress.total}` : ""}`,
+                    fr: `Ton portefeuille s'est assoupi — frappe encore${progress ? ` ${progress.current}/${progress.total}` : ""}`,
+                    en: `Your wallet fell asleep — knock again${progress ? ` ${progress.current}/${progress.total}` : ""}`,
                   })}
                 </button>
               )}

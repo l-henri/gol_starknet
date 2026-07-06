@@ -126,14 +126,14 @@ function SpawnButton({
     <button className="btn primary breathe-btn" onClick={onClick} disabled={busy}>
       {status === "signing"
         ? progress
-          ? t({ fr: `Confirmez l'étape ${progress.current}/${progress.total}…`, en: `Confirm step ${progress.current}/${progress.total}…` })
-          : t({ fr: "Confirmez dans votre portefeuille…", en: "Confirm in your wallet…" })
+          ? t({ fr: `Confirme l'étape ${progress.current}/${progress.total}…`, en: `Confirm step ${progress.current}/${progress.total}…` })
+          : t({ fr: "Confirme dans ton portefeuille…", en: "Confirm in your wallet…" })
         : status === "pending"
           ? progress
-            ? t({ fr: `Vérification… (${progress.current}/${progress.total})`, en: `Verifying… (${progress.current}/${progress.total})` })
-            : t({ fr: "Naissance… (tx en attente)", en: "Spawning… (tx pending)" })
+            ? t({ fr: `On prouve qu'elle vit… (${progress.current}/${progress.total})`, en: `Proving it lives… (${progress.current}/${progress.total})` })
+            : t({ fr: "Naissance… (la chaîne écrit)", en: "Being born… (the chain is writing)" })
           : status === "confirmed"
-            ? t({ fr: "✓ Née — on vous y emmène…", en: "✓ Spawned — taking you there…" })
+            ? t({ fr: "✓ Née — on t'y emmène…", en: "✓ Born — taking you there…" })
             : status === "error"
               ? t({ fr: "Réessayer", en: "Try again" })
               : idleLabel}
@@ -400,31 +400,31 @@ export default function CreatePage() {
     const bm = desc.tokenId ? isBookmarked(desc.tokenId) : false;
     const base =
       desc.kind === "path"
-        ? t({ fr: "Faire naître le chemin", en: "Spawn this path" })
-        : t({ fr: "Faire naître la boucle", en: "Spawn the loop" });
+        ? t({ fr: "Libérer la vagabonde", en: "Set the wanderer free" })
+        : t({ fr: "Libérer la boucle", en: "Set the loop free" });
     const idle = resume
-      ? t({ fr: `Reprendre (${resume.done}/${resume.total}) · ${desc.nut} NUT`, en: `Resume (${resume.done}/${resume.total}) · ${desc.nut} NUT` })
+      ? t({ fr: `Reprendre (${resume.done}/${resume.total}) · ${desc.nut} $NUT`, en: `Resume (${resume.done}/${resume.total}) · ${desc.nut} $NUT` })
       : desc.tx > 1
-        ? t({ fr: `${base} · ${desc.nut} NUT · ${desc.tx} tx`, en: `${base} · ${desc.nut} NUT · ${desc.tx} txs` })
-        : t({ fr: `${base} · ${desc.nut} NUT`, en: `${base} · ${desc.nut} NUT` });
+        ? t({ fr: `${base} · ${desc.nut} $NUT · ${desc.tx} signatures`, en: `${base} · ${desc.nut} $NUT · ${desc.tx} signaturess` })
+        : t({ fr: `${base} · ${desc.nut} $NUT`, en: `${base} · ${desc.nut} $NUT` });
     return (
       <div key={desc.kind} style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
         {desc.already ? (
           <Link className="btn primary" href={`/life/${desc.tokenId}`}>
             {desc.kind === "path"
-              ? t({ fr: "Chemin déjà né → le rencontrer", en: "Path already born → meet it" })
-              : t({ fr: "Boucle déjà née → la rencontrer", en: "Loop already born → meet it" })}
+              ? t({ fr: "Cette vagabonde vit déjà → la rencontrer", en: "This wanderer already lives → meet it" })
+              : t({ fr: "Cette boucle vit déjà → la rencontrer", en: "This loop already lives → meet it" })}
           </Link>
         ) : !address ? (
           <button className="btn" onClick={connect}>{base}</button>
         ) : !onSepolia ? (
-          <button className="btn primary" onClick={switchToSepolia}>{t({ fr: "Passez sur Sepolia", en: "Switch to Sepolia" })}</button>
+          <button className="btn primary" onClick={switchToSepolia}>{t({ fr: "Passe sur Sepolia", en: "Switch to Sepolia" })}</button>
         ) : tooLong ? (
-          <span className="note">{t({ fr: `${base} : trop long (~${desc.tx} tx, max ${MAX_TX}).`, en: `${base}: too long (~${desc.tx} txs, max ${MAX_TX}).` })}</span>
+          <span className="note">{t({ fr: `${base} : trop long (~${desc.tx} signatures, max ${MAX_TX}).`, en: `${base}: too long (~${desc.tx} signatures, max ${MAX_TX}).` })}</span>
         ) : !affordable(desc.nut) ? (
           <span className="note">
-            {t({ fr: `Pas assez de $NUT : il en faut ${desc.nut}, vous en avez ${nutDisplay}. `, en: `Not enough $NUT: needs ${desc.nut}, you have ${nutDisplay}. ` })}
-            <Link href="/" className="tx-link">{t({ fr: "nourrissez des créatures pour en gagner →", en: "feed creatures to earn some →" })}</Link>
+            {t({ fr: `Pas assez de $NUT : il en faut ${desc.nut}, tu en as ${nutDisplay}. `, en: `Not enough $NUT: needs ${desc.nut}, you have ${nutDisplay}. ` })}
+            <Link href="/" className="tx-link">{t({ fr: "nourris des créatures pour en gagner →", en: "feed creatures to earn some →" })}</Link>
           </span>
         ) : (
           <SpawnButton
@@ -439,8 +439,8 @@ export default function CreatePage() {
         {active && stalled && status === "signing" && (
           <button className="btn primary" onClick={continueMint}>
             {t({
-              fr: `Le portefeuille n'affiche rien ? Relancer l'étape${progress ? ` ${progress.current}/${progress.total}` : ""}`,
-              en: `Wallet showing nothing? Re-request step${progress ? ` ${progress.current}/${progress.total}` : ""}`,
+              fr: `Ton portefeuille s'est assoupi — frappe encore${progress ? ` ${progress.current}/${progress.total}` : ""}`,
+              en: `Your wallet fell asleep — knock again${progress ? ` ${progress.current}/${progress.total}` : ""}`,
             })}
           </button>
         )}
@@ -448,7 +448,7 @@ export default function CreatePage() {
           <button
             className="btn"
             disabled={busy}
-            title={t({ fr: "Garder sans faire naître", en: "Save without minting" })}
+            title={t({ fr: "Garder sans libérer", en: "Keep without setting free" })}
             onClick={() => {
               if (bm) removeBookmark(desc.tokenId!);
               else addBookmark({ id: desc.tokenId!, rows: desc.rows, period: desc.nut, kind: desc.kind, loopPeriod: desc.loopPeriod, savedAt: Date.now() });
@@ -481,6 +481,9 @@ export default function CreatePage() {
         <div className="section-label">{t({ fr: "Créer", en: "Create" })}</div>
         <Link href="/" className="note">{t({ fr: "← le jardin", en: "← the garden" })}</Link>
       </div>
+      <p className="dim" style={{ margin: "4px 0 14px" }}>
+        {t({ fr: "Dessine une graine. Regarde sa destinée.", en: "Draw a seed. Watch its destiny." })}
+      </p>
       <SlotScore
         seq={seqVal}
         loopLen={loopVal}
@@ -512,9 +515,9 @@ export default function CreatePage() {
 
       <div className="callout" style={{ marginTop: 16 }}>
         {!sdk ? (
-          <span><span className="spinner" /> {t({ fr: "préchauffage du moteur…", en: "warming up the engine…" })}</span>
+          <span><span className="spinner" /> {t({ fr: "on réveille la boîte de Pétri…", en: "waking the petri dish…" })}</span>
         ) : fate.kind === "empty" ? (
-          <span>{t({ fr: "Dessinez quelque chose à gauche pour commencer.", en: "Draw something on the left to begin." })}</span>
+          <span>{t({ fr: "Dessine quelque chose à gauche pour commencer.", en: "Draw something on the left to begin." })}</span>
         ) : fate.kind === "computing" ? (
           <span><span className="spinner" /> {t({ fr: "on trace sa destinée…", en: "tracing its fate…" })}</span>
         ) : fate.kind === "transient" ? (
@@ -530,11 +533,11 @@ export default function CreatePage() {
                     ? t({ fr: ` après ${loop.steps} génération${loop.steps === 1 ? "" : "s"}`, en: ` after ${loop.steps} generation${loop.steps === 1 ? "" : "s"}` })
                     : t({ fr: " aussitôt", en: " right away" })}
                   {loop.steps > 0
-                    ? t({ fr: " — faites naître le chemin, ou la boucle qu’il rejoint.", en: " — spawn the path, or the loop it joins." })
-                    : t({ fr: " — à faire naître.", en: " — ready to spawn." })}
+                    ? t({ fr: " — libère la vagabonde, ou la boucle qu’elle rejoint.", en: " — set the wanderer free, or the loop it joins." })
+                    : t({ fr: " — à libérer.", en: " — yours to set free." })}
                 </>
               ) : dead ? (
-                <>{t({ fr: `Un chemin mourant : s’éteint après ${dead.steps} génération${dead.steps === 1 ? "" : "s"} — à faire naître.`, en: `A dying path: fades to nothing after ${dead.steps} generation${dead.steps === 1 ? "" : "s"} — ready to spawn.` })}</>
+                <>{t({ fr: `Une vagabonde mourante : elle s’éteint après ${dead.steps} génération${dead.steps === 1 ? "" : "s"} — à libérer.`, en: `A dying wanderer: it fades to nothing after ${dead.steps} generation${dead.steps === 1 ? "" : "s"} — yours to set free.` })}</>
               ) : null}
             </div>
             <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -543,8 +546,8 @@ export default function CreatePage() {
             {anyMulti && status !== "error" && address && onSepolia && (
               <p className="note" style={{ marginTop: 8, maxWidth: "52ch" }}>
                 {t({
-                  fr: "Les longues créatures sont vérifiées par morceaux — votre portefeuille demandera d'approuver plusieurs transactions à la suite.",
-                  en: "Long creatures are verified in pieces — your wallet will ask you to approve several transactions in a row.",
+                  fr: "Les longues créatures sont vérifiées par morceaux — ton portefeuille demandera plusieurs signatures à la suite.",
+                  en: "Long creatures are verified in pieces — your wallet will ask for several signatures in a row.",
                 })}
               </p>
             )}

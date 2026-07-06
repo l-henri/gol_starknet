@@ -18,6 +18,24 @@
 
 ---
 
+## 2026-07-06 (copy pass) — Full website copy review + rewrite in one voice
+- **Goal:** Henri: "full in-depth review of all the wording — is this the best we can do?" It
+  wasn't. Review at [copy-review.md](../copy-review.md); Henri's register calls: **tu**,
+  **vagabonde** (the FR Wanderer), dark-but-soft reaper — and **no reaper UI at all** ("it's a
+  bot thing"), **"set free"** as the EN mint verb.
+- **Branch:** `main` · **Commits:** (this one) · pushed
+- **Changed (~130 strings):** the Wanderers finally wander (path/chemin → wanderer/vagabonde
+  everywhere user-facing; "chemin/path" survives only as the math trait); minting speaks the
+  world's language (spawn/mint → set free/libérer; "tx pending" → "the chain is writing";
+  "Verifying" → "Proving it lives"; "· 4 txs" → "· 4 signatures"); whole-site tutoiement (the
+  tu/vous mix is gone); $NUT unified; death unified on Éteinte/Gone out; engine → petri dish;
+  /pets lost its reaper section (bots reap; humans just see "le faucheur passe" on wilted bonds);
+  /create gained its invitation ("Dessine une graine. Regarde sa destinée."); EN grammar fix on
+  the home thesis.
+- **Verified:** `next build` green; sweeps confirm no stray vous/chemin/spawn in FR/EN copy.
+- **Next:** Henri's full review pass; then outreach package.
+- **Blockers:** none.
+
 ## 2026-07-06 (later still) — Pet UI shipped: wards, clocks, the reaper's rounds
 - **Goal:** the client side of the caretaker layer ("go ahead on the pet UI"). Also: Henri
   confirmed the multi-tx stall fix — **the long wanderer mint worked**.

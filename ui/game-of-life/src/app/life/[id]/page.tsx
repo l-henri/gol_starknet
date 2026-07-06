@@ -230,7 +230,7 @@ function LoopDetail({ id }: { id: string }) {
           {isOwner && rp && edit && (
             <div style={{ marginTop: 14 }}>
               <div className="note" style={{ marginBottom: 6 }}>
-                {t({ fr: "apparence · à vous de régler", en: "appearance · yours to tune" })}
+                {t({ fr: "apparence · à toi de régler", en: "appearance · yours to tune" })}
               </div>
               <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
                 <label className="note" style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -258,7 +258,7 @@ function LoopDetail({ id }: { id: string }) {
                   {editInvalid && <p className="breathe-err">{t({ fr: "le fond et la cellule doivent différer", en: "background and cell colour must differ" })}</p>}
                   <button className="btn primary" onClick={doEdit} disabled={editBusy || editInvalid}>
                     {editStatus === "signing"
-                      ? t({ fr: "Confirmez dans votre portefeuille…", en: "Confirm in your wallet…" })
+                      ? t({ fr: "Confirme dans ton portefeuille…", en: "Confirm in your wallet…" })
                       : editStatus === "pending"
                         ? t({ fr: "Modification… (tx en attente)", en: "Editing… (tx pending)" })
                         : editStatus === "confirmed"
@@ -310,11 +310,11 @@ function LoopDetail({ id }: { id: string }) {
                 disabled={busy}
               >
                 {!connected
-                  ? t({ fr: "Connectez-vous pour nourrir", en: "Connect to feed" })
+                  ? t({ fr: "Connecte-toi pour nourrir", en: "Connect to feed" })
                   : !onSepolia
-                    ? t({ fr: "Passez sur Sepolia pour nourrir", en: "Switch to Sepolia to feed" })
+                    ? t({ fr: "Passe sur Sepolia pour nourrir", en: "Switch to Sepolia to feed" })
                     : status === "signing"
-                      ? t({ fr: "Confirmez dans votre portefeuille…", en: "Confirm in your wallet…" })
+                      ? t({ fr: "Confirme dans ton portefeuille…", en: "Confirm in your wallet…" })
                       : status === "pending"
                         ? t({ fr: "Alimentation… (tx en attente)", en: "Feeding… (tx pending)" })
                         : status === "confirmed"
@@ -337,7 +337,7 @@ function LoopDetail({ id }: { id: string }) {
                     disabled={petStatus === "signing" || petStatus === "pending" || busy}
                   >
                     {petStatus === "signing"
-                      ? t({ fr: "Confirmez dans votre portefeuille…", en: "Confirm in your wallet…" })
+                      ? t({ fr: "Confirme dans ton portefeuille…", en: "Confirm in your wallet…" })
                       : petStatus === "pending"
                         ? t({ fr: "Caresse… (tx en attente)", en: "Petting… (tx pending)" })
                         : petStatus === "confirmed"
@@ -354,7 +354,7 @@ function LoopDetail({ id }: { id: string }) {
                       return (
                         <p className="breathe-hint">
                           {t({
-                            fr: "caressez-la pour tisser un lien : un souffle par caresse, et revenez sous 7 jours — sinon le lien fane.",
+                            fr: "caresse-la pour tisser un lien : un souffle par caresse, et reviens sous 7 jours — sinon le lien fane.",
                             en: "pet it to form a bond: one breath per pet, and come back within 7 days — or the bond wilts.",
                           })}
                         </p>
@@ -363,15 +363,15 @@ function LoopDetail({ id }: { id: string }) {
                       return (
                         <p className="breathe-err">
                           {t({
-                            fr: "votre lien a fané — n'importe qui peut le récolter. Une caresse le ravive.",
-                            en: "your bond has wilted — anyone can reap it. A pet revives it.",
+                            fr: "ton lien a fané — le faucheur peut passer. Une caresse le ravive.",
+                            en: "your bond has wilted — the reaper may pass. A pet revives it.",
                           })}
                         </p>
                       );
                     return (
                       <p className="breathe-hint">
                         {t({
-                          fr: `votre lien : encore ${left >= 1 ? `${Math.floor(left)} j` : `${Math.max(1, Math.round(left * 24))} h`} avant qu'il ne fane.`,
+                          fr: `ton lien : encore ${left >= 1 ? `${Math.floor(left)} j` : `${Math.max(1, Math.round(left * 24))} h`} avant qu'il ne fane.`,
                           en: `your bond: ${left >= 1 ? `${Math.floor(left)} days` : `${Math.max(1, Math.round(left * 24))} hours`} before it wilts.`,
                         })}
                       </p>
@@ -381,7 +381,7 @@ function LoopDetail({ id }: { id: string }) {
                 </div>
               )}
               {status === "idle" && connected && (
-                <p className="breathe-hint">{t({ fr: "nourrissez-la — chaque génération la garde en vie et vous rapporte 1 $NUT.", en: "feed it forward — each generation keeps it alive and earns you 1 $NUT." })}</p>
+                <p className="breathe-hint">{t({ fr: "nourris-la — chaque génération la garde en vie et te rapporte 1 $NUT.", en: "feed it forward — each generation keeps it alive and earns you 1 $NUT." })}</p>
               )}
             </div>
           )}
@@ -430,7 +430,7 @@ function PathDetail({ id }: { id: string }) {
   }, [rp]);
 
   if (loading) return <Shell><p className="status-line"><span className="spinner" /> {t({ fr: "lecture de la chaîne…", en: "reading the chain…" })}</p></Shell>;
-  if (!pf) return <Shell><p className="status-line">{t({ fr: `aucun chemin #${id} sur Sepolia.`, en: `no path #${id} is minted on Sepolia.` })}</p></Shell>;
+  if (!pf) return <Shell><p className="status-line">{t({ fr: `aucune vagabonde #${id} sur Sepolia.`, en: `no wanderer #${id} is minted on Sepolia.` })}</p></Shell>;
 
   const isOwner = !!address && sameId(address, pf.owner);
   const editBusy = editStatus === "signing" || editStatus === "pending";
@@ -461,7 +461,7 @@ function PathDetail({ id }: { id: string }) {
 
   const lifeLabel =
     pf.life_state === "dead"
-      ? t({ fr: "Mort · s’éteint dans le vide", en: "Dead · fades to nothing" })
+      ? t({ fr: "Éteinte · disparue dans le vide", en: "Gone out · faded to nothing" })
       : pf.life_state === "frozen"
         ? t({ fr: "Figé · devient une nature morte", en: "Frozen · settles to a still life" })
         : t({ fr: "Vivant · rejoint une boucle", en: "Alive · joins a dynamic loop" });
@@ -485,14 +485,14 @@ function PathDetail({ id }: { id: string }) {
           )}
         </div>
         <div>
-          <span className="kicker">{t({ fr: "un chemin · vit sur Starknet", en: "a path · living on Starknet" })}</span>
+          <span className="kicker">{t({ fr: "une vagabonde · vit sur Starknet", en: "a wanderer · living on Starknet" })}</span>
           <div className="meta-row">
             <Copyable label={t({ fr: "propriétaire", en: "owner" })} value={pf.owner} display={shortAddr(pf.owner)} />
             <Copyable label={t({ fr: "token", en: "token" })} value={pf.token_id} display={shortAddr(pf.token_id)} />
           </div>
 
           <div className="trait-grid">
-            <Trait t={t({ fr: "Type", en: "Kind" })} v={t({ fr: "Chemin", en: "Path" })} />
+            <Trait t={t({ fr: "Type", en: "Kind" })} v={t({ fr: "Vagabonde", en: "Wanderer" })} />
             <Trait t={t({ fr: "État", en: "State" })} v={lifeLabel} />
             <Trait t={t({ fr: "Longueur", en: "Length" })} v={String(pf.sequence_length)} />
             {pf.life_state !== "dead" && (
@@ -506,7 +506,7 @@ function PathDetail({ id }: { id: string }) {
           {/* Appearance is owner-only; the values show read-only in the grid above. */}
           {isOwner && rp && edit && (
             <div style={{ marginTop: 14 }}>
-              <div className="note" style={{ marginBottom: 6 }}>{t({ fr: "apparence · à vous de régler", en: "appearance · yours to tune" })}</div>
+              <div className="note" style={{ marginBottom: 6 }}>{t({ fr: "apparence · à toi de régler", en: "appearance · yours to tune" })}</div>
               <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
                 <label className="note" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   {t({ fr: "fond", en: "background" })}
@@ -526,14 +526,14 @@ function PathDetail({ id }: { id: string }) {
                   {editInvalid && <p className="breathe-err">{t({ fr: "le fond et la cellule doivent différer", en: "background and cell colour must differ" })}</p>}
                   <button className="btn primary" onClick={doEdit} disabled={editBusy || editInvalid}>
                     {editStatus === "signing"
-                      ? t({ fr: "Confirmez dans votre portefeuille…", en: "Confirm in your wallet…" })
+                      ? t({ fr: "Confirme dans ton portefeuille…", en: "Confirm in your wallet…" })
                       : editStatus === "pending"
                         ? t({ fr: "Modification… (tx en attente)", en: "Editing… (tx pending)" })
                         : editStatus === "confirmed"
                           ? t({ fr: "✓ Modifiée", en: "✓ Edited" })
                           : editStatus === "error"
                             ? t({ fr: "Réessayer", en: "Try again" })
-                            : t({ fr: "Modifier le chemin", en: "Edit path" })}
+                            : t({ fr: "Modifier la vagabonde", en: "Edit wanderer" })}
                   </button>
                   {editErr && editStatus === "error" && <p className="breathe-err">{editErr}</p>}
                 </div>
@@ -543,14 +543,14 @@ function PathDetail({ id }: { id: string }) {
 
           {pf.life_state !== "dead" && (
             <p className="dim" style={{ maxWidth: "46ch", marginTop: 14 }}>
-              {t({ fr: "Ce chemin mène à une ", en: "This path leads into a " })}
+              {t({ fr: "Cette vagabonde rejoint une ", en: "This wanderer settles into a " })}
               <Link className="tx-link" href={`/life/${pf.target_loop_id}`}>{t({ fr: "boucle →", en: "loop →" })}</Link>
             </p>
           )}
           <p className="dim" style={{ maxWidth: "46ch" }}>
             {t({
-              fr: "Un chemin est un instantané figé : il ne se nourrit pas. Sa rareté tient à sa longueur — plus il est loin de sa boucle, plus il est rare.",
-              en: "A path is a frozen snapshot: it can't be fed. Its rarity is its length — the farther from its loop, the rarer.",
+              fr: "Une vagabonde est un instant de voyage, figé : elle ne se nourrit pas. Sa rareté est la longueur de son périple — plus elle erre loin de sa boucle, plus elle est rare.",
+              en: "A wanderer is a moment of travel, caught: it can't be fed. Its rarity is the length of its journey — the farther it wanders from its loop, the rarer.",
             })}
           </p>
         </div>
@@ -618,8 +618,8 @@ function BeastDetail() {
           <h1>{beast.name}</h1>
           <p className="dim" style={{ maxWidth: "46ch" }}>
             {t({
-              fr: `Un${beast.family === "spaceship" ? " vaisseau" : beast.family === "still" ? "e nature morte" : " oscillateur"} connu du répertoire de Conway. Découvrez-le sur le plateau, puis faites-le naître pour le libérer — vivant sur Starknet, indépendant de vous.`,
-              en: `A known ${beast.family === "spaceship" ? "spaceship" : beast.family === "still" ? "still life" : "oscillator"} from Conway’s reservoir. Discover it on the board, then mint it to set it free — alive on Starknet, independent of you.`,
+              fr: `Un${beast.family === "spaceship" ? " vaisseau" : beast.family === "still" ? "e nature morte" : " oscillateur"} connu du répertoire de Conway. Découvre-le sur le plateau, puis libère-le — vivant sur Starknet, indépendant de toi.`,
+              en: `A known ${beast.family === "spaceship" ? "spaceship" : beast.family === "still" ? "still life" : "oscillator"} from Conway’s reservoir. Discover it on the board, then set it free — alive on Starknet, independent of you.`,
             })}
           </p>
 
@@ -627,13 +627,13 @@ function BeastDetail() {
             <Trait t={t({ fr: "Type", en: "Kind" })} v={beast.kind} />
             <Trait t={t({ fr: "Destinée", en: "Fate" })} v={info.kind === "toolarge" ? t({ fr: "Voyage sans fin", en: "Travels forever" }) : t({ fr: "Vivant · une boucle", en: "Alive · a loop" })} />
             <Trait t={t({ fr: "Longueur de boucle", en: "Loop length" })} v={period ? String(period) : info.kind === "toolarge" ? t({ fr: "grande", en: "large" }) : "…"} />
-            <Trait t={t({ fr: "Coût de naissance", en: "Mint cost" })} v={period ? `${period} NUT` : "—"} />
+            <Trait t={t({ fr: "Coût de naissance", en: "Birth cost" })} v={period ? `${period} NUT` : "—"} />
           </div>
 
           {info.kind === "toolarge" && (
             <div className="callout">
               {t({
-                fr: "Ce voyageur ne se stabilise jamais en une petite boucle sur le tore 41×41 — sa période est trop grande pour une naissance bon marché. Rencontrez-le et regardez-le vivre.",
+                fr: "Ce voyageur ne se stabilise jamais en une petite boucle sur le tore 41×41 — sa période est trop grande pour une naissance bon marché. Rencontre-le et regarde-le vivre.",
                 en: "This traveller never settles into a small loop on the 41×41 torus — its period is too large to mint cheaply. Meet it and watch it live.",
               })}
             </div>
@@ -653,9 +653,9 @@ function BeastDetail() {
             ) : ready?.minted ? (
               <Link className="btn primary" href={`/life/${ready.tokenId}`}>{t({ fr: "Rencontrer cette créature →", en: "Meet this creature →" })}</Link>
             ) : !address ? (
-              <button className="btn" onClick={connect}>{t({ fr: "Connectez-vous pour la libérer", en: "Connect to set it free" })}</button>
+              <button className="btn" onClick={connect}>{t({ fr: "Connecte-toi pour la libérer", en: "Connect to set it free" })}</button>
             ) : !onSepolia ? (
-              <button className="btn primary" onClick={switchToSepolia}>{t({ fr: "Passez sur Sepolia pour faire naître", en: "Switch to Sepolia to mint" })}</button>
+              <button className="btn primary" onClick={switchToSepolia}>{t({ fr: "Passe sur Sepolia pour libérer", en: "Switch to Sepolia to set it free" })}</button>
             ) : (
               <button
                 className="btn primary breathe-btn"
@@ -663,11 +663,11 @@ function BeastDetail() {
                 disabled={busy}
               >
                 {status === "signing"
-                  ? t({ fr: "Confirmez dans votre portefeuille…", en: "Confirm in your wallet…" })
+                  ? t({ fr: "Confirme dans ton portefeuille…", en: "Confirm in your wallet…" })
                   : status === "pending"
-                    ? t({ fr: "Libération… (tx en attente)", en: "Setting it free… (tx pending)" })
+                    ? t({ fr: "Libération… (la chaîne écrit)", en: "Setting it free… (the chain is writing)" })
                     : status === "confirmed"
-                      ? t({ fr: "✓ Née — on vous y emmène…", en: "✓ Born — taking you there…" })
+                      ? t({ fr: "✓ Née — on t'y emmène…", en: "✓ Born — taking you there…" })
                       : status === "error"
                         ? t({ fr: "Réessayer", en: "Try again" })
                         : t({ fr: `La libérer · ${period} NUT`, en: `Set it free · ${period} NUT` })}

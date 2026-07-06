@@ -11,11 +11,11 @@ export const tokenIdDecimal = (hex: string): string => BigInt(hex).toString();
 export function lifeformKind(
   lf: Pick<JsLifeform, "is_loop" | "is_still" | "is_dead" | "sequence_length">
 ): Dict {
-  if (lf.is_dead) return { fr: "Éteinte", en: "Dead" };
+  if (lf.is_dead) return { fr: "Éteinte", en: "Gone out" };
   if (lf.is_still) return { fr: "Nature morte", en: "Still life" };
   // The period is shown as its own trait now, so the kind label stays clean ("Loop", not "Loop · period N").
   if (lf.is_loop) return { fr: "Boucle", en: "Loop" };
-  return { fr: "Chemin", en: "Path" };
+  return { fr: "Vagabonde", en: "Wanderer" };
 }
 
 /** NUT hex balance -> human number with up to 2 decimals. */

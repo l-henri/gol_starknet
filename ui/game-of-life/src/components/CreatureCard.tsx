@@ -138,7 +138,7 @@ function PathCard({ pf }: { pf: JsPath }) {
     <Link
       href={`/life/${pf.token_id}`}
       className="creature-card"
-      aria-label={t({ fr: `Chemin ${id}, longueur ${pf.sequence_length}`, en: `Path ${id}, length ${pf.sequence_length}` })}
+      aria-label={t({ fr: `Vagabonde ${id}, longueur ${pf.sequence_length}`, en: `Wanderer ${id}, length ${pf.sequence_length}` })}
     >
       <div className="dish">
         <Creature
@@ -147,15 +147,15 @@ function PathCard({ pf }: { pf: JsPath }) {
           cell={rp?.cell}
           speed={rp?.speed}
           variant={dead ? "dead" : "living"}
-          ariaLabel={t({ fr: `chemin ${id}`, en: `path ${id}` })}
+          ariaLabel={t({ fr: `vagabonde ${id}`, en: `wanderer ${id}` })}
         />
       </div>
       <div className="cmeta">
-        <span className="ckind">{t({ fr: "Chemin", en: "Path" })}</span>
+        <span className="ckind">{t({ fr: "Vagabonde", en: "Wanderer" })}</span>
       </div>
       <div className="cfoot">
         <span className="age-dot" style={{ background: dead ? "rgb(58,65,80)" : "var(--nut)" }} />
-        {dead ? t({ fr: "mort", en: "dead" }) : t({ fr: "chemin", en: "path" })} · {t({ fr: "longueur", en: "length" })} {pf.sequence_length}
+        {dead ? t({ fr: "éteinte", en: "gone out" }) : t({ fr: "vagabonde", en: "wanderer" })} · {t({ fr: "longueur", en: "length" })} {pf.sequence_length}
       </div>
     </Link>
   );

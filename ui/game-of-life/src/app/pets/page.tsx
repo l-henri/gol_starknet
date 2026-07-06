@@ -17,14 +17,13 @@ interface Ward {
   lifeform: JsLifeform | null; // null = burned creature (orphaned bond)
 }
 
-/** The caretaker page: your wards (bond clocks + pet), and the reaper feed (lapsed bonds). */
+/** The caretaker page: your wards (bond clocks + pet). Reaping is left to bots — no UI. */
 export default function PetsPage() {
   const { t } = useT();
   const { sdk } = useGolSdk();
   const { address, connect, onSepolia, switchToSepolia, txEpoch } = useWallet();
-  const { status, error, pet, reap, reset } = usePet();
+  const { status, error, pet, reset } = usePet();
   const [wards, setWards] = useState<Ward[] | null>(null);
-  const [reapables, setReapables] = useState<Ward[] | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
 
   // The caretaker graph: every (creature, holder) that ever petted, filtered by live bond status.
@@ -56,12 +55,8 @@ export default function PetsPage() {
         }
         if (cancelled) return;
         setWards(address ? active.filter((w) => BigInt(w.holder) === BigInt(address)) : []);
-        setReapables(active.filter((w) => w.bond.reapable));
       } catch {
-        if (!cancelled) {
-          setWards([]);
-          setReapables([]);
-        }
+        if (!cancelled) setWards([]);
       }
     })();
     return () => {
@@ -95,20 +90,20 @@ export default function PetsPage() {
         <h1>{t({ fr: "Mes protégés", en: "My wards" })}</h1>
         <p className="thesis">
           {t({
-            fr: "Une caresse est un souffle : elle nourrit la créature d'une génération, vous rapporte 1 $NUT, et ravive votre lien pour 7 jours. Un lien délaissé fane — et n'importe qui peut le récolter.",
-            en: "A pet is a breath: it feeds the creature one generation, earns you 1 $NUT, and renews your bond for 7 days. A neglected bond wilts — and anyone may reap it.",
+            fr: "Une caresse est un souffle : elle nourrit la créature d'une génération, te rapporte 1 $NUT, et ravive ton lien pour 7 jours. Un lien délaissé fane — et le faucheur passe.",
+            en: "A pet is a breath: it feeds the creature one generation, earns you 1 $NUT, and renews your bond for 7 days. A neglected bond wilts — and the reaper passes.",
           })}
         </p>
       </section>
 
       <h3 className="section-label" style={{ marginTop: 20 }}>{t({ fr: "Protégés", en: "Wards" })}</h3>
       {!address ? (
-        <button className="btn primary" onClick={connect}>{t({ fr: "Connectez-vous pour voir vos protégés", en: "Connect to see your wards" })}</button>
+        <button className="btn primary" onClick={connect}>{t({ fr: "Connecte-toi pour voir tes protégés", en: "Connect to see your wards" })}</button>
       ) : wards === null ? (
-        <p className="dim">{t({ fr: "Lecture de la chaîne…", en: "Reading the chain…" })}</p>
+        <p className="dim">{t({ fr: "on scrute la chaîne à la recherche de vie…", en: "scanning the chain for life…" })}</p>
       ) : wards.length === 0 ? (
         <p className="dim">
-          {t({ fr: "Aucun protégé — adoptez une créature du ", en: "No wards yet — adopt a creature from the " })}
+          {t({ fr: "Aucun protégé — adopte une créature du ", en: "No wards yet — adopt a creature from the " })}
           <Link href="/" className="tx-link">{t({ fr: "jardin", en: "garden" })}</Link>.
         </p>
       ) : (
@@ -148,49 +143,6 @@ export default function PetsPage() {
         </ol>
       )}
 
-      <h3 className="section-label" style={{ marginTop: 32 }}>{t({ fr: "À récolter", en: "The reaper's rounds" })}</h3>
-      <p className="dim">
-        {t({
-          fr: "Liens fanés, tous gardiens confondus — récolter un lien délaissé rapporte 1 $NUT.",
-          en: "Wilted bonds across all caretakers — reaping a neglected bond earns 1 $NUT.",
-        })}
-      </p>
-      {reapables === null ? (
-        <p className="dim">{t({ fr: "Lecture de la chaîne…", en: "Reading the chain…" })}</p>
-      ) : reapables.length === 0 ? (
-        <p className="dim">{t({ fr: "Tous les liens sont entretenus — le jardin est bien gardé.", en: "Every bond is tended — the garden is well kept." })}</p>
-      ) : (
-        <ol className="board">
-          {reapables.map((w) => (
-            <li key={`${w.creatureId}:${w.holder}`}>
-              <span className="board-row">
-                <span className="board-thumb">
-                  {w.lifeform ? <Creature rows={w.lifeform.current_state} res={96} animate={false} /> : <span className="dim">✕</span>}
-                </span>
-                <span className="board-what">
-                  <span className="mono">{shortAddr(w.holder)}</span>
-                  <span className="dim"> · {t({ fr: "lien fané sur", en: "wilted bond on" })} </span>
-                  <span className="mono">{shortAddr(w.creatureId)}</span>
-                </span>
-                {address && onSepolia && (
-                  <button
-                    className="btn"
-                    disabled={busy}
-                    onClick={() => act(`${w.creatureId}:${w.holder}`, () => reap(w.creatureId, w.holder))}
-                  >
-                    {activeId === `${w.creatureId}:${w.holder}` && busy
-                      ? t({ fr: "Récolte…", en: "Reaping…" })
-                      : t({ fr: "Récolter · 1 $NUT", en: "Reap · 1 $NUT" })}
-                  </button>
-                )}
-              </span>
-              {activeId === `${w.creatureId}:${w.holder}` && status === "error" && error && (
-                <p className="breathe-err">{error}</p>
-              )}
-            </li>
-          ))}
-        </ol>
-      )}
     </div>
   );
 }

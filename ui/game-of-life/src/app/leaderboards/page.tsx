@@ -51,7 +51,7 @@ export default function LeaderboardsPage() {
     const guard = <T,>(set: (v: T) => void) => (v: T) => {
       if (!cancelled) set(v);
     };
-    sdk.recentLifeforms(0).then(guard(setLoops)).catch(() => guard(setError)(t({ fr: "Lecture de la chaîne impossible", en: "Could not read the chain" })));
+    sdk.recentLifeforms(0).then(guard(setLoops)).catch(() => guard(setError)(t({ fr: "la boîte de Pétri est hors ligne", en: "the petri dish is offline" })));
     sdk
       .recentPathTokenIds(0)
       .then(async (ids: string[]) => {
@@ -128,7 +128,7 @@ export default function LeaderboardsPage() {
     return out.sort((a, b) => b.length - a.length || b.block - a.block).slice(0, TOP);
   }, [loopMints, pathMints, loops, paths]);
 
-  const loading = t({ fr: "Lecture de la chaîne…", en: "Reading the chain…" });
+  const loading = t({ fr: "on scrute la chaîne à la recherche de vie…", en: "scanning the chain for life…" });
   const nobody = t({ fr: "Personne encore — sois le premier.", en: "Nobody yet — be the first." });
 
   return (
@@ -138,8 +138,8 @@ export default function LeaderboardsPage() {
         <h1>{t({ fr: "Palmarès", en: "Leaderboards" })}</h1>
         <p className="thesis">
           {t({
-            fr: "Chaque score se gagne sur la chaîne : découvrir une longue boucle, dénicher un long chemin, ou donner du souffle aux créatures des autres.",
-            en: "Every score is earned on-chain: discover a long loop, unearth a long path, or breathe life into other people’s creatures.",
+            fr: "Chaque score se gagne sur la chaîne : découvrir une longue boucle, suivre une vagabonde au long cours, ou donner du souffle aux créatures des autres.",
+            en: "Every score is earned on-chain: discover a long loop, follow a far-travelled wanderer, or breathe life into other people’s creatures.",
           })}
         </p>
       </section>
@@ -168,7 +168,7 @@ export default function LeaderboardsPage() {
       </section>
 
       <section className="garden-section wrap">
-        <span className="section-label">{t({ fr: "Mathusalems (chemins)", en: "Methuselahs (paths)" })}</span>
+        <span className="section-label">{t({ fr: "Mathusalems (vagabondes)", en: "Methuselahs (wanderers)" })}</span>
         <p className="dim">
           {t({
             fr: "La plus longue vie depuis la plus petite graine : distance à la boucle ÷ cellules de départ.",
@@ -267,7 +267,7 @@ export default function LeaderboardsPage() {
                 <span className="board-what">
                   {f.kind === "loop"
                     ? t({ fr: "boucle, période", en: "loop, period" })
-                    : t({ fr: "chemin, longueur", en: "path, length" })}{" "}
+                    : t({ fr: "vagabonde, longueur", en: "wanderer, length" })}{" "}
                   <strong>{f.length}</strong>
                 </span>
               </Link>

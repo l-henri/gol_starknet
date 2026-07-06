@@ -10,7 +10,7 @@ export type BreatheStatus = "idle" | "signing" | "pending" | "confirmed" | "erro
 function humanize(e: unknown, t: (d: Dict) => string): string {
   const m = e instanceof Error ? e.message : String(e);
   if (/reject|abort|denied|cancel/i.test(m))
-    return t({ fr: "Vous avez refusé la signature.", en: "You declined the signature." });
+    return t({ fr: "Tu as refusé la signature.", en: "You declined the signature." });
   if (/insufficient|balance|fee|funds/i.test(m))
     return t({ fr: "Pas assez de gas Sepolia pour nourrir.", en: "Not enough Sepolia gas to feed." });
   // Some wallets (seen with Xverse) throw a blank error when they fail to broadcast — never show an
@@ -18,7 +18,7 @@ function humanize(e: unknown, t: (d: Dict) => string): string {
   const msg = m.trim();
   if (!msg)
     return t({
-      fr: "Votre portefeuille n'a pas diffusé la transaction. Réessayez, ou utilisez un autre portefeuille Starknet (ArgentX, Braavos).",
+      fr: "Ton portefeuille n'a pas diffusé la transaction. Réessaie, ou utilise un autre portefeuille Starknet (ArgentX, Braavos).",
       en: "Your wallet didn't broadcast the transaction. Try again, or use another Starknet wallet (ArgentX, Braavos).",
     });
   return msg.length > 140 ? msg.slice(0, 137) + "…" : msg;

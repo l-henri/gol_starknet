@@ -1,8 +1,10 @@
 # Website Copy Review — full pass
 
 **Date:** 2026-07-06 · **Scope:** every user-facing string (≈230 FR/EN pairs across 13 files) ·
-**Status:** findings + proposed lexicon; awaiting Henri's calls on the four decisions in §5 before
-the rewrite pass.
+**Status:** EXECUTED same day. Henri's calls: **tu** · **vagabonde** · dark-but-soft AND the reaper
+section removed from the site entirely ("it's a bot thing, not a human thing" — reaping stays in
+the SDK for bots; the site only warns that "le faucheur passe") · **set free**. ~130 strings
+changed in one pass; `next build` green.
 
 ## 1. Verdict
 

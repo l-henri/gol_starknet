@@ -52,7 +52,7 @@ export function usePet() {
         const m = e instanceof Error ? e.message : String(e);
         setError(
           /reject|abort|denied|cancel/i.test(m)
-            ? t({ fr: "Vous avez refusé la signature.", en: "You declined the signature." })
+            ? t({ fr: "Tu as refusé la signature.", en: "You declined the signature." })
             : m.slice(0, 140)
         );
         setStatus("error");

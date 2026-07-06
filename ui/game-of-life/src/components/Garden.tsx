@@ -69,7 +69,7 @@ export default function Garden() {
 
         {items && items.length === 0 && !scanError && (
           <p className="status-line">
-            {t({ fr: "aucune créature pour l’instant — soyez le premier à en libérer une ci-dessous.", en: "no creatures minted yet — be the first to set one free below." })}
+            {t({ fr: "aucune créature pour l’instant — sois le premier à en libérer une ci-dessous.", en: "no creatures minted yet — be the first to set one free below." })}
           </p>
         )}
 
