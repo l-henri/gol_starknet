@@ -221,9 +221,14 @@ export function useMint() {
     return true;
   }, [sdk, address, connect]);
 
+  // Owner-defined, permanent-at-birth appearance: 0xRRGGBB ints + generations/second.
+  // Appended to the mint's FINAL step so it lands in the same tx that creates the creature (the
+  // token exists by then, and the caller is its owner). See /create's "set it free" ritual.
+  type Appearance = { bg: number; cell: number; speed: number };
+
   // Mint a LOOP: `rows` = the loop's canonical (smallest) state; `period` = its length.
   const mint = useCallback(
-    async (rows: number[], period: number): Promise<boolean> => {
+    async (rows: number[], period: number, appearance?: Appearance): Promise<boolean> => {
       if (!(await prep()) || !sdk || !address) return false;
       let plan: Plan;
       let id: string;
@@ -231,6 +236,11 @@ export function useMint() {
         const r = new Float64Array(rows);
         id = sdk.familyTokenId(r, period) as string; // v3: the orbit-family id
         plan = sdk.planLoopMint(r, period, address, chunkSteps, singleShotMax, MAX_TX) as Plan;
+        if (appearance && !plan.tooLong && plan.steps.length > 0) {
+          plan.steps[plan.steps.length - 1].calls.push(
+            sdk.setRenderParamsCall(id, appearance.bg, appearance.cell, appearance.speed)
+          );
+        }
       } catch (e) {
         setError(humanize(e, t));
         setStatus("error");
@@ -244,7 +254,7 @@ export function useMint() {
   // Mint a PATH: `rows` = the path's start state; `sequenceLength` = its distance to the loop;
   // `loopPeriod` = the terminal loop's period.
   const mintPath = useCallback(
-    async (rows: number[], sequenceLength: number, loopPeriod: number): Promise<boolean> => {
+    async (rows: number[], sequenceLength: number, loopPeriod: number, appearance?: Appearance): Promise<boolean> => {
       if (!(await prep()) || !sdk || !address) return false;
       let plan: Plan;
       let id: string;
@@ -260,6 +270,11 @@ export function useMint() {
           singleShotMax,
           MAX_TX
         ) as Plan;
+        if (appearance && !plan.tooLong && plan.steps.length > 0) {
+          plan.steps[plan.steps.length - 1].calls.push(
+            sdk.setPathRenderParamsCall(id, appearance.bg, appearance.cell, appearance.speed)
+          );
+        }
       } catch (e) {
         setError(humanize(e, t));
         setStatus("error");

@@ -5,7 +5,14 @@
 
 **Last updated:** 2026-07-09
 **Framing:** WIP **art piece**, not a commercial product — the outcome is burning gas and creating art.
-**Active branch:** `main` (single trunk since the 2026-07-06 consolidation; pushed to origin)
+**Active branch:** `new_design` — website design overhaul in progress. Done so far: the Garden
+home (living gallery), the global chrome (the "petri" top bar + Conway-blinker favicon), `/create`
+(the "slot machine of life" — draw → warm verdict → set-free with on-chain colours), and
+`/incubator` (eggs not yet hatched — warming-egg progress, resume, saved patterns → /create).
+Still on the old design: `/pets` (Wards), `/leaderboards` (Records), `/life/[id]`.
+Site renamed **petri** (loop/wanderer collections keep their names). See LOG 2026-07-09/07-10.
+`main` remains the shipped trunk. ⚠️ Redesign pages not yet QA'd with a connected wallet
+(set-free mint, hatch, pet flows).
 **Build/test:** `scarb build` ✅ · `snforge test` ✅ (91) · `cargo test -p gol-sdk` ✅ (43) · `next build` ✅
 **Live site:** https://gol-starknet.vercel.app — Vercel git integration auto-deploys every push to `main` (verified current 2026-07-06)
 **Tx tooling:** all on-chain transactions via **strkd** — pair with `kind:"agent"`; never sncast/raw keys

@@ -18,6 +18,151 @@
 
 ---
 
+## 2026-07-10 (later) — /incubator rebuilt: eggs not yet hatched
+- **Goal:** rebuild `/incubator` per the brief — a warm workbench for births in progress and saved
+  patterns, with progress shown as a warming egg (not a progress bar).
+- **Branch:** `new_design` · **Commits:** uncommitted WIP
+- **Changed (frontend, `ui/game-of-life`):**
+  - `src/app/incubator/page.tsx` rewritten: two groups — **Mints in progress** (interrupted
+    multi-tx mints from `listMintProgress`; egg + "signatures done/total" + **Continue hatching**
+    → resumes via `useMint`, stall "knock again", hatched → "Meet it") and **Saved patterns**
+    (bookmarks; **Open in Create →** `/create?load=<id>` to edit/set-free, quiet "hatch it here"
+    for handed-off big ones, Forget). Inviting empty state ("No eggs yet — draw something in
+    Create and save it to hatch later" + Go to Create). Reuses the proven persistence
+    (`incubator.ts` localStorage) and on-chain minted-detection.
+  - The **warming-egg** metaphor (`.egg` in globals.css): an oval shell holding the pattern under a
+    warm amber light that RISES with progress (`height = done/total`), a soft incubation pulse, and
+    a green wash + glow on hatch. Not a progress bar.
+  - `src/app/create/page.tsx`: added `?load=<id>` support — opens a saved bookmark's pattern onto
+    the grid (then cleans the URL), so Incubator's "Open in Create" round-trips.
+  - `globals.css`: new `.inc-*` / `.egg*` styles.
+- **Verified (headless Chrome + CDP, live Sepolia):** empty state renders (three breathing egg
+  outlines + Go to Create); seeding localStorage with a bookmark + a 2/3 mint-progress shows both
+  groups — the in-progress egg glows amber, filled to ~2/3, labelled "signatures 2/3" with
+  "Continue hatching"; saved pattern shows "Open in Create → / hatch it here / Forget". tsc +
+  eslint clean, `next build` green. NOT verified (needs a real wallet): an actual resume-to-hatch
+  and the round-trip mint.
+- **Next:** wallet-connected pass across create → incubator → hatch → garden.
+- **Blockers:** none.
+
+## 2026-07-10 — /create rebuilt: the "slot machine of life" (discovery + set-free)
+- **Goal:** rebuild `/create` per the brief — a playful, kid-first discovery flow (an 8-year-old is
+  a real primary user): draw a seed, watch what it becomes, set the living ones free.
+- **Branch:** `new_design` · **Commits:** uncommitted WIP
+- **Decision (asked Henri):** the contract has **no on-chain name field** — Henri chose
+  **appearance-only** for the set-free ritual (no naming). Creatures stay auto-named by pattern/type.
+- **Changed (frontend, `ui/game-of-life`):**
+  - `src/app/create/page.tsx` fully rewritten: ONE big tactile 41×41 grid (draw = green #22c55e on
+    #070709, click/drag), toolbar (Clear / Invert / green **Randomize** lever + Blinker/Glider/Block
+    presets), Play / Step / Rewind + speed. Destiny detected by stepping the seed and hashing each
+    generation for a repeat → a **warm verdict**: green "This one lives" for still-life/oscillator
+    (shows period + steps), gentle neutral "It goes out" for death, "still wandering" for transients.
+    Never punitive. "Set it free" is gated on a living verdict.
+  - **Set-free ritual** = a colours modal (8 cell swatches, 5 backgrounds, 3 paces) with a live
+    preview → writes the chosen appearance **on-chain in the same mint tx** → a celebratory "It's
+    alive" drop animation → redirect to the newborn. Framing line: "When you set it free, it belongs
+    to whoever keeps it alive." Single-shot only; **big patterns hand off to /incubator** (bookmark +
+    link). Wanderer (path) minting kept as a quiet secondary for dying/transient-into-loop drawings.
+  - `src/lib/useMint.ts`: `mint()`/`mintPath()` take an optional `appearance {bg,cell,speed}` and
+    append `set_render_params` / `set_path_render_params` to the plan's FINAL step, so colours land
+    atomically in the creature-creating tx. Everything else (planning, resume, stall recovery) intact.
+  - `globals.css`: new `.create-*` / `.verdict` / `.free-modal` / swatch styles. Left the old
+    `.slot`/`.reels` casino-reel CSS in place but unused (no longer rendered — the brief says no
+    scores); can be removed later.
+- **Notes / simplifications vs. the old page:** dropped the casino Score reels (no scores, per brief);
+  dropped the sibling auto-bookmark on redirect; grid is **41×41** (contract size; the brief's
+  "e.g. 15×15" was illustrative). "Green is a tool colour here" (draw grid, lever, set-free button) —
+  the creature's own colours are chosen in the modal.
+- **Verified (headless Chrome + CDP click harness, live Sepolia):** Blinker → "loops every 2 beats"
+  and correctly detects the genesis blinker already lives → "meet it"; Block → "still life";
+  Randomize → a still life after 694 generations (fate engine + step count work); Play advances
+  gen 0→15; the set-free modal opens with preview + swatches + pace + "Release it →", preview
+  recolours on swatch pick. tsc + eslint clean, `next build` green. NOT verified (needs a real
+  wallet): the actual set-free tx with appearance, the "It's alive" drop, and the redirect —
+  logic reuses the proven `useMint` path.
+- **Next:** wallet-connected end-to-end mint QA (colours on-chain, drop animation, redirect);
+  confirm the multi-tx → /incubator handoff starts/resumes cleanly.
+- **Blockers:** none.
+
+## 2026-07-09 (later still) — Global chrome: the "petri" top bar, wordmark, blinker favicon
+- **Goal:** the persistent chrome from the design brief — a quiet top bar on every surface, the
+  "petri" wordmark, and a Conway-blinker favicon. "The quiet rim of the petri dish."
+- **Branch:** `new_design` · **Commits:** uncommitted WIP
+- **Changed (frontend, `ui/game-of-life`):**
+  - `src/components/GardenHeader.tsx` rebuilt as the sticky top bar: LEFT = pulsing #22c55e
+    heartbeat dot (the only animated thing in the bar) + lowercase-mono `petri` wordmark +
+    small-caps descriptor → links home; CENTER = GARDEN/CREATE/INCUBATOR/WARDS/RECORDS with
+    `usePathname` active-detection (only the active item lit #f2f2f5); RIGHT = living census
+    ("N alive"), wallet connect → truncated address, and an amber dot when a connected caretaker
+    has a hungry ward (→ /pets). Collapses to a slide-in sheet under 820px.
+  - `src/components/FaviconBlinker.tsx` (new) + `src/app/icon.svg` (new): favicon is a Conway
+    blinker (3 green cells on #070709). Static `icon.svg` is the social/app mark + first-paint
+    favicon; the component swaps the icon href between the two phases (h↔v) every 1s, holding one
+    phase under prefers-reduced-motion. Deleted the old `src/app/favicon.ico`.
+  - `src/app/layout.tsx`: mounts `<FaviconBlinker/>`; metadata title → "petri — a garden of
+    digital bacteria".
+  - `src/components/SiteFooter.tsx`: wordmark → "petri"; dropped the FR `useT`.
+  - `globals.css`: replaced the old `.site-header`/`.brand`/`.nut-chip` block with a `.topbar`/
+    `.tb-*` system (translucent #070709 @ 82% + blur, 1px #1f1f28 border, mono ~12px) + the mobile
+    burger/sheet.
+  - **Dropped from the bar** vs. the old header (per the brief's right-side spec): the NUT-balance
+    chip and the persistent "Sepolia · testnet" pill. Kept a quiet "Wrong network" affordance only
+    when connected to the wrong chain (safety).
+- **Decisions:** the census counts alive **Bacteria** (loops) — the living things — via
+  `recentLifeforms(0)`; should move to an indexer count at scale (noted in code). The sheet is
+  rendered as a **sibling of `<header>`, not a child** — `.topbar`'s `backdrop-filter` makes it the
+  containing block for `position:fixed`, which was confining the sheet to the 56px bar (caught in
+  verification; see below).
+- **Verified (headless Chrome + a CDP click harness against live Sepolia):** desktop bar renders
+  with all elements; active nav tracks the route (GARDEN on `/`, CREATE on `/create`); census read
+  a real "4 alive"; favicon carries both the static `icon.svg` and the JS-swapped data-URI blinker;
+  mobile collapses (nav/descriptor/census hidden, burger shown); **clicking the burger opens the
+  sheet** with all 5 links + active state + census/Connect in the foot, page dimmed behind. tsc +
+  eslint clean, `next build` green. NOT verified (needs a real wallet): connected address display,
+  the hungry-ward amber dot, and the wrong-network affordance.
+- **Next:** carry the `.tb-*` chrome language to the inner pages; wallet-connected QA pass.
+- **Blockers:** none.
+
+## 2026-07-09 (later) — Garden home rebuilt: the living gallery ("Petri")
+- **Goal:** overhaul the home page ("/") into the living gallery from the design brief — a dense,
+  inhabited petri dish that legibly separates the two collections and reads life at a glance.
+- **Branch:** `new_design` (branched off `main` this session) · **Commits:** uncommitted WIP
+- **Changed (frontend only, `ui/game-of-life`):**
+  - `src/app/page.tsx` → server component: a quiet poetic lead + a soft `/create` invitation
+    (no hard CTA), then `<Garden />`. Dropped the old hero/`useT`.
+  - `src/components/Garden.tsx` rewritten: two labelled collections — **Digital Bacteria**
+    (living loops) and **Digital Wanderers** (static portraits) — a 3-way lens
+    (**newly set free / oldest / hungry**), and parent-level data via `recentLifeforms` +
+    hydrated `recentPathTokenIds` (bounded-concurrency pool, order preserved).
+  - `src/components/CreatureCard.tsx` rewritten into presentational tiles `BacteriaTile` /
+    `WandererTile`. The site owns only the FRAME (`#070709` backdrop, `#1f1f28` border, faint
+    petri stipple); the render inside is the creature's OWN on-chain look (`renderParams`
+    bg/cell/speed passed straight to `<Creature>` — never recoloured). State dot: alive `#22c55e`,
+    hungry `#f97316`, gone out `#4a4a56`. Bacteria get a hover "breathe" affordance; wanderers
+    don't (they're portraits, rendered static). Short-hash caption (`shortAddr`) — the v3 ids are
+    76-digit Poseidon hashes and overflowed as decimals.
+  - `globals.css`: new `.petri-*` / `.lens` / `.collection` namespace appended. Left the existing
+    `.creature-card` / `.dish` / `.garden-grid` classes untouched — `incubator` + `leaderboards`
+    still use them.
+  - `src/app/layout.tsx`: `suppressHydrationWarning` on `<html>` + `<body>` — a browser extension
+    was injecting attributes before hydration and tripping React 19's attribute-mismatch warning
+    (couldn't repro in a clean headless browser; no render-time browser globals in our code). Only
+    suppresses those two elements one level deep; real mismatches elsewhere still surface.
+  - **"Hungry" is derived honestly**, not faked: there's no creature-level hunger flag, so Garden
+    walks the bond graph once (`petPairs` → `bondStatus`) and marks any creature whose keeper is
+    within 2 days of (or past) the 7-day lapse. Empty bond graph → "the garden is well tended".
+- **Verified:** `tsc` + eslint clean; `next build` green (`/` static, 4.4 kB). Drove it headless
+  (Chrome) against live Sepolia: 7 tiles across both collections, on-chain palettes faithful,
+  breathe affordance only on the 3 bacteria, lens + state dots present, caption contained.
+  NOT yet verified: hungry/oldest lens interaction against real bonds (no near-lapse bonds live
+  right now); mobile widths; a full click-through on device.
+- **Decisions:** kept the shared-rAF `<Creature>` canvas (already IntersectionObserver-gated) as
+  the tile render rather than per-tile on-chain iframes — the brief's perf requirement rules out
+  N iframes. Wanderers render static (`animate={false}`) to match "travelling portraits".
+- **Next:** repoint the rest of the site to this design language; Henri's browser/device pass;
+  decide whether the breathe affordance should breathe inline or keep leading to `/life/[id]`.
+- **Blockers:** none.
+
 ## 2026-07-09 — French temporarily disabled; site defaults to English
 - **Goal:** Henri: "disable the French version for now — the wording is confusing. Remove the
   fr/en toggle at the top and default to English. We'll add it back later."

@@ -11,6 +11,7 @@ Docs are grouped by what you're trying to do. One topic per file.
 | Category | Files | Read it when you want to… |
 |----------|-------|---------------------------|
 | **Concept** | [purpose.md](purpose.md), [overview.md](overview.md) | Understand the vision: digital bacteria that live forever on-chain |
+| **Design** | [design-brief.md](design-brief.md) | Brief for the website design overhaul: why petting exists, how it feels, and the full scope of what users do |
 | **Contracts** | [technical-overview.md](technical-overview.md), [project-structure.md](project-structure.md), [loop-minter.md](loop-minter.md), [path-minter.md](path-minter.md), [nutrient-token.md](nutrient-token.md) | Understand the Cairo smart contracts and how they fit together |
 | **v2 & mechanisms** | [v2-grid-redesign.md](v2-grid-redesign.md), [v2-deployment.md](v2-deployment.md), [path-creatures-spec.md](path-creatures-spec.md), [symmetry-challenge-spec.md](symmetry-challenge-spec.md), [partial-paths-mint-ux.md](partial-paths-mint-ux.md), [sierra-gas-metering-discrepancy.md](sierra-gas-metering-discrepancy.md) | Understand the 41×41 v2 system, its deployments, burn mechanisms, and gas realities |
 | **v3 (live)** | [v3-identity-spec.md](v3-identity-spec.md), [v3-deployment.md](v3-deployment.md) | The orbit-canonical identity model: one id system, copies prevented at mint — live on Sepolia |
