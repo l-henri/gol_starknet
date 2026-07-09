@@ -32,6 +32,7 @@ export function usePet() {
   const { address, connect, execute, waitForTx } = useWallet();
   const [status, setStatus] = useState<PetStatus>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [txHash, setTxHash] = useState<string | null>(null);
 
   const run = useCallback(
     async (calls: unknown) => {
@@ -40,10 +41,12 @@ export function usePet() {
         return false;
       }
       setError(null);
+      setTxHash(null);
       setStatus("signing");
       try {
         const hash = await execute(calls);
         if (!hash) throw new Error("Wallet returned no transaction hash.");
+        setTxHash(hash);
         setStatus("pending");
         await waitForTx(hash);
         setStatus("confirmed");
@@ -74,9 +77,10 @@ export function usePet() {
   const reset = useCallback(() => {
     setStatus("idle");
     setError(null);
+    setTxHash(null);
   }, []);
 
-  return { status, error, pet, reap, reset, connected: !!address };
+  return { status, txHash, error, pet, reap, reset, connected: !!address };
 }
 
 /** The connected wallet's bond on one creature (refetches after every confirmed tx). */

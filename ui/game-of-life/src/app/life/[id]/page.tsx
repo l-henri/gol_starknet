@@ -2,62 +2,52 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Creature from "@/components/Creature";
+import BreathCanvas from "@/components/BreathCanvas";
 import { useGolSdk } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
 import { useBreathe } from "@/lib/useBreathe";
 import { usePet, useBond, daysLeft } from "@/lib/usePet";
 import { useMint } from "@/lib/useMint";
-import { useGasCaps } from "@/lib/gasCaps";
 import { findBeast } from "@/lib/bestiary";
-import { rowsFromCoords } from "@/lib/creatures";
-import { lifeformKind, shortAddr, tokenIdDecimal } from "@/lib/format";
+import { fromRows, rowsFromCoords, step, type Cells } from "@/lib/creatures";
+import { shortAddr, tokenIdDecimal } from "@/lib/format";
 import { explorerTxUrl } from "@/lib/config";
 import type { JsLifeform } from "@/lib/types";
-import { onchainHtml, LIFEFORM_DESCRIPTION } from "@/lib/onchainRender";
-import { useT } from "@/lib/i18n";
+import { onchainHtml } from "@/lib/onchainRender";
 
-// The feed slider max is sized per-wallet from the connected account's gas-metering tier (see
-// gasCaps.ts): one move_lifeform_forward_n(id, n) costs ~3.0M gas/gen on a modern Sierra-gas account
-// vs ~14M/gen on a legacy one, so the ~1.2B per-tx wallet cap allows ~340 vs ~82 generations. The cap
-// comes from useGasCaps(); legacy is the safe default while the tier is still resolving.
-const SPEED_MAX = 200; // contract invariant: 0 < speed < SPEED_MAX
-const toHexColor = (n: number) => "#" + (n & 0xffffff).toString(16).padStart(6, "0");
-const fromHexColor = (s: string) => parseInt(s.replace("#", ""), 16) || 0;
-const sameId = (a: string, b: string) => {
-  try {
-    return BigInt(a) === BigInt(b);
-  } catch {
-    return false;
-  }
-};
+const toHex = (n: number) => "#" + (n & 0xffffff).toString(16).padStart(6, "0");
+const sameId = (a: string, b: string) => { try { return BigInt(a) === BigInt(b); } catch { return false; } };
+type RP = { bg: number; cell: number; speed: number };
+
+/* microscope-slide frame: thin border + corner ticks + faint petri texture behind the render */
+function Slide({ children }: { children: ReactNode }) {
+  return (
+    <div className="slide">
+      <div className="slide-glass">{children}</div>
+      <span className="tick tl" /><span className="tick tr" /><span className="tick bl" /><span className="tick br" />
+    </div>
+  );
+}
 
 export default function LifePage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
-  const beast = findBeast(id);
-
-  if (beast) return <BeastDetail key={id} />;
+  if (findBeast(id)) return <BeastDetail key={id} />;
   return <MintedDetail key={id} id={id} />;
 }
 
-/* ---------- dispatcher: a minted id is either a loop creature or a path creature ---------- */
+/* dispatcher: a minted id is a loop (Bacterium) or a path (Wanderer) */
 function MintedDetail({ id }: { id: string }) {
-  const { t } = useT();
   const { sdk, error } = useGolSdk();
   const [kind, setKind] = useState<"loading" | "loop" | "path" | "none">("loading");
   useEffect(() => {
     if (!sdk) return;
     let cancelled = false;
     (async () => {
-      // Loop and path NFTs share the token-id scheme but live on different contracts. Race both;
-      // render whichever exists. A just-minted creature can lag chain reads, so retry briefly.
       for (let attempt = 0; attempt < 5; attempt++) {
-        const [l, p] = await Promise.all([
-          sdk.lifeform(id).catch(() => null),
-          sdk.pathLifeform(id).catch(() => null),
-        ]);
+        const [l, p] = await Promise.all([sdk.lifeform(id).catch(() => null), sdk.pathLifeform(id).catch(() => null)]);
         if (cancelled) return;
         if (l) return setKind("loop");
         if (p) return setKind("path");
@@ -65,508 +55,388 @@ function MintedDetail({ id }: { id: string }) {
       }
       if (!cancelled) setKind("none");
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [sdk, id]);
 
-  if (error)
-    return <Shell><p className="status-line">{t({ fr: "la boîte de Pétri est hors ligne — ", en: "the petri dish is offline — " })}{error}</p></Shell>;
-  if (kind === "loading")
-    return <Shell><p className="status-line"><span className="spinner" /> {t({ fr: "lecture de la chaîne…", en: "reading the chain…" })}</p></Shell>;
+  if (error) return <Shell><p className="status-line">the petri dish is offline — {error}</p></Shell>;
+  if (kind === "loading") return <Shell><p className="status-line"><span className="spinner" /> reading the chain…</p></Shell>;
   if (kind === "loop") return <LoopDetail id={id} />;
   if (kind === "path") return <PathDetail id={id} />;
-  return <Shell><p className="status-line">{t({ fr: `aucune créature #${id} sur Sepolia.`, en: `no creature #${id} is minted on Sepolia.` })}</p></Shell>;
+  return <Shell><p className="status-line">no creature #{id} is minted on Sepolia.</p></Shell>;
 }
 
-/* ---------- a minted, on-chain LOOP creature ---------- */
+/* ---------- a living Bacterium: the ritual surface ---------- */
 function LoopDetail({ id }: { id: string }) {
-  const { t } = useT();
   const { sdk, error } = useGolSdk();
-  const { address, onSepolia, switchToSepolia, execute, waitForTx } = useWallet();
-  const { feedCap, tier } = useGasCaps();
-  const { status, txHash, error: breatheError, breathe, reset, connected } = useBreathe();
-  const { status: petStatus, error: petError, pet, reset: petReset } = usePet();
-  const bond = useBond(id); // route id (hex or decimal) — parsed by the SDK
+  const { onSepolia, switchToSepolia, execute, waitForTx } = useWallet();
+  const { status: bStatus, txHash: bHash, error: bErr, breathe, reset: bReset, connected } = useBreathe();
+  const { status: pStatus, txHash: pHash, error: pErr, pet, reset: pReset } = usePet();
+  const bond = useBond(id);
+
   const [lf, setLf] = useState<JsLifeform | null>(null);
-  const [rp, setRp] = useState<{ bg: number; cell: number; speed: number } | null>(null);
+  const [rp, setRp] = useState<RP | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [reward, setReward] = useState(false);
-  const [feedGen, setFeedGen] = useState(1);
-  // owner-editable render params: `edit` starts as the on-chain values; an "Edit creature" tx persists.
-  const [edit, setEdit] = useState<{ bg: number; cell: number; speed: number } | null>(null);
-  const [editStatus, setEditStatus] = useState<"idle" | "signing" | "pending" | "confirmed" | "error">("idle");
-  const [editErr, setEditErr] = useState<string | null>(null);
+
+  const [born, setBorn] = useState<number | null>(null);
+  const [pack, setPack] = useState<{ holder: string; left: number | null }[] | null>(null);
+  const [packEpoch, setPackEpoch] = useState(0);
+
+  const [scrubGen, setScrubGen] = useState<number | null>(null);
+  const [showIframe, setShowIframe] = useState(false);
+  const [breathSignal, setBreathSignal] = useState(0);
+  const [confirmMsg, setConfirmMsg] = useState<{ text: string; hash: string | null } | null>(null);
+  const [shownAge, setShownAge] = useState(0);
+
+  const [dcOpen, setDcOpen] = useState(false);
+  const [dcTo, setDcTo] = useState("");
+  const [dcStatus, setDcStatus] = useState<"idle" | "signing" | "pending" | "confirmed" | "error">("idle");
+  const [dcErr, setDcErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!sdk) return;
-    // No token_uri fetch: the on-chain artifact is rebuilt locally from these cheap reads + the
-    // cached template (see onchainRender). lifeform() already covers owner + current_state.
-    // A just-minted creature can lag chain reads by a beat, so retry briefly before concluding it
-    // isn't minted — this makes the post-mint redirect land smoothly without a manual refresh.
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
         const [l, p] = await Promise.all([sdk.lifeform(id), sdk.renderParams(id)]);
-        if (l) {
-          setLf(l as JsLifeform);
-          setRp((p as { bg: number; cell: number; speed: number } | null) ?? null);
-          setNotFound(false);
-          setLoading(false);
-          return;
-        }
-      } catch {
-        // transient read error — retry
-      }
+        if (l) { setLf(l as JsLifeform); setRp((p as RP | null) ?? null); setNotFound(false); setLoading(false); return; }
+      } catch { /* transient — retry */ }
       if (attempt < 4) await new Promise((r) => setTimeout(r, 1800));
     }
-    setNotFound(true);
-    setLoading(false);
+    setNotFound(true); setLoading(false);
   }, [sdk, id]);
+  useEffect(() => { setLoading(true); load(); }, [load]);
 
+  useEffect(() => { if (lf) setShownAge(lf.age); }, [lf?.age]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // lazy: the birth block (the on-chain name is just "Lifeform <id>"; we show a cleaner type name)
+  useEffect(() => { if (!sdk) return; let c = false; sdk.recentMints().then((m) => { const hit = (m as { token_id: string; block: number }[]).find((x) => sameId(x.token_id, id)); if (!c) setBorn(hit?.block ?? null); }).catch(() => {}); return () => { c = true; }; }, [sdk, id]);
+
+  // caretakers ("the pack") — every held bond on this creature, soonest-to-wilt first
   useEffect(() => {
-    setLoading(true);
+    if (!sdk) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const pairs = ((await sdk.petPairs()) as { creature_id: string; holder: string }[]) ?? [];
+        const mine = pairs.filter((p) => sameId(p.creature_id, id));
+        const seen = new Set<string>();
+        const out: { holder: string; left: number | null }[] = [];
+        for (const p of mine) {
+          const k = BigInt(p.holder).toString();
+          if (seen.has(k)) continue;
+          seen.add(k);
+          const b = (await sdk.bondStatus(p.creature_id, p.holder)) as { held: boolean; last_pet: number; reapable: boolean };
+          if (!b.held) continue;
+          out.push({ holder: p.holder, left: daysLeft({ held: true, lastPet: b.last_pet, reapable: b.reapable }) });
+        }
+        if (!cancelled) setPack(out.sort((a, b) => (a.left ?? 0) - (b.left ?? 0)));
+      } catch { if (!cancelled) setPack([]); }
+    })();
+    return () => { cancelled = true; };
+  }, [sdk, id, packEpoch]);
+
+  // a confirmed breath → play the animation, tick the counter, refetch, settle
+  useEffect(() => {
+    if (bStatus !== "confirmed") return;
+    setShowIframe(false); setScrubGen(null);
+    setBreathSignal((s) => s + 1);
+    setShownAge((a) => a + 1);
+    setConfirmMsg({ text: "You gave it a breath.", hash: bHash });
     load();
-  }, [load]);
-
-  // keep the editable params synced to the on-chain values (resets after a confirmed edit)
+    const t = setTimeout(() => bReset(), 3200);
+    return () => clearTimeout(t);
+  }, [bStatus]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (rp) setEdit({ ...rp });
-  }, [rp]);
+    if (pStatus !== "confirmed") return;
+    setShowIframe(false); setScrubGen(null);
+    setBreathSignal((s) => s + 1);
+    setShownAge((a) => a + 1);
+    setConfirmMsg({ text: "You gave it a breath. Bond renewed.", hash: pHash });
+    load(); setPackEpoch((e) => e + 1);
+    const t = setTimeout(() => pReset(), 3200);
+    return () => clearTimeout(t);
+  }, [pStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // on confirmation: refetch the (now older) creature, flash +1 NUT, then settle
-  useEffect(() => {
-    if (status !== "confirmed") return;
-    setReward(true);
-    load();
-    const t1 = setTimeout(() => setReward(false), 2600);
-    const t2 = setTimeout(() => reset(), 2800);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, [status, load, reset]);
-
-  if (error) return <Shell><p className="status-line">{t({ fr: "la boîte de Pétri est hors ligne — ", en: "the petri dish is offline — " })}{error}</p></Shell>;
-  if (loading) return <Shell><p className="status-line"><span className="spinner" /> {t({ fr: "lecture de la chaîne…", en: "reading the chain…" })}</p></Shell>;
-  if (notFound) return <Shell><p className="status-line">{t({ fr: `aucune créature #${id} sur Sepolia.`, en: `no lifeform #${id} is minted on Sepolia.` })}</p></Shell>;
+  if (error) return <Shell><p className="status-line">the petri dish is offline — {error}</p></Shell>;
+  if (loading) return <Shell><p className="status-line"><span className="spinner" /> reading the chain…</p></Shell>;
+  if (notFound) return <Shell><p className="status-line">no lifeform #{id} is minted on Sepolia.</p></Shell>;
   if (!lf) return null;
 
-  const kind = lifeformKind(lf);
   const decId = tokenIdDecimal(lf.token_id);
-  const busy = status === "signing" || status === "pending";
+  const period = lf.sequence_length;
+  const displayName = lf.is_still ? "Still Life" : lf.is_loop ? `Period-${period} Loop` : "Lifeform";
+  const stateWord = lf.is_dead ? "gone out" : "alive";
+  const bBusy = bStatus === "signing" || bStatus === "pending";
+  const pBusy = pStatus === "signing" || pStatus === "pending";
+  const left = daysLeft(bond);
+  const hungry = left !== null && left <= 2;
 
-  const isOwner = !!address && sameId(address, lf.owner);
-  const editBusy = editStatus === "signing" || editStatus === "pending";
-  const editChanged = !!edit && !!rp && (edit.bg !== rp.bg || edit.cell !== rp.cell || edit.speed !== rp.speed);
-  const editInvalid = !!edit && edit.bg === edit.cell;
+  const doBreathe = () => (bStatus === "error" ? bReset() : !connected || !onSepolia ? (onSepolia ? breathe(decId, 1) : switchToSepolia()) : breathe(decId, 1));
+  const doPet = () => (pStatus === "error" ? pReset() : !onSepolia ? switchToSepolia() : pet(decId));
 
-  const doEdit = async () => {
-    if (!sdk || !edit) return;
-    if (editStatus === "error") {
-      setEditStatus("idle");
-      setEditErr(null);
-      return;
-    }
-    setEditErr(null);
-    setEditStatus("signing");
+  const doTransfer = async () => {
+    if (!sdk || !dcTo.trim()) return;
+    setDcErr(null); setDcStatus("signing");
     try {
-      const calls = sdk.setRenderParamsCall(lf.token_id, edit.bg, edit.cell, edit.speed);
-      const hash = await execute(calls);
-      setEditStatus("pending");
+      const hash = await execute(sdk.transferBondCall(decId, dcTo.trim()));
+      setDcStatus("pending");
       await waitForTx(hash);
-      setEditStatus("confirmed");
-      await load(); // refetch → rp updates → edit re-syncs → "changed" clears
-      setTimeout(() => setEditStatus("idle"), 1800);
+      setDcStatus("confirmed");
+      setPackEpoch((e) => e + 1);
+      setTimeout(() => { setDcOpen(false); setDcStatus("idle"); setDcTo(""); }, 1400);
     } catch (e) {
-      setEditErr(e instanceof Error ? e.message : String(e));
-      setEditStatus("error");
+      setDcErr(e instanceof Error ? e.message.slice(0, 140) : String(e));
+      setDcStatus("error");
     }
   };
 
+  const scrubMax = Math.min(period - 1, 63);
+
   return (
     <Shell>
-      <div className="detail">
-        <div className={`stage${busy ? " inhaling" : ""}`}>
-          {/* the exact on-chain render: the contract's renderer, rebuilt locally from the cached
-              template + this token's rows/bg/cell/speed (no token_uri fetch). */}
-          {rp ? (
-            <div className="svg-frame">
-              <iframe srcDoc={onchainHtml(lf.current_state, rp.bg, rp.cell, rp.speed)} title={`On-chain renderer for lifeform ${decId}`} sandbox="allow-scripts" style={{ width: "100%", height: "100%", border: 0, background: "var(--bg-dish)" }} />
+      <div className="life">
+        <div className="life-main">
+          {/* LEFT — the render, framed as a microscope slide */}
+          <div className="life-left">
+            <Slide>
+              {rp && showIframe ? (
+                <iframe srcDoc={onchainHtml(lf.current_state, rp.bg, rp.cell, rp.speed)} title={`On-chain renderer for ${decId}`} sandbox="allow-scripts" style={{ width: "100%", height: "100%", border: 0, background: toHex(rp.bg) }} />
+              ) : rp ? (
+                <BreathCanvas rows={lf.current_state} bg={rp.bg} cell={rp.cell} speed={rp.speed} playing={scrubGen === null} scrubGen={scrubGen} breathSignal={breathSignal} />
+              ) : (
+                <div className="status-line" style={{ padding: 24 }}>reading render params…</div>
+              )}
+            </Slide>
+
+            <div className="life-counter">
+              <span className="life-gen">{shownAge.toLocaleString("en-US")}</span>
+              <span className="life-gen-label">generation{shownAge === 1 ? "" : "s"} lived</span>
             </div>
-          ) : (
-            <div className="svg-frame" style={{ background: "var(--bg-dish)" }}>
-              <span className="status-line">{t({ fr: "lecture des paramètres de rendu…", en: "reading render params…" })}</span>
+
+            {period > 1 && !showIframe && (
+              <div className="life-scrub">
+                <button className={"scrub-live" + (scrubGen === null ? " on" : "")} onClick={() => setScrubGen(null)}>
+                  <span className="dot" /> live
+                </button>
+                <input type="range" min={0} max={scrubMax} value={scrubGen ?? 0} onChange={(e) => setScrubGen(Number(e.target.value))} aria-label="Replay generations" />
+                <span className="scrub-read">{scrubGen === null ? "cycle" : `phase ${scrubGen} / ${period}`}</span>
+              </div>
+            )}
+            <button className="life-onchain" onClick={() => setShowIframe((v) => !v)}>
+              {showIframe ? "← show the replayable view" : "view the on-chain renderer"}
+            </button>
+          </div>
+
+          {/* RIGHT — identity, facts, and the two acts of care */}
+          <div className="life-right">
+            <span className="eyebrow">{stateWord} · living on Starknet</span>
+            <h1 className="life-name">{displayName} <span className="life-id">{shortAddr(lf.token_id)}</span></h1>
+
+            <div className="life-facts">
+              <span>born · <span className="mono">{born !== null ? `block ${born.toLocaleString("en-US")}` : "…"}</span></span>
+              <Copyable label="set free by" value={lf.owner} display={shortAddr(lf.owner)} />
             </div>
-          )}
-          {reward && <span className="nut-float">+{feedGen} NUT</span>}
+
+            <div className="trait-grid">
+              <Trait t="Kind" v={lf.is_still ? "Still life" : "Loop"} />
+              <Trait t="Loop period" v={String(period)} />
+              <Trait t="State" v={stateWord} />
+              {rp && <Trait t="Cell" v={<Swatch color={toHex(rp.cell)} />} />}
+              {rp && <Trait t="Background" v={<Swatch color={toHex(rp.bg)} />} />}
+              {rp && <Trait t="Pace" v={`${rp.speed} gen/s`} />}
+            </div>
+
+            {!lf.is_dead && (
+              <div className="acts">
+                <button className="btn set-free breathe-act" onClick={doBreathe} disabled={bBusy || pBusy}>
+                  {!connected ? "Connect to breathe"
+                    : !onSepolia ? "Switch to Sepolia"
+                    : bStatus === "signing" ? "Drawing breath…"
+                    : bStatus === "pending" ? "The chain is writing…"
+                    : bStatus === "error" ? "Try again"
+                    : "Breathe life"}
+                </button>
+                <p className="act-note">One generation forward. Casual, anonymous — earns you a little $NUT. No bond.</p>
+
+                {connected && onSepolia && (
+                  <div className="act-pet">
+                    <button className="btn pet-act" onClick={doPet} disabled={pBusy || bBusy}>
+                      {pStatus === "signing" ? "Drawing breath…"
+                        : pStatus === "pending" ? "The chain is writing…"
+                        : pStatus === "error" ? "Try again"
+                        : bond?.held ? "Pet — the committed breath" : "Adopt it — become its caretaker"}
+                    </button>
+                    {bond?.held ? (
+                      <div className={"bond-clock" + (hungry ? " hungry" : "")}>
+                        <span className="bond-dot" />
+                        {left !== null && left <= 0
+                          ? "bond wilted — a pet revives it"
+                          : `bond: ${left! >= 1 ? `${Math.floor(left!)} day${Math.floor(left!) === 1 ? "" : "s"}` : `${Math.max(1, Math.round(left! * 24))} hours`} left`}
+                      </div>
+                    ) : (
+                      <p className="act-note">Petting opens your caretaker bond and a 7-day clock. Come back within 7 days, or the bond wilts.</p>
+                    )}
+
+                    {bond?.held && (
+                      dcOpen ? (
+                        <div className="daycare">
+                          <input className="dc-input" placeholder="0x… friend's address" value={dcTo} onChange={(e) => setDcTo(e.target.value)} />
+                          <div className="daycare-row">
+                            <button className="btn set-free" disabled={dcStatus === "signing" || dcStatus === "pending" || !dcTo.trim()} onClick={doTransfer}>
+                              {dcStatus === "signing" ? "Confirm…" : dcStatus === "pending" ? "Handing over…" : dcStatus === "confirmed" ? "Handed over" : "Hand over"}
+                            </button>
+                            <button className="btn ghost" onClick={() => { setDcOpen(false); setDcErr(null); }}>Cancel</button>
+                          </div>
+                          {dcErr && <p className="breathe-err">{dcErr}</p>}
+                          <p className="act-note">Daycare: hand the bond to a friend to pet-sit while you’re away. The clock rides along.</p>
+                        </div>
+                      ) : (
+                        <button className="btn ghost dc-open" onClick={() => setDcOpen(true)}>hand to daycare →</button>
+                      )
+                    )}
+                  </div>
+                )}
+
+                {confirmMsg && (
+                  <div className="breath-confirm">
+                    <p>{confirmMsg.text}</p>
+                    {confirmMsg.hash && <a className="tx-link" href={explorerTxUrl(confirmMsg.hash)} target="_blank" rel="noreferrer">{shortAddr(confirmMsg.hash)} ↗</a>}
+                  </div>
+                )}
+                {bStatus === "error" && bErr && <p className="breathe-err">{bErr}</p>}
+                {pStatus === "error" && pErr && <p className="breathe-err">{pErr}</p>}
+              </div>
+            )}
+            {lf.is_dead && <p className="dim" style={{ marginTop: 16 }}>This one has gone out. It rests on-chain, a record of a life.</p>}
+          </div>
         </div>
 
-        <div>
-          <span className="kicker">
-            {lf.is_alive ? t({ fr: "en vie", en: "alive" }) : t({ fr: "en sommeil", en: "dormant" })}
-            {t({ fr: " · vit sur Starknet", en: " · living on Starknet" })}
-          </span>
-          <div className="meta-row">
-            <Copyable label={t({ fr: "propriétaire", en: "owner" })} value={lf.owner} display={shortAddr(lf.owner)} />
-            <Copyable label={t({ fr: "token", en: "token" })} value={lf.token_id} display={shortAddr(lf.token_id)} />
-          </div>
-
-          <div className="trait-grid">
-            <Trait t={t({ fr: "Type", en: "Kind" })} v={t(kind)} />
-            <Trait t={t({ fr: "Période de la boucle", en: "Loop period" })} v={String(lf.sequence_length)} />
-            <Trait t={t({ fr: "Âge", en: "Age" })} v={`${lf.age} ${t({ fr: lf.age === 1 ? "souffle" : "souffles", en: lf.age === 1 ? "breath" : "breaths" })}`} />
-            {rp && (
-              <>
-                <Trait t={t({ fr: "Fond", en: "Background" })} v={<Swatch color={toHexColor(rp.bg)} />} />
-                <Trait t={t({ fr: "Cellule", en: "Cell" })} v={<Swatch color={toHexColor(rp.cell)} />} />
-                <Trait t={t({ fr: "Vitesse", en: "Speed" })} v={`${rp.speed} ${t({ fr: "gén/s", en: "gen/s" })}`} />
-              </>
+        {/* BELOW — the pack, and the generations it lives through */}
+        <div className="life-below">
+          <section>
+            <h3 className="life-h3">Caretakers</h3>
+            {pack === null ? (
+              <p className="dim"><span className="spinner" /> reading the pack…</p>
+            ) : pack.length === 0 ? (
+              <p className="dim">No caretakers yet — be the first to pet it.</p>
+            ) : (
+              <ul className="pack">
+                {pack.map((c) => (
+                  <li key={c.holder}>
+                    <span className="pack-dot" style={{ background: c.left !== null && c.left <= 2 ? "#f97316" : "#22c55e" }} />
+                    <span className="mono">{shortAddr(c.holder)}</span>
+                    <span className="pack-left">{c.left === null ? "" : c.left <= 0 ? "wilting" : c.left >= 1 ? `${Math.floor(c.left)}d left` : `${Math.max(1, Math.round(c.left * 24))}h left`}</span>
+                  </li>
+                ))}
+              </ul>
             )}
-          </div>
-
-          {/* Editing the appearance is owner-only — the values themselves are shown read-only in the
-              characteristics grid above. These controls appear only when the owner's wallet is connected. */}
-          {isOwner && rp && edit && (
-            <div style={{ marginTop: 14 }}>
-              <div className="note" style={{ marginBottom: 6 }}>
-                {t({ fr: "apparence · à toi de régler", en: "appearance · yours to tune" })}
-              </div>
-              <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
-                <label className="note" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {t({ fr: "fond", en: "background" })}
-                  <input type="color" value={toHexColor(edit.bg)} onChange={(e) => setEdit({ ...edit, bg: fromHexColor(e.target.value) })} />
-                </label>
-                <label className="note" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {t({ fr: "cellule", en: "cell" })}
-                  <input type="color" value={toHexColor(edit.cell)} onChange={(e) => setEdit({ ...edit, cell: fromHexColor(e.target.value) })} />
-                </label>
-                <label className="note" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {t({ fr: "vitesse", en: "speed" })}
-                  <input
-                    type="number"
-                    min={1}
-                    max={SPEED_MAX - 1}
-                    value={edit.speed}
-                    onChange={(e) => setEdit({ ...edit, speed: Math.max(1, Math.min(SPEED_MAX - 1, Number(e.target.value) || 1)) })}
-                    style={{ width: 64 }}
-                  />
-                </label>
-              </div>
-              {editChanged && (
-                <div style={{ marginTop: 10 }}>
-                  {editInvalid && <p className="breathe-err">{t({ fr: "le fond et la cellule doivent différer", en: "background and cell colour must differ" })}</p>}
-                  <button className="btn primary" onClick={doEdit} disabled={editBusy || editInvalid}>
-                    {editStatus === "signing"
-                      ? t({ fr: "Confirme dans ton portefeuille…", en: "Confirm in your wallet…" })
-                      : editStatus === "pending"
-                        ? t({ fr: "Modification… (tx en attente)", en: "Editing… (tx pending)" })
-                        : editStatus === "confirmed"
-                          ? t({ fr: "✓ Modifiée", en: "✓ Edited" })
-                          : editStatus === "error"
-                            ? t({ fr: "Réessayer", en: "Try again" })
-                            : t({ fr: "Modifier la créature", en: "Edit creature" })}
-                  </button>
-                  {editErr && editStatus === "error" && <p className="breathe-err">{editErr}</p>}
-                </div>
-              )}
-            </div>
-          )}
-
-          <p className="dim" style={{ maxWidth: "46ch" }}>{LIFEFORM_DESCRIPTION}</p>
-
-          {!lf.is_dead && (
-            <div className="breathe-block">
-              {connected && onSepolia && (
-                <label className="note" style={{ display: "block", marginBottom: 8 }}>
-                  {t({
-                    fr: `nourrir ${feedGen} génération${feedGen === 1 ? "" : "s"} · gagner ${feedGen} $NUT`,
-                    en: `feed ${feedGen} generation${feedGen === 1 ? "" : "s"} · earn ${feedGen} $NUT`,
-                  })}
-                  <input
-                    type="range"
-                    min={1}
-                    max={feedCap}
-                    value={feedGen}
-                    onChange={(e) => setFeedGen(Number(e.target.value))}
-                    disabled={busy}
-                    style={{ display: "block", width: "100%", maxWidth: 320 }}
-                  />
-                  {tier === "modern" && (
-                    <span className="note" style={{ display: "block", marginTop: 4, opacity: 0.7 }}>
-                      {t({
-                        fr: `⚡ jusqu'à ${feedCap} générations par transaction (portefeuille à gas moderne)`,
-                        en: `⚡ up to ${feedCap} generations per feed (modern-gas wallet)`,
-                      })}
-                    </span>
-                  )}
-                </label>
-              )}
-              <button
-                className="btn primary breathe-btn"
-                onClick={() =>
-                  status === "error" ? reset() : connected && !onSepolia ? switchToSepolia() : breathe(decId, feedGen)
-                }
-                disabled={busy}
-              >
-                {!connected
-                  ? t({ fr: "Connecte-toi pour nourrir", en: "Connect to feed" })
-                  : !onSepolia
-                    ? t({ fr: "Passe sur Sepolia pour nourrir", en: "Switch to Sepolia to feed" })
-                    : status === "signing"
-                      ? t({ fr: "Confirme dans ton portefeuille…", en: "Confirm in your wallet…" })
-                      : status === "pending"
-                        ? t({ fr: "Alimentation… (tx en attente)", en: "Feeding… (tx pending)" })
-                        : status === "confirmed"
-                          ? t({ fr: `✓ Nourrie · +${feedGen} $NUT`, en: `✓ Fed · +${feedGen} $NUT` })
-                          : status === "error"
-                            ? t({ fr: "Réessayer", en: "Try again" })
-                            : t({ fr: `Nourrir & gagner ${feedGen} $NUT`, en: `Feed & get ${feedGen} $NUT` })}
-              </button>
-              {txHash && (status === "pending" || status === "confirmed") && (
-                <a className="tx-link" href={explorerTxUrl(txHash)} target="_blank" rel="noreferrer">
-                  {t({ fr: "voir la tx ↗", en: "view tx ↗" })}
-                </a>
-              )}
-              {status === "error" && breatheError && <p className="breathe-err">{breatheError}</p>}
-              {connected && onSepolia && (
-                <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
-                  <button
-                    className="btn breathe-btn"
-                    onClick={() => (petStatus === "error" ? petReset() : pet(decId))}
-                    disabled={petStatus === "signing" || petStatus === "pending" || busy}
-                  >
-                    {petStatus === "signing"
-                      ? t({ fr: "Confirme dans ton portefeuille…", en: "Confirm in your wallet…" })
-                      : petStatus === "pending"
-                        ? t({ fr: "Caresse… (tx en attente)", en: "Petting… (tx pending)" })
-                        : petStatus === "confirmed"
-                          ? t({ fr: "✓ Caressée — le lien est ravivé", en: "✓ Petted — the bond is renewed" })
-                          : petStatus === "error"
-                            ? t({ fr: "Réessayer la caresse", en: "Retry the pet" })
-                            : bond?.held
-                              ? t({ fr: "🤲 Caresser · un souffle", en: "🤲 Pet · one breath" })
-                              : t({ fr: "🤲 L'adopter · un souffle", en: "🤲 Adopt it · one breath" })}
-                  </button>
-                  {(() => {
-                    const left = daysLeft(bond);
-                    if (left === null)
-                      return (
-                        <p className="breathe-hint">
-                          {t({
-                            fr: "caresse-la pour tisser un lien : un souffle par caresse, et reviens sous 7 jours — sinon le lien fane.",
-                            en: "pet it to form a bond: one breath per pet, and come back within 7 days — or the bond wilts.",
-                          })}
-                        </p>
-                      );
-                    if (left <= 0)
-                      return (
-                        <p className="breathe-err">
-                          {t({
-                            fr: "ton lien a fané — le faucheur peut passer. Une caresse le ravive.",
-                            en: "your bond has wilted — the reaper may pass. A pet revives it.",
-                          })}
-                        </p>
-                      );
-                    return (
-                      <p className="breathe-hint">
-                        {t({
-                          fr: `ton lien : encore ${left >= 1 ? `${Math.floor(left)} j` : `${Math.max(1, Math.round(left * 24))} h`} avant qu'il ne fane.`,
-                          en: `your bond: ${left >= 1 ? `${Math.floor(left)} days` : `${Math.max(1, Math.round(left * 24))} hours`} before it wilts.`,
-                        })}
-                      </p>
-                    );
-                  })()}
-                  {petStatus === "error" && petError && <p className="breathe-err">{petError}</p>}
-                </div>
-              )}
-              {status === "idle" && connected && (
-                <p className="breathe-hint">{t({ fr: "nourris-la — chaque génération la garde en vie et te rapporte 1 $NUT.", en: "feed it forward — each generation keeps it alive and earns you 1 $NUT." })}</p>
-              )}
-            </div>
-          )}
+          </section>
+          <section>
+            <h3 className="life-h3">Lived generations</h3>
+            <p className="dim">It has lived <b>{shownAge.toLocaleString("en-US")}</b> generation{shownAge === 1 ? "" : "s"}{period > 1 ? `, cycling through ${period} states` : " as a still life"}.</p>
+            {rp && <Filmstrip rows={lf.current_state} period={period} rp={rp} />}
+          </section>
         </div>
       </div>
     </Shell>
   );
 }
 
-/* ---------- a minted PATH creature (a transient that leads into a loop) ---------- */
+/* the states a creature moves through (its cycle) as a filmstrip */
+function Filmstrip({ rows, period, rp }: { rows: number[]; period: number; rp: RP }) {
+  const frames = useMemo(() => {
+    const out: Cells[] = [];
+    let c = fromRows(rows);
+    for (let i = 0; i < Math.min(period, 10); i++) { out.push(c); c = step(c); }
+    return out;
+  }, [rows, period]);
+  return (
+    <div className="filmstrip">
+      {frames.map((f, i) => (
+        <div className="film-frame" key={i} title={`generation ${i}`}>
+          <Creature cells={f} bg={rp.bg} cell={rp.cell} variant="living" animate={false} res={120} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ---------- a Wanderer: a static travelling portrait (no care) ---------- */
 type JsPath = {
-  token_id: string;
-  owner: string;
-  life_state: string; // "alive" | "frozen" | "dead"
-  sequence_length: number;
-  start_state: number[];
-  target_loop_id: string;
-  target_period: number;
-  minted_at: number;
-  escrow: string;
+  token_id: string; owner: string; life_state: string; sequence_length: number;
+  start_state: number[]; target_loop_id: string; target_period: number; minted_at: number; escrow: string;
 };
-
 function PathDetail({ id }: { id: string }) {
-  const { t } = useT();
   const { sdk } = useGolSdk();
-  const { address, execute, waitForTx } = useWallet();
   const [pf, setPf] = useState<JsPath | null>(null);
-  const [rp, setRp] = useState<{ bg: number; cell: number; speed: number } | null>(null);
+  const [rp, setRp] = useState<RP | null>(null);
+  const [born, setBorn] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [edit, setEdit] = useState<{ bg: number; cell: number; speed: number } | null>(null);
-  const [editStatus, setEditStatus] = useState<"idle" | "signing" | "pending" | "confirmed" | "error">("idle");
-  const [editErr, setEditErr] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  useEffect(() => {
     if (!sdk) return;
-    const [p, params] = await Promise.all([sdk.pathLifeform(id), sdk.pathRenderParams(id)]);
-    setPf((p as JsPath) ?? null);
-    setRp((params as { bg: number; cell: number; speed: number } | null) ?? null);
-    setLoading(false);
+    let c = false;
+    Promise.all([sdk.pathLifeform(id), sdk.pathRenderParams(id)]).then(([p, params]) => {
+      if (c) return;
+      setPf((p as JsPath) ?? null); setRp((params as RP | null) ?? null); setLoading(false);
+    });
+    sdk.recentPathMints().then((m) => { const hit = (m as { token_id: string; block: number }[]).find((x) => sameId(x.token_id, id)); if (!c) setBorn(hit?.block ?? null); }).catch(() => {});
+    return () => { c = true; };
   }, [sdk, id]);
-  useEffect(() => {
-    load();
-  }, [load]);
-  useEffect(() => {
-    if (rp) setEdit({ ...rp });
-  }, [rp]);
 
-  if (loading) return <Shell><p className="status-line"><span className="spinner" /> {t({ fr: "lecture de la chaîne…", en: "reading the chain…" })}</p></Shell>;
-  if (!pf) return <Shell><p className="status-line">{t({ fr: `aucune vagabonde #${id} sur Sepolia.`, en: `no wanderer #${id} is minted on Sepolia.` })}</p></Shell>;
+  if (loading) return <Shell><p className="status-line"><span className="spinner" /> reading the chain…</p></Shell>;
+  if (!pf) return <Shell><p className="status-line">no wanderer #{id} is minted on Sepolia.</p></Shell>;
 
-  const isOwner = !!address && sameId(address, pf.owner);
-  const editBusy = editStatus === "signing" || editStatus === "pending";
-  const editChanged = !!edit && !!rp && (edit.bg !== rp.bg || edit.cell !== rp.cell || edit.speed !== rp.speed);
-  const editInvalid = !!edit && edit.bg === edit.cell;
-  const doEdit = async () => {
-    if (!sdk || !edit) return;
-    if (editStatus === "error") {
-      setEditStatus("idle");
-      setEditErr(null);
-      return;
-    }
-    setEditErr(null);
-    setEditStatus("signing");
-    try {
-      const calls = sdk.setPathRenderParamsCall(pf.token_id, edit.bg, edit.cell, edit.speed);
-      const hash = await execute(calls);
-      setEditStatus("pending");
-      await waitForTx(hash);
-      setEditStatus("confirmed");
-      await load();
-      setTimeout(() => setEditStatus("idle"), 1800);
-    } catch (e) {
-      setEditErr(e instanceof Error ? e.message : String(e));
-      setEditStatus("error");
-    }
-  };
-
-  const lifeLabel =
-    pf.life_state === "dead"
-      ? t({ fr: "Éteinte · disparue dans le vide", en: "Gone out · faded to nothing" })
-      : pf.life_state === "frozen"
-        ? t({ fr: "Figé · devient une nature morte", en: "Frozen · settles to a still life" })
-        : t({ fr: "Vivant · rejoint une boucle", en: "Alive · joins a dynamic loop" });
+  const dead = pf.life_state === "dead";
+  const stateLabel = dead ? "Gone out · faded to nothing" : pf.life_state === "frozen" ? "Frozen · settles to a still life" : "Travelling · bound for a loop";
 
   return (
     <Shell>
-      <div className="detail">
-        <div className="stage">
-          {/* the exact on-chain render of the path's start state (the contract's renderer). */}
-          {rp ? (
-            <div className="svg-frame">
-              <iframe
-                srcDoc={onchainHtml(pf.start_state, rp.bg, rp.cell, rp.speed)}
-                title={`On-chain renderer for path ${tokenIdDecimal(pf.token_id)}`}
-                sandbox="allow-scripts"
-                style={{ width: "100%", height: "100%", border: 0, background: "var(--bg-dish)" }}
-              />
-            </div>
-          ) : (
-            <div className="svg-frame" style={{ background: "var(--bg-dish)" }} />
-          )}
-        </div>
-        <div>
-          <span className="kicker">{t({ fr: "une vagabonde · vit sur Starknet", en: "a wanderer · living on Starknet" })}</span>
-          <div className="meta-row">
-            <Copyable label={t({ fr: "propriétaire", en: "owner" })} value={pf.owner} display={shortAddr(pf.owner)} />
-            <Copyable label={t({ fr: "token", en: "token" })} value={pf.token_id} display={shortAddr(pf.token_id)} />
-          </div>
-
-          <div className="trait-grid">
-            <Trait t={t({ fr: "Type", en: "Kind" })} v={t({ fr: "Vagabonde", en: "Wanderer" })} />
-            <Trait t={t({ fr: "État", en: "State" })} v={lifeLabel} />
-            <Trait t={t({ fr: "Longueur", en: "Length" })} v={String(pf.sequence_length)} />
-            {pf.life_state !== "dead" && (
-              <Trait t={t({ fr: "Période de la boucle", en: "Loop period" })} v={String(pf.target_period)} />
-            )}
-            {rp && <Trait t={t({ fr: "Fond", en: "Background" })} v={<Swatch color={toHexColor(rp.bg)} />} />}
-            {rp && <Trait t={t({ fr: "Cellule", en: "Cell" })} v={<Swatch color={toHexColor(rp.cell)} />} />}
-            {rp && <Trait t={t({ fr: "Vitesse", en: "Speed" })} v={`${rp.speed} ${t({ fr: "gén/s", en: "gen/s" })}`} />}
-          </div>
-
-          {/* Appearance is owner-only; the values show read-only in the grid above. */}
-          {isOwner && rp && edit && (
-            <div style={{ marginTop: 14 }}>
-              <div className="note" style={{ marginBottom: 6 }}>{t({ fr: "apparence · à toi de régler", en: "appearance · yours to tune" })}</div>
-              <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
-                <label className="note" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {t({ fr: "fond", en: "background" })}
-                  <input type="color" value={toHexColor(edit.bg)} onChange={(e) => setEdit({ ...edit, bg: fromHexColor(e.target.value) })} />
-                </label>
-                <label className="note" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {t({ fr: "cellule", en: "cell" })}
-                  <input type="color" value={toHexColor(edit.cell)} onChange={(e) => setEdit({ ...edit, cell: fromHexColor(e.target.value) })} />
-                </label>
-                <label className="note" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {t({ fr: "vitesse", en: "speed" })}
-                  <input type="number" min={1} max={SPEED_MAX - 1} value={edit.speed} onChange={(e) => setEdit({ ...edit, speed: Math.max(1, Math.min(SPEED_MAX - 1, Number(e.target.value) || 1)) })} style={{ width: 64 }} />
-                </label>
-              </div>
-              {editChanged && (
-                <div style={{ marginTop: 10 }}>
-                  {editInvalid && <p className="breathe-err">{t({ fr: "le fond et la cellule doivent différer", en: "background and cell colour must differ" })}</p>}
-                  <button className="btn primary" onClick={doEdit} disabled={editBusy || editInvalid}>
-                    {editStatus === "signing"
-                      ? t({ fr: "Confirme dans ton portefeuille…", en: "Confirm in your wallet…" })
-                      : editStatus === "pending"
-                        ? t({ fr: "Modification… (tx en attente)", en: "Editing… (tx pending)" })
-                        : editStatus === "confirmed"
-                          ? t({ fr: "✓ Modifiée", en: "✓ Edited" })
-                          : editStatus === "error"
-                            ? t({ fr: "Réessayer", en: "Try again" })
-                            : t({ fr: "Modifier la vagabonde", en: "Edit wanderer" })}
-                  </button>
-                  {editErr && editStatus === "error" && <p className="breathe-err">{editErr}</p>}
-                </div>
+      <div className="life">
+        <div className="life-main">
+          <div className="life-left">
+            <Slide>
+              {rp ? (
+                <BreathCanvas rows={pf.start_state} bg={rp.bg} cell={rp.cell} speed={rp.speed} playing={false} scrubGen={0} breathSignal={0} />
+              ) : (
+                <div className="status-line" style={{ padding: 24 }}>reading render params…</div>
               )}
+            </Slide>
+            <div className="life-counter">
+              <span className="life-gen">{pf.sequence_length}</span>
+              <span className="life-gen-label">generations of travel</span>
             </div>
-          )}
-
-          {pf.life_state !== "dead" && (
-            <p className="dim" style={{ maxWidth: "46ch", marginTop: 14 }}>
-              {t({ fr: "Cette vagabonde rejoint une ", en: "This wanderer settles into a " })}
-              <Link className="tx-link" href={`/life/${pf.target_loop_id}`}>{t({ fr: "boucle →", en: "loop →" })}</Link>
+          </div>
+          <div className="life-right">
+            <span className="eyebrow">a wanderer · a moment of travel, caught</span>
+            <h1 className="life-name">Wanderer <span className="life-id">{shortAddr(pf.token_id)}</span></h1>
+            <div className="life-facts">
+              <span>born · <span className="mono">{born !== null ? `block ${born.toLocaleString("en-US")}` : "…"}</span></span>
+              <Copyable label="set free by" value={pf.owner} display={shortAddr(pf.owner)} />
+            </div>
+            <div className="trait-grid">
+              <Trait t="Kind" v="Wanderer" />
+              <Trait t="State" v={stateLabel} />
+              <Trait t="Journey" v={`${pf.sequence_length} generations`} />
+              {!dead && <Trait t="Bound for" v={<Link className="tx-link" href={`/life/${pf.target_loop_id}`}>a loop →</Link>} />}
+              {rp && <Trait t="Cell" v={<Swatch color={toHex(rp.cell)} />} />}
+              {rp && <Trait t="Background" v={<Swatch color={toHex(rp.bg)} />} />}
+            </div>
+            <p className="dim" style={{ maxWidth: "44ch", marginTop: 14 }}>
+              A wanderer is a portrait, not a pet — a single caught moment of a pattern travelling toward its fate. It isn’t fed and holds no bond. Its rarity is the length of its journey: the farther it wandered from its loop, the rarer.
             </p>
-          )}
-          <p className="dim" style={{ maxWidth: "46ch" }}>
-            {t({
-              fr: "Une vagabonde est un instant de voyage, figé : elle ne se nourrit pas. Sa rareté est la longueur de son périple — plus elle erre loin de sa boucle, plus elle est rare.",
-              en: "A wanderer is a moment of travel, caught: it can't be fed. Its rarity is the length of its journey — the farther it wanders from its loop, the rarer.",
-            })}
-          </p>
+          </div>
         </div>
       </div>
     </Shell>
   );
 }
 
-/* ---------- a not-yet-minted pattern from the bestiary ---------- */
+/* ---------- a not-yet-minted bestiary pattern (discover & set free) ---------- */
 type BeastInfo =
-  | { kind: "loading" }
-  | { kind: "toolarge" }
+  | { kind: "loading" } | { kind: "toolarge" }
   | { kind: "ready"; period: number; smallest: number[]; tokenId: string; minted: boolean };
-
 function BeastDetail() {
-  const { t } = useT();
   const params = useParams<{ id: string }>();
   const beast = findBeast(params.id)!;
   const router = useRouter();
@@ -575,27 +445,17 @@ function BeastDetail() {
   const { status, txHash, error, mint, reset } = useMint();
   const [info, setInfo] = useState<BeastInfo>({ kind: "loading" });
 
-  // v2 identity, off-chain via the SDK: the loop's period + canonical (smallest) state, its token
-  // id, and whether it's already minted. findLoop/tokenIdForRows are synchronous wasm calls.
   useEffect(() => {
     if (!sdk) return;
     let cancelled = false;
     const rows = rowsFromCoords(beast.coords);
     const loop = sdk.findLoop(new Float64Array(rows), 32) as { period: number; smallest: number[] } | null;
-    if (!loop) {
-      setInfo({ kind: "toolarge" });
-      return;
-    }
+    if (!loop) { setInfo({ kind: "toolarge" }); return; }
     const tokenId = sdk.familyTokenId(new Float64Array(loop.smallest), loop.period) as string;
-    sdk.lifeform(tokenId).then((lf) => {
-      if (!cancelled) setInfo({ kind: "ready", period: loop.period, smallest: loop.smallest, tokenId, minted: !!lf });
-    });
-    return () => {
-      cancelled = true;
-    };
+    sdk.lifeform(tokenId).then((lf) => { if (!cancelled) setInfo({ kind: "ready", period: loop.period, smallest: loop.smallest, tokenId, minted: !!lf }); });
+    return () => { cancelled = true; };
   }, [sdk, beast]);
 
-  // on a confirmed mint, send the visitor to their newly-born creature
   useEffect(() => {
     if (status === "confirmed" && info.kind === "ready") {
       const t = setTimeout(() => router.push(`/life/${info.tokenId}`), 1200);
@@ -609,74 +469,41 @@ function BeastDetail() {
 
   return (
     <Shell>
-      <div className="detail">
-        <div className={`stage${busy ? " inhaling" : ""}`}>
-          <Creature coords={beast.coords} variant="potential" engaged res={540} ariaLabel={`${beast.name} pattern`} />
-        </div>
-        <div>
-          <span className="kicker">{t({ fr: "en attente de découverte · pas encore sur la chaîne", en: "waiting to be discovered · not yet on chain" })}</span>
-          <h1>{beast.name}</h1>
-          <p className="dim" style={{ maxWidth: "46ch" }}>
-            {t({
-              fr: `Un${beast.family === "spaceship" ? " vaisseau" : beast.family === "still" ? "e nature morte" : " oscillateur"} connu du répertoire de Conway. Découvre-le sur le plateau, puis libère-le — vivant sur Starknet, indépendant de toi.`,
-              en: `A known ${beast.family === "spaceship" ? "spaceship" : beast.family === "still" ? "still life" : "oscillator"} from Conway’s reservoir. Discover it on the board, then set it free — alive on Starknet, independent of you.`,
-            })}
-          </p>
-
-          <div className="trait-grid">
-            <Trait t={t({ fr: "Type", en: "Kind" })} v={beast.kind} />
-            <Trait t={t({ fr: "Destinée", en: "Fate" })} v={info.kind === "toolarge" ? t({ fr: "Voyage sans fin", en: "Travels forever" }) : t({ fr: "Vivant · une boucle", en: "Alive · a loop" })} />
-            <Trait t={t({ fr: "Longueur de boucle", en: "Loop length" })} v={period ? String(period) : info.kind === "toolarge" ? t({ fr: "grande", en: "large" }) : "…"} />
-            <Trait t={t({ fr: "Coût de naissance", en: "Birth cost" })} v={period ? `${period} NUT` : "—"} />
+      <div className="life">
+        <div className="life-main">
+          <div className="life-left">
+            <Slide><div className="slide-glass" style={{ background: "#070709" }}><Creature coords={beast.coords} variant="potential" res={540} ariaLabel={`${beast.name} pattern`} /></div></Slide>
           </div>
-
-          {info.kind === "toolarge" && (
-            <div className="callout">
-              {t({
-                fr: "Ce voyageur ne se stabilise jamais en une petite boucle sur le tore 41×41 — sa période est trop grande pour une naissance bon marché. Rencontre-le et regarde-le vivre.",
-                en: "This traveller never settles into a small loop on the 41×41 torus — its period is too large to mint cheaply. Meet it and watch it live.",
-              })}
+          <div className="life-right">
+            <span className="eyebrow">waiting to be discovered · not yet on chain</span>
+            <h1 className="life-name">{beast.name}</h1>
+            <p className="dim" style={{ maxWidth: "44ch" }}>A known {beast.family === "spaceship" ? "spaceship" : beast.family === "still" ? "still life" : "oscillator"} from Conway’s reservoir. Set it free — alive on Starknet, independent of you.</p>
+            <div className="trait-grid">
+              <Trait t="Kind" v={beast.kind} />
+              <Trait t="Fate" v={info.kind === "toolarge" ? "Travels forever" : "Alive · a loop"} />
+              <Trait t="Loop period" v={period ? String(period) : info.kind === "toolarge" ? "large" : "…"} />
             </div>
-          )}
-          {ready?.minted && (
-            <div className="callout">
-              {t({ fr: "Déjà découverte — cette créature vit sur Starknet. ", en: "Already discovered — this creature lives on Starknet. " })}
-              <Link className="tx-link" href={`/life/${ready.tokenId}`}>{t({ fr: "la rencontrer ↗", en: "meet it ↗" })}</Link>
+            {info.kind === "toolarge" && <div className="callout">This traveller never settles into a small loop on the 41×41 torus — too large to set free cheaply.</div>}
+            {ready?.minted && <div className="callout">Already discovered — it lives on Starknet. <Link className="tx-link" href={`/life/${ready.tokenId}`}>meet it ↗</Link></div>}
+            <div style={{ marginTop: 18 }}>
+              {info.kind === "loading" ? (
+                <button className="btn" disabled><span className="spinner" /> reading the chain…</button>
+              ) : info.kind === "toolarge" ? (
+                <button className="btn" disabled>Can’t be set free yet</button>
+              ) : ready?.minted ? (
+                <Link className="btn set-free" href={`/life/${ready.tokenId}`}>Meet this creature →</Link>
+              ) : !address ? (
+                <button className="btn set-free" onClick={connect}>Connect to set it free</button>
+              ) : !onSepolia ? (
+                <button className="btn set-free" onClick={switchToSepolia}>Switch to Sepolia</button>
+              ) : (
+                <button className="btn set-free" onClick={() => (status === "error" ? reset() : ready && mint(ready.smallest, ready.period))} disabled={busy}>
+                  {status === "signing" ? "Confirm in your wallet…" : status === "pending" ? "The chain is writing…" : status === "confirmed" ? "Born — taking you there…" : status === "error" ? "Try again" : `Set it free · ${period} $NUT`}
+                </button>
+              )}
+              {txHash && (status === "pending" || status === "confirmed") && <a className="tx-link" href={explorerTxUrl(txHash)} target="_blank" rel="noreferrer" style={{ marginLeft: 12 }}>view tx ↗</a>}
+              {status === "error" && error && <p className="breathe-err">{error}</p>}
             </div>
-          )}
-
-          <div style={{ marginTop: 18 }}>
-            {info.kind === "loading" ? (
-              <button className="btn" disabled><span className="spinner" /> {t({ fr: "lecture de la chaîne…", en: "reading the chain…" })}</button>
-            ) : info.kind === "toolarge" ? (
-              <button className="btn" disabled title={t({ fr: "Boucle trop grande pour une naissance bon marché", en: "Loop too large to mint cheaply" })}>{t({ fr: "Pas encore libérable", en: "Can’t be set free yet" })}</button>
-            ) : ready?.minted ? (
-              <Link className="btn primary" href={`/life/${ready.tokenId}`}>{t({ fr: "Rencontrer cette créature →", en: "Meet this creature →" })}</Link>
-            ) : !address ? (
-              <button className="btn" onClick={connect}>{t({ fr: "Connecte-toi pour la libérer", en: "Connect to set it free" })}</button>
-            ) : !onSepolia ? (
-              <button className="btn primary" onClick={switchToSepolia}>{t({ fr: "Passe sur Sepolia pour libérer", en: "Switch to Sepolia to set it free" })}</button>
-            ) : (
-              <button
-                className="btn primary breathe-btn"
-                onClick={() => (status === "error" ? reset() : ready && mint(ready.smallest, ready.period))}
-                disabled={busy}
-              >
-                {status === "signing"
-                  ? t({ fr: "Confirme dans ton portefeuille…", en: "Confirm in your wallet…" })
-                  : status === "pending"
-                    ? t({ fr: "Libération… (la chaîne écrit)", en: "Setting it free… (the chain is writing)" })
-                    : status === "confirmed"
-                      ? t({ fr: "✓ Née — on t'y emmène…", en: "✓ Born — taking you there…" })
-                      : status === "error"
-                        ? t({ fr: "Réessayer", en: "Try again" })
-                        : t({ fr: `La libérer · ${period} NUT`, en: `Set it free · ${period} NUT` })}
-              </button>
-            )}
-            {txHash && (status === "pending" || status === "confirmed") && (
-              <a className="tx-link" href={explorerTxUrl(txHash)} target="_blank" rel="noreferrer" style={{ marginLeft: 12 }}>{t({ fr: "voir la tx ↗", en: "view tx ↗" })}</a>
-            )}
-            {status === "error" && error && <p className="breathe-err">{error}</p>}
           </div>
         </div>
       </div>
@@ -685,52 +512,19 @@ function BeastDetail() {
 }
 
 function Trait({ t, v }: { t: string; v: ReactNode }) {
-  return (
-    <div className="trait">
-      <div className="t">{t}</div>
-      <div className="v">{v}</div>
-    </div>
-  );
+  return <div className="trait"><div className="t">{t}</div><div className="v">{v}</div></div>;
 }
-
-// Click to copy the full value to the clipboard (shows a brief "copied!").
 function Copyable({ label, value, display }: { label: string; value: string; display: string }) {
-  const { t } = useT();
   const [copied, setCopied] = useState(false);
   return (
-    <span
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(value);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1200);
-        } catch {
-          /* clipboard unavailable */
-        }
-      }}
-      title={t({ fr: "Cliquer pour copier", en: "Click to copy" })}
-      style={{ cursor: "pointer" }}
-    >
-      {label} <span className="mono">{copied ? t({ fr: "copié !", en: "copied!" }) : display}</span>
+    <span onClick={async () => { try { await navigator.clipboard.writeText(value); setCopied(true); setTimeout(() => setCopied(false), 1200); } catch { /* no clipboard */ } }} title="Click to copy" style={{ cursor: "pointer" }}>
+      {label} <span className="mono">{copied ? "copied!" : display}</span>
     </span>
   );
 }
-
 function Swatch({ color }: { color: string }) {
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-      <span style={{ display: "inline-block", width: 16, height: 16, borderRadius: 4, background: color, border: "1px solid rgba(255,255,255,0.2)" }} />
-      <span className="mono">{color}</span>
-    </span>
-  );
+  return <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ display: "inline-block", width: 14, height: 14, borderRadius: 4, background: color, border: "1px solid rgba(255,255,255,0.2)" }} /><span className="mono">{color}</span></span>;
 }
-
 function Shell({ children }: { children: React.ReactNode }) {
-  const { t } = useT();
-  return (
-    <div className="wrap">
-      {children}
-      <Link href="/" className="back-link">{t({ fr: "← retour au jardin", en: "← back to the garden" })}</Link>
-    </div>
-  );
+  return <div className="wrap life-wrap">{children}<Link href="/" className="back-link">← back to the garden</Link></div>;
 }

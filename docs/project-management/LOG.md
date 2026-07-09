@@ -18,6 +18,47 @@
 
 ---
 
+## 2026-07-10 (later still) — /life/[id] rebuilt: the ritual surface + the breath animation
+- **Goal:** rebuild the single-creature page per the brief — the most intimate screen: an authentic
+  framed render, the two acts of care, and a carefully designed one-generation "breath".
+- **Branch:** `new_design` · **Commits:** uncommitted WIP
+- **Changed (frontend, `ui/game-of-life`):**
+  - `src/components/BreathCanvas.tsx` (new): the stage canvas. Renders a creature in ITS OWN
+    on-chain colours (bg/cell — never restyled), autoplays its cycle at the on-chain speed, holds a
+    scrubbed generation, and plays the **breath** — exactly one Conway generation (via `creatures.step`,
+    matching the contract) revealed with a gather-then-ripple-from-centre. One rAF, prop-mirrored refs,
+    reduced-motion aware (snaps instead of animating). NO confetti.
+  - `src/app/life/[id]/page.tsx` rewritten:
+    - LOOP (Bacterium) = the ritual surface. LEFT: BreathCanvas in a **microscope-slide** frame
+      (thin border, corner ticks, petri texture), a big JetBrains-Mono **generations-lived** counter,
+      a live/scrub replay slider over the cycle, and a "view the on-chain renderer" toggle (the exact
+      contract iframe on demand — authenticity without losing scrub/breath). RIGHT: derived type
+      **name + short id** (no rename affordance — there's no on-chain name field; the raw on-chain name
+      is just "Lifeform <id>"), born-at block, "set free by" (owner, truncated), traits, state. Two
+      acts: **Breathe life** (one gen, anonymous, a little $NUT, no bond) and **Pet** (the committed
+      breath — opens/refreshes the caretaker bond + 7-day clock; shows "bond: N days left", amber when
+      low; **hand to daycare** = `transfer_bond`). On confirm: the breath animation plays, the counter
+      ticks, the clock resets, quiet "You gave it a breath. Bond renewed." + tx hash. BELOW:
+      **caretakers** ("the pack", from `petPairs`+`bondStatus`) and **lived-generations** (a filmstrip
+      of the creature's cycle).
+    - PATH (Wanderer) = a static **portrait** page: the caught travelling state, its story, NO
+      breathe/pet/bond affordances.
+    - Bestiary (unminted) discover-&-set-free case kept, in English + the new frame.
+  - `src/lib/usePet.ts`: expose `txHash` (so the pet's tx can be linked). `useBreathe` already had it.
+  - `globals.css`: new `.life-*` / `.slide` / `.bond-clock` / `.pack` / `.filmstrip` styles.
+- **Decisions:** appearance is now chosen at set-free (/create) — the old owner-only colour editor was
+  DROPPED from /life to keep the ritual surface clean (re-editing could return later). Breathe is one
+  generation (the multi-gen feed slider dropped) so the action matches the single-breath animation.
+  Left render uses the controllable canvas by default (needed for scrub + breath) with the authentic
+  iframe one click away — both show the exact on-chain colours.
+- **Verified (headless Chrome + CDP, live Sepolia, genesis blinker):** renders "Period-2 Loop
+  0x7d4e…c4b9", born block 11,642,283, set-free-by, 6 traits, on-chain colours faithful (magenta bg /
+  cream cell), scrubber + counter (344 lived), Caretakers pack (2 holders, 3d/6d left), filmstrip
+  (2 phases). tsc + eslint clean, `next build` green. NOT verified (needs a wallet): the breath
+  animation on confirm, breathe/pet txs, daycare transfer.
+- **Next:** wallet-connected pass — watch a real breath, pet+bond clock, daycare hand-off.
+- **Blockers:** none.
+
 ## 2026-07-10 (later) — /incubator rebuilt: eggs not yet hatched
 - **Goal:** rebuild `/incubator` per the brief — a warm workbench for births in progress and saved
   patterns, with progress shown as a warming egg (not a progress bar).
