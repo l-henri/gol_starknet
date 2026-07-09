@@ -18,6 +18,23 @@
 
 ---
 
+## 2026-07-09 — French temporarily disabled; site defaults to English
+- **Goal:** Henri: "disable the French version for now — the wording is confusing. Remove the
+  fr/en toggle at the top and default to English. We'll add it back later."
+- **Branch:** `main` · **Commits:** uncommitted WIP
+- **Changed:** minimal, reversible. `src/lib/i18n.tsx` pinned to `lang: "en"` (dropped the
+  localStorage + `navigator.language` FR detection and the `LangToggle` component; `setLang` is
+  now a no-op); removed `<LangToggle />` + its import from `GardenHeader.tsx`; deleted the dead
+  `.lang-toggle` CSS from `globals.css`. **All ~250 inline `{ fr, en }` copy pairs left in place**
+  — `t()` just always resolves `en`, so restoring French later is: bring back the language state +
+  detection and re-add `<LangToggle />` (previous impl is in this file's git history).
+- **Verified:** `tsc --noEmit` clean; grep confirms no remaining `LangToggle` / `.lang-toggle`
+  references outside i18n's own API. Not run: `next build`, browser pass.
+- **Decisions:** kept the FR strings rather than stripping them — the ask is "for now / add back
+  later", so a full copy teardown would be wasted work and lose the reviewed FR voice.
+- **Next:** Henri to eyeball the header in a browser; revisit FR wording before re-enabling.
+- **Blockers:** none.
+
 ## 2026-07-06 (copy pass) — Full website copy review + rewrite in one voice
 - **Goal:** Henri: "full in-depth review of all the wording — is this the best we can do?" It
   wasn't. Review at [copy-review.md](../copy-review.md); Henri's register calls: **tu**,

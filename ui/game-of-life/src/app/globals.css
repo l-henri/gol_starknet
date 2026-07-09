@@ -101,19 +101,6 @@ h3 { font-size: 1.25rem; font-weight: 600; margin: 0; }
 .btn.primary { background: rgba(90, 209, 255, 0.1); border-color: rgba(90, 209, 255, 0.4); color: var(--accent); }
 .btn.primary:hover { background: rgba(90, 209, 255, 0.16); }
 
-/* language switch ------------------------------------------ */
-.lang-toggle {
-  display: inline-flex; border: 1px solid var(--line); border-radius: 999px;
-  overflow: hidden; background: rgba(255, 255, 255, 0.012);
-}
-.lang-toggle button {
-  font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.06em; font-weight: 500;
-  padding: 0.42em 0.72em; border: 0; background: transparent; color: var(--ink-dim); cursor: pointer;
-  transition: color var(--dur) var(--ease-quiet), background var(--dur) var(--ease-quiet);
-}
-.lang-toggle button.on { color: var(--accent); background: rgba(90, 209, 255, 0.12); }
-.lang-toggle button:hover:not(.on) { color: var(--ink); }
-
 /* creature card -------------------------------------------- */
 .creature-card {
   display: block; background: var(--bg-dish); border: 1px solid var(--line);

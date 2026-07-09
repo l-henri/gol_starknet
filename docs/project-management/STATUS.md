@@ -3,7 +3,7 @@
 > Snapshot of where the project stands. Keep this short and current — rewrite it each session.
 > History lives in [LOG.md](LOG.md); the plan lives in [ROADMAP.md](ROADMAP.md).
 
-**Last updated:** 2026-07-06 (evening)
+**Last updated:** 2026-07-09
 **Framing:** WIP **art piece**, not a commercial product — the outcome is burning gas and creating art.
 **Active branch:** `main` (single trunk since the 2026-07-06 consolidation; pushed to origin)
 **Build/test:** `scarb build` ✅ · `snforge test` ✅ (91) · `cargo test -p gol-sdk` ✅ (43) · `next build` ✅
@@ -26,7 +26,9 @@
 - **v2** (and v1) remain deployed but superseded — [v2-deployment.md](../v2-deployment.md); the v2
   symmetry challenge-burn stays live there for its collection.
 - **Frontend** (`ui/game-of-life`): garden, `/create` editor, incubator, `/leaderboards` (4 boards,
-  data live-verified; ⚠️ page not yet eyeballed in a browser), FR/EN — [frontend.md](../frontend.md).
+  data live-verified; ⚠️ page not yet eyeballed in a browser) — [frontend.md](../frontend.md).
+  **FR temporarily disabled (2026-07-09):** site is English-only, toggle removed; all `{ fr, en }`
+  copy is still in the source so French can be restored once the wording is revised.
 - **Specs ready to build:** [pet-mechanism-spec.md](../pet-mechanism-spec.md) (targets v3, uses
   `feed_for`); [leaderboards.md](../leaderboards.md) backlog; [audience-research.md](../audience-research.md)
   plays (Seed Grant, genesis bestiary, essay — leaderboards-before-outreach).
