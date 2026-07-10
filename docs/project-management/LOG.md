@@ -18,6 +18,37 @@
 
 ---
 
+## 2026-07-10 (evening) — /pets (Wards) rebuilt: the caretaker home
+- **Goal:** rebuild `/pets` per the brief — a windowsill of the creatures you keep alive. Tender,
+  never a scold; loss-aversion as the gentle engine; hunger shown as warmth, never alarm-red.
+- **Branch:** `new_design` · **Commits:** uncommitted WIP
+- **Changed (frontend, `ui/game-of-life`):** `src/app/pets/page.tsx` rewritten into three sections:
+  - **Your wards** — every creature you hold a bond for AND have petted; sorted **soonest-to-hungry
+    first**. Card = live on-chain thumbnail + name + the **hunger clock as hero** ("3 days until
+    hungry", amber #f97316 when ≤2 days / wilting, green otherwise), a one-tap **Pet** (shared usePet;
+    resets the 7-day clock), and **hand to daycare**.
+  - **The reaper's rounds** — bonds you once petted but no longer hold (lapsed & reaped), shown with
+    dignity: "The reaper passed. You're no longer its keeper — but it lives on if others tend it."
+    Offers a gentle "Adopt again" (petting re-mints the bond). Soft, never a punishment popup.
+  - **Daycare** — hand a bond to a friend's address to pet-sit (`transfer_bond`), a **Sitting for a
+    friend** list (bonds you hold but never petted → received via daycare → "hand back"), and an
+    **Out at daycare** list (bonds you lent, tracked locally).
+  - **Honest derivation:** walks the bond graph (`petPairs` + `bondStatus(creature, me)` for every
+    creature with bond activity — finds bonds you hold even if you never petted them). "Petted by me"
+    distinguishes wards from sat bonds; a local `gol:lent` set distinguishes a daycare loan from a
+    reaping (they look identical on-chain). `usePet` exposes `txHash` (from the /life work).
+  - `globals.css`: `.wards-*` / `.ward-card` / `.ward-clock` styles. NUT framed only as "a small
+    thank-you for the breath — nothing more" (no earn/yield/APR anywhere).
+- **Verified (headless Chrome + CDP, live Sepolia):** pointed the page at the agent caretaker account
+  read-only — rendered "Your wards" with the blinker ward, live magenta thumbnail, "3 days until
+  hungry" (green, comfortable), Pet + hand-to-daycare, and the Daycare explainer (no reaper/sitting
+  for that account). Connect + empty states render. tsc + eslint clean, `next build` green. NOT
+  verified (needs a wallet): the pet tx, daycare transfer, and the amber/wilting/reaper/sitting
+  variants (no account is in those states right now).
+- **Next:** the redesign sweep is done except **/leaderboards (Records)**. Then a wallet-connected
+  QA pass across the whole flow, and decide about pushing `new_design` / opening a PR.
+- **Blockers:** none.
+
 ## 2026-07-10 (later still) — /life/[id] rebuilt: the ritual surface + the breath animation
 - **Goal:** rebuild the single-creature page per the brief — the most intimate screen: an authentic
   framed render, the two acts of care, and a carefully designed one-generation "breath".

@@ -552,6 +552,65 @@ canvas.creature { display: block; width: 100%; height: 100%; }
   .life-below { grid-template-columns: 1fr; }
 }
 
+/* ============================================================
+   /pets (Wards) — the caretaker home (new_design)
+   A windowsill of things you're responsible for. Tender, never a
+   scold. Hunger surfaces as warmth (amber), never alarm-red.
+   ============================================================ */
+.wards { padding-bottom: clamp(40px, 8vw, 80px); }
+.wards-lead { padding: clamp(30px, 5vw, 56px) 0 clamp(10px, 2vw, 20px); }
+.wards-lead .eyebrow { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-faint); }
+.wards-title { font-size: clamp(1.7rem, 4vw, 2.6rem); line-height: 1.1; letter-spacing: -0.015em; margin: 0.4em 0 0; }
+.wards-sub { color: var(--ink-dim); max-width: 56ch; margin: 0.7em 0 0; }
+.wards-connect { margin-top: 22px; }
+
+.wards-group { margin-top: clamp(30px, 5vw, 52px); }
+.wards-group-head { display: flex; align-items: baseline; gap: 0.85em; flex-wrap: wrap; margin-bottom: 1.3em; padding-bottom: 0.9em; border-bottom: 1px solid var(--line); }
+.wards-group-head h2 { font-family: var(--mono); font-size: 0.9rem; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 600; color: var(--ink); }
+.wards-group.reaper .wards-group-head h2 { color: var(--ink-dim); }
+.wards-group-head .desc { font-size: 0.9rem; color: var(--ink-dim); }
+.wards-h3 { font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); margin: 1.6em 0 1em; }
+
+.ward-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: clamp(14px, 2vw, 20px); }
+
+/* a ward: thumbnail + name + the hunger clock as hero */
+.ward-card {
+  display: flex; gap: 14px; align-items: center;
+  padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg-dish);
+  transition: border-color var(--dur) var(--ease-quiet);
+}
+.ward-card.hungry { border-color: rgba(249, 115, 22, 0.35); background: rgba(249, 115, 22, 0.035); }
+.ward-card.reaped { opacity: 0.86; }
+.ward-thumb { width: 84px; height: 84px; flex: none; border-radius: 10px; overflow: hidden; border: 1px solid #1f1f28; background: #070709; }
+.ward-thumb canvas { width: 100%; height: 100%; display: block; }
+.ward-thumb.gone { display: flex; align-items: center; justify-content: center; color: var(--ink-faint); font-family: var(--mono); }
+.ward-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.ward-name { font-size: 1rem; color: var(--ink); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ward-name:hover { color: var(--accent); }
+.ward-name-sm { font-family: var(--mono); font-size: 0.86rem; color: var(--ink-dim); }
+
+/* the hunger clock — the hero datum */
+.ward-clock { display: inline-flex; align-items: center; gap: 0.5em; font-family: var(--mono); font-size: 0.92rem; color: #4ade80; font-weight: 500; }
+.ward-clock-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 8px rgba(34, 197, 94, 0.6); flex: none; }
+.ward-clock.hungry { color: #f97316; }
+.ward-clock.hungry .ward-clock-dot { background: #f97316; box-shadow: 0 0 9px rgba(249, 115, 22, 0.75); }
+
+.ward-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 2px; }
+.ward-actions .btn { padding: 0.42em 0.85em; font-size: 0.82rem; }
+
+.reaper-note { font-size: 0.86rem; color: var(--ink-faint); line-height: 1.5; margin: 2px 0; max-width: 34ch; }
+
+.lent-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.lent-list li { font-size: 0.9rem; }
+
+.wards-empty { text-align: center; padding: clamp(40px, 9vw, 90px) 0; }
+.wards-empty-line { font-size: 1.15rem; font-weight: 600; margin: 0; }
+.wards-empty-sub { color: var(--ink-dim); margin: 0.5em 0 0; }
+
+@media (max-width: 560px) {
+  .ward-grid { grid-template-columns: 1fr; }
+}
+
 /* footer ---------------------------------------------------- */
 .site-footer { margin-top: clamp(64px, 10vw, 120px); border-top: 1px solid var(--line); }
 .site-footer .bar { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 24px 0 64px; color: var(--ink-faint); font-size: 0.82rem; }

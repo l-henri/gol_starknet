@@ -9,8 +9,9 @@
 home (living gallery), the global chrome (the "petri" top bar + Conway-blinker favicon), `/create`
 (the "slot machine of life"), `/incubator` (warming-egg workbench), and `/life/[id]` (the ritual
 surface — microscope-slide render, one-generation breath animation, breathe/pet/bond/daycare,
-caretaker pack, filmstrip; Wanderers render as static portraits).
-Still on the old design: `/pets` (Wards) and `/leaderboards` (Records).
+caretaker pack, filmstrip; Wanderers render as static portraits), and `/pets` (Wards — windowsill
+of wards + hunger clocks, the reaper's rounds, daycare).
+Still on the old design: `/leaderboards` (Records) only.
 Site renamed **petri** (loop/wanderer collections keep their names). See LOG 2026-07-09/07-10.
 `main` remains the shipped trunk. ⚠️ Redesign pages not yet QA'd with a connected wallet
 (set-free mint, hatch, breathe/pet/daycare).
