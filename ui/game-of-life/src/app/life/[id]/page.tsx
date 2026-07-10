@@ -223,7 +223,7 @@ function LoopDetail({ id }: { id: string }) {
                   {!connected ? "Connect to breathe"
                     : !onSepolia ? "Switch to Sepolia"
                     : pStatus === "signing" ? "Drawing breath…"
-                    : pStatus === "pending" ? "The chain is writing…"
+                    : pStatus === "pending" ? "Breathing…"
                     : pStatus === "error" ? "Try again"
                     : "Breathe life"}
                 </button>

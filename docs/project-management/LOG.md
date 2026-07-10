@@ -18,6 +18,28 @@
 
 ---
 
+## 2026-07-10 (evening, 8) — /create: no colour modal (roll at random); 15 fps; breathe wording
+- **Goal:** Henri: (1) on `/life` loops, change the pending label "The chain is writing…" to
+  "Breathing…"; (2) on `/create`, drop the pick-colours/speed modal — "Set it free" mints straight
+  away with a look rolled at random; (3) default the `/create` sim to 15 fps. (His wanderer
+  "bound for a loop" bullet was already shipped in evening-7 — no change needed.)
+- **Branch:** `new_design` · **Commits:** uncommitted WIP
+- **Changed (`ui/game-of-life`):**
+  - `src/app/life/[id]/page.tsx`: LoopDetail breathe button pending state "The chain is writing…" →
+    "Breathing…" (signing stays "Drawing breath…").
+  - `src/app/create/page.tsx`: removed the set-free colour/speed modal (`freeing`/`Free` state, the
+    swatch/segmented picker, the "Release it →" panel). `openLoop`/`openPath` now `rollLook()` —
+    pick a random cell colour + background + speed from the existing palettes — and call
+    `mint`/`mintPath` immediately. Minting progress + errors now render inline in `verdict-actions`
+    ("Confirm in your wallet…" / "Breathing it to life…" / "Try again"). The "it's alive" born drop
+    stays (uses a new `bornPreview` + the rolled colours). Sim default speed 10 → **15 fps**.
+- **Verified (headless + CDP, live Sepolia):** `/create` speed slider defaults to 15; no picker
+  modal / swatches in the DOM; loading a blinker still detects "This one lives." and the actions
+  render (already-minted → "already lives → meet it"). tsc + eslint clean, `next build` green
+  (`/create` 4.76 → 4.5 kB). NOT verifiable headlessly (needs wallet + an unminted pattern): the
+  straight-to-mint tx with the rolled colours.
+- **Next:** unchanged — wallet-connected QA, then ship decision.
+
 ## 2026-07-10 (evening, 7) — /life wanderers: "bound for" resolves to a real loop
 - **Goal:** Henri: a wanderer's "bound for a loop" should point somewhere real. If the loop it
   settles into already exists on-chain, link to that loop's page; if it isn't born yet, hand it to

@@ -65,7 +65,8 @@ const CELL_SWATCHES = ["#22c55e", "#5ad1ff", "#c8ff7a", "#ffb454", "#ff6b6b", "#
 const BG_SWATCHES = ["#070709", "#0a0e14", "#0c1416", "#141014", "#0e0a16"];
 const SPEEDS = [{ label: "slow", v: 1 }, { label: "medium", v: 2 }, { label: "lively", v: 4 }];
 
-type Free = { kind: "loop" | "path"; tokenId: string; previewCells: Cells; run: (app: { bg: number; cell: number; speed: number }) => void };
+/** A creature's look is no longer chosen in a modal — it's rolled from the palettes at set-free time. */
+const pickRandom = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
 export default function CreatePage() {
   const { sdk } = useGolSdk();
@@ -78,7 +79,7 @@ export default function CreatePage() {
   const [rightRows, setRightRows] = useState<number[]>(() => rowsFromCells(EMPTY)); // the live sim (output)
   const [gen, setGen] = useState(0);
   const [playing, setPlaying] = useState(true);
-  const [speed, setSpeed] = useState(10);
+  const [speed, setSpeed] = useState(15);
   const [fate, setFate] = useState<Fate>({ kind: "empty" });
 
   const [tokenId, setTokenId] = useState<string | null>(null);
@@ -86,10 +87,9 @@ export default function CreatePage() {
   const [pathTokenId, setPathTokenId] = useState<string | null>(null);
   const [pathMinted, setPathMinted] = useState(false);
 
-  const [freeing, setFreeing] = useState<Free | null>(null);
-  const [cell, setCell] = useState(CELL_SWATCHES[0]);
-  const [bgc, setBgc] = useState(BG_SWATCHES[1]);
-  const [spd, setSpd] = useState(2);
+  const [bornPreview, setBornPreview] = useState<Cells>(EMPTY); // what the "it's alive" drop shows
+  const [cell, setCell] = useState(CELL_SWATCHES[0]);           // the rolled cell colour (for that drop)
+  const [bgc, setBgc] = useState(BG_SWATCHES[1]);               // the rolled background
   const [activeId, setActiveId] = useState<string | null>(null);
 
   // detection state for the right grid's evolution
@@ -155,7 +155,6 @@ export default function CreatePage() {
     historyRef.current = [];
     resolvedRef.current = false;
     setActiveId(null);
-    setFreeing(null);
     reset();
     if (isEmptyRows(leftRows)) {
       setFate({ kind: "empty" });
@@ -224,24 +223,26 @@ export default function CreatePage() {
   const pathSteps = fate.kind === "loop" ? fate.steps : fate.kind === "dead" ? fate.steps : 0;
   const pathTx = pathMintable ? plannedPathTxCount(pathSteps, fate.kind === "loop" ? fate.period : 1, caps) : 0;
 
+  // roll a random look (cell/bg/speed) and set it free straight away — no modal.
+  const rollLook = () => {
+    const cellHex = pickRandom(CELL_SWATCHES);
+    const bgHex = pickRandom(BG_SWATCHES);
+    setCell(cellHex);
+    setBgc(bgHex);
+    return { bg: hexToInt(bgHex), cell: hexToInt(cellHex), speed: pickRandom(SPEEDS).v };
+  };
   const openLoop = () => {
     if (fate.kind !== "loop" || !tokenId) return;
-    setFreeing({
-      kind: "loop",
-      tokenId,
-      previewCells: fromRows(fate.canonical),
-      run: (app) => { setActiveId(tokenId); void mint(fate.canonical, fate.period, app); },
-    });
+    setBornPreview(fromRows(fate.canonical));
+    setActiveId(tokenId);
+    void mint(fate.canonical, fate.period, rollLook());
   };
   const openPath = () => {
     if (!pathTokenId || fate.kind === "empty" || fate.kind === "watching" || fate.kind === "transient") return;
     const loopPeriod = fate.kind === "loop" ? fate.period : 1;
-    setFreeing({
-      kind: "path",
-      tokenId: pathTokenId,
-      previewCells: left,
-      run: (app) => { setActiveId(pathTokenId); void mintPath(leftRows, pathSteps, loopPeriod, app); },
-    });
+    setBornPreview(left);
+    setActiveId(pathTokenId);
+    void mintPath(leftRows, pathSteps, loopPeriod, rollLook());
   };
 
   const sendToIncubator = (id: string, rows: number[], period: number, kind: "loop" | "path", loopPeriod: number) => {
@@ -330,35 +331,46 @@ export default function CreatePage() {
             )}
 
             <div className="verdict-actions">
-              {living && (
-                already ? (
-                  <Link className="btn primary" href={`/life/${tokenId}`}>This one already lives → meet it</Link>
-                ) : !address ? (
-                  <button className="btn primary" onClick={connect}>Connect to set it free</button>
-                ) : !onSepolia ? (
-                  <button className="btn primary" onClick={switchToSepolia}>Switch to Sepolia</button>
-                ) : loopTx > MAX_TX ? (
-                  <p className="dim">This one’s too big to set free right now (~{loopTx} signatures).</p>
-                ) : loopTx > 1 ? (
-                  <button className="btn primary" onClick={() => sendToIncubator(tokenId!, fate.canonical, fate.period, "loop", fate.period)}>
-                    This one’s big — set it free in the Incubator →
-                  </button>
-                ) : (
-                  <button className="btn primary set-free" onClick={openLoop}>Set it free</button>
-                )
-              )}
+              {busy ? (
+                <p className="verdict-line"><span className="spinner" /> {status === "signing" ? "Confirm in your wallet…" : "Breathing it to life…"}</p>
+              ) : status === "error" ? (
+                <>
+                  <button className="btn primary" onClick={reset}>Try again</button>
+                  {mintError && <p className="breathe-err">{mintError}</p>}
+                </>
+              ) : (
+                <>
+                  {living && (
+                    already ? (
+                      <Link className="btn primary" href={`/life/${tokenId}`}>This one already lives → meet it</Link>
+                    ) : !address ? (
+                      <button className="btn primary" onClick={connect}>Connect to set it free</button>
+                    ) : !onSepolia ? (
+                      <button className="btn primary" onClick={switchToSepolia}>Switch to Sepolia</button>
+                    ) : loopTx > MAX_TX ? (
+                      <p className="dim">This one’s too big to set free right now (~{loopTx} signatures).</p>
+                    ) : loopTx > 1 ? (
+                      <button className="btn primary" onClick={() => sendToIncubator(tokenId!, fate.canonical, fate.period, "loop", fate.period)}>
+                        This one’s big — set it free in the Incubator →
+                      </button>
+                    ) : (
+                      <button className="btn primary set-free" onClick={openLoop}>Set it free</button>
+                    )
+                  )}
 
-              {pathMintable && !pathMinted && address && onSepolia && pathTokenId && (
-                pathTx > MAX_TX ? null : pathTx > 1 ? (
-                  <button className="btn ghost" onClick={() => sendToIncubator(pathTokenId, leftRows, pathSteps, "path", fate.kind === "loop" ? fate.period : 1)}>
-                    keep the journey as a Wanderer (Incubator) →
-                  </button>
-                ) : (
-                  <button className="btn ghost" onClick={openPath}>keep the journey as a Wanderer</button>
-                )
-              )}
-              {pathMintable && pathMinted && pathTokenId && (
-                <Link className="btn ghost" href={`/life/${pathTokenId}`}>this wanderer already lives → meet it</Link>
+                  {pathMintable && !pathMinted && address && onSepolia && pathTokenId && (
+                    pathTx > MAX_TX ? null : pathTx > 1 ? (
+                      <button className="btn ghost" onClick={() => sendToIncubator(pathTokenId, leftRows, pathSteps, "path", fate.kind === "loop" ? fate.period : 1)}>
+                        keep the journey as a Wanderer (Incubator) →
+                      </button>
+                    ) : (
+                      <button className="btn ghost" onClick={openPath}>keep the journey as a Wanderer</button>
+                    )
+                  )}
+                  {pathMintable && pathMinted && pathTokenId && (
+                    <Link className="btn ghost" href={`/life/${pathTokenId}`}>this wanderer already lives → meet it</Link>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -367,73 +379,13 @@ export default function CreatePage() {
         </div>
       </div>
 
-      {/* ---- set-free ritual: choose colours, then release ---- */}
-      {freeing && !born && (
-        <div className="free-modal" role="dialog" aria-modal="true" aria-label="Set it free">
-          <div className="free-overlay" onClick={busy ? undefined : () => setFreeing(null)} />
-          <div className="free-panel">
-            <h2 className="free-title">Set it free</h2>
-            <p className="free-sub">Choose how it looks — its colours are yours to pick, and they’re its forever.</p>
-
-            <div className="free-preview">
-              <GolCanvas cells={freeing.previewCells} cellColor={cell} bg={bgc} size={300} showGrid={false} />
-            </div>
-
-            <div className="free-controls">
-              <div className="free-row">
-                <span className="free-label">cell</span>
-                <div className="swatches">
-                  {CELL_SWATCHES.map((c) => (
-                    <button key={c} className={"swatch" + (cell === c ? " on" : "")} style={{ background: c }} aria-label={c} onClick={() => setCell(c)} />
-                  ))}
-                </div>
-              </div>
-              <div className="free-row">
-                <span className="free-label">back</span>
-                <div className="swatches">
-                  {BG_SWATCHES.map((c) => (
-                    <button key={c} className={"swatch" + (bgc === c ? " on" : "")} style={{ background: c }} aria-label={c} onClick={() => setBgc(c)} />
-                  ))}
-                </div>
-              </div>
-              <div className="free-row">
-                <span className="free-label">pace</span>
-                <div className="segmented">
-                  {SPEEDS.map((s) => (
-                    <button key={s.v} className={"seg" + (spd === s.v ? " on" : "")} onClick={() => setSpd(s.v)}>{s.label}</button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {status === "error" && mintError && <p className="breathe-err">{mintError}</p>}
-
-            <div className="free-buttons">
-              {!busy && status !== "confirmed" && (
-                <button className="btn" onClick={() => setFreeing(null)}>Back</button>
-              )}
-              <button
-                className="btn primary set-free"
-                disabled={busy}
-                onClick={() => freeing.run({ bg: hexToInt(bgc), cell: hexToInt(cell), speed: spd })}
-              >
-                {status === "signing" ? "Confirm in your wallet…"
-                  : status === "pending" ? "Breathing it to life…"
-                  : status === "error" ? "Try again"
-                  : "Release it →"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ---- it lives: drop into the garden ---- */}
+      {/* ---- it lives: drop into the garden (colours were rolled at set-free) ---- */}
       {born && (
         <div className="free-modal" role="dialog" aria-modal="true" aria-label="It lives">
           <div className="free-overlay" />
           <div className="free-panel born">
             <div className="born-preview drop">
-              <GolCanvas cells={freeing?.previewCells ?? rightCells} cellColor={cell} bg={bgc} size={260} showGrid={false} />
+              <GolCanvas cells={bornPreview} cellColor={cell} bg={bgc} size={260} showGrid={false} />
             </div>
             <h2 className="free-title lives">It’s alive.</h2>
             <p className="free-sub">Dropping it into the garden…</p>
