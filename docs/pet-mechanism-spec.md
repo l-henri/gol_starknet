@@ -1,5 +1,12 @@
 # Pet Bonds (ERC1155 Caretakers) — Technical Spec
 
+> **Changed 2026-07-10 — daycare removed from the UI.** Henri asked to drop the "daycare"
+> hand-off (transfer a bond to a friend to pet-sit) from `/pets` and `/life/[id]`. The
+> transferable-bond *capability* remains on-chain (`transfer_bond` / `transferBondCall` are
+> untouched), but no surface in the app exposes it: no "hand to daycare", no "Sitting for a
+> friend" / "Out at daycare" lists. A caretaker either holds a bond (pets to keep the clock
+> fresh) or lets it lapse (the reaper's rounds). If daycare returns, re-expose those flows here.
+
 **Status:** draft (interview-derived, 2026-07-03). Implementation queued after the symmetry
 mechanism and leaderboards.
 **Scope:** a caretaker layer over living creatures — pet bonds as a transferable ERC1155, petting =

@@ -18,6 +18,41 @@
 
 ---
 
+## 2026-07-10 (evening, 9) — Incubator per-wallet + auto-clean; daycare removed
+- **Goal:** Henri, on `/incubator`: rename "Mints in progress"→"Hatches in progress" and
+  "Saved patterns"→"Saved creatures"; remove a creature from the incubator once it's hatched;
+  add "Open in Create" under hatches-in-progress; hide pending mints when no wallet is connected;
+  and make the incubator per-wallet (switching accounts must not show the other's eggs / midway
+  hatches). On `/pets`: remove the daycare (the "hand to daycare" hand-off and the whole section).
+- **Branch:** `new_design` · **Commits:** uncommitted WIP
+- **Changed (`ui/game-of-life`):**
+  - `src/lib/incubator.ts`: added `owner?: string` to `Bookmark` and `MintProgress` (the wallet the
+    egg belongs to; legacy entries without it are shown to nobody now).
+  - `src/lib/useMint.ts`: `MintMeta` carries `owner`; `mint`/`mintPath` pass the connected `address`
+    (post-guard, so it's non-null), and `persist()` stamps it on saved progress. (Passed via meta,
+    not read in `runPlan`, to avoid the stale-closure trap — `runPlan`'s deps don't include address.)
+  - `src/app/create/page.tsx`: `sendToIncubator` stamps `owner: address` on the bookmark.
+  - `src/app/incubator/page.tsx`: `refresh()` filters both lists by `sameAddr(owner, connected)`
+    (BigInt compare); no wallet → "Connect to see your incubator" (nothing leaks). Renamed both
+    headings. An effect now removes any entry found on-chain (`lifeform`/`pathLifeform`) from local
+    storage + refresh, so a hatched creature disappears from the incubator (the "hatched" cards are
+    gone). Added "Open in Create →" to hatches-in-progress (via the `?rows=` hand-off).
+  - `src/app/pets/page.tsx`: removed the daycare entirely — transfer state, `doTransfer`,
+    `daycareControl`, the `gol:lent` lent-tracking, and the "Sitting for a friend"/"Out at daycare"
+    categories + Daycare section. Only "Your wards" + "The reaper's rounds" remain; ward cards show
+    just the Pet action. `reaped` = every lapsed bond you petted.
+  - `src/app/life/[id]/page.tsx`: for consistency, also removed the loop page's daycare hand-off
+    (the "hand to daycare →" button + transfer form + state); the bond clock stays. Dropped the now
+    -unused `execute`/`waitForTx` from its wallet destructure.
+- **Verified:** built client bundle contains "Hatches in progress" / "Saved creatures" /
+  "Open in Create" / the two connect prompts, and has ZERO matches for "Mints in progress",
+  "Saved patterns", "hand to daycare", "hand back", "Sitting for a friend", "Out at daycare",
+  "pet-sit while". Headless (no wallet): `/incubator` and `/pets` render their per-wallet connect
+  prompts without error. tsc + eslint clean, `next build` green (`/pets` 5.45→4.69 kB,
+  `/life` 8.39→8.02 kB). NOT verifiable headlessly (needs a connected wallet + local eggs): the
+  per-wallet filtering across two accounts, the hatched-→-removed cleanup, and "Open in Create".
+- **Next:** unchanged — wallet-connected QA, then ship decision.
+
 ## 2026-07-10 (evening, 8) — /create: no colour modal (roll at random); 15 fps; breathe wording
 - **Goal:** Henri: (1) on `/life` loops, change the pending label "The chain is writing…" to
   "Breathing…"; (2) on `/create`, drop the pick-colours/speed modal — "Set it free" mints straight

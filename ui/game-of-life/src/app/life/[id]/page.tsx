@@ -67,7 +67,7 @@ function MintedDetail({ id }: { id: string }) {
 /* ---------- a living Bacterium: the ritual surface ---------- */
 function LoopDetail({ id }: { id: string }) {
   const { sdk, error } = useGolSdk();
-  const { address, connect, onSepolia, switchToSepolia, execute, waitForTx } = useWallet();
+  const { address, connect, onSepolia, switchToSepolia } = useWallet();
   const { status: pStatus, txHash: pHash, error: pErr, pet, reset: pReset } = usePet();
   const bond = useBond(id);
   const connected = !!address;
@@ -83,11 +83,6 @@ function LoopDetail({ id }: { id: string }) {
 
   const [confirmMsg, setConfirmMsg] = useState<{ text: string; hash: string | null } | null>(null);
   const [shownAge, setShownAge] = useState(0);
-
-  const [dcOpen, setDcOpen] = useState(false);
-  const [dcTo, setDcTo] = useState("");
-  const [dcStatus, setDcStatus] = useState<"idle" | "signing" | "pending" | "confirmed" | "error">("idle");
-  const [dcErr, setDcErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!sdk) return;
@@ -162,22 +157,6 @@ function LoopDetail({ id }: { id: string }) {
     pet(decId);
   };
 
-  const doTransfer = async () => {
-    if (!sdk || !dcTo.trim()) return;
-    setDcErr(null); setDcStatus("signing");
-    try {
-      const hash = await execute(sdk.transferBondCall(decId, dcTo.trim()));
-      setDcStatus("pending");
-      await waitForTx(hash);
-      setDcStatus("confirmed");
-      setPackEpoch((e) => e + 1);
-      setTimeout(() => { setDcOpen(false); setDcStatus("idle"); setDcTo(""); }, 1400);
-    } catch (e) {
-      setDcErr(e instanceof Error ? e.message.slice(0, 140) : String(e));
-      setDcStatus("error");
-    }
-  };
-
   return (
     <Shell>
       <div className="life">
@@ -237,22 +216,6 @@ function LoopDetail({ id }: { id: string }) {
                         ? "bond wilted — a breath revives it"
                         : `bond: ${left! >= 1 ? `${Math.floor(left!)} day${Math.floor(left!) === 1 ? "" : "s"}` : `${Math.max(1, Math.round(left! * 24))} hours`} left`}
                     </div>
-
-                    {dcOpen ? (
-                      <div className="daycare">
-                        <input className="dc-input" placeholder="0x… friend's address" value={dcTo} onChange={(e) => setDcTo(e.target.value)} />
-                        <div className="daycare-row">
-                          <button className="btn set-free" disabled={dcStatus === "signing" || dcStatus === "pending" || !dcTo.trim()} onClick={doTransfer}>
-                            {dcStatus === "signing" ? "Confirm…" : dcStatus === "pending" ? "Handing over…" : dcStatus === "confirmed" ? "Handed over" : "Hand over"}
-                          </button>
-                          <button className="btn ghost" onClick={() => { setDcOpen(false); setDcErr(null); }}>Cancel</button>
-                        </div>
-                        {dcErr && <p className="breathe-err">{dcErr}</p>}
-                        <p className="act-note">Daycare: hand the bond to a friend to pet-sit while you’re away. The clock rides along.</p>
-                      </div>
-                    ) : (
-                      <button className="btn ghost dc-open" onClick={() => setDcOpen(true)}>hand to daycare →</button>
-                    )}
                   </div>
                 )}
 

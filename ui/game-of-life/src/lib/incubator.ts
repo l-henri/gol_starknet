@@ -18,6 +18,7 @@ export type Bookmark = {
   period: number; // loop: loop length; path: sequence_length (distance to loop)
   kind?: CreatureKind; // undefined = "loop" (back-compat with pre-path bookmarks)
   loopPeriod?: number; // path only: the terminal loop's period
+  owner?: string; // the wallet that kept it (undefined = legacy, shown to nobody now)
   savedAt: number;
 };
 
@@ -27,6 +28,7 @@ export type MintProgress = {
   period: number; // loop: loop length; path: sequence_length
   kind?: CreatureKind; // undefined = "loop"
   loopPeriod?: number; // path only
+  owner?: string; // the wallet mid-hatch (undefined = legacy) — the incubator is per-wallet
   done: number; // number of plan steps completed
   total: number; // total plan steps
   updatedAt: number;

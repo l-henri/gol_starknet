@@ -26,14 +26,7 @@ async function runPool<T>(items: T[], n: number, worker: (t: T) => Promise<void>
   }));
 }
 
-// A hand-off (daycare loan) looks identical on-chain to a lapse: both leave you no longer holding the
-// bond. Remember what you lent so the UI can tell "being pet-sat" from "the reaper passed."
-const LENT_KEY = "gol:lent";
-const readLent = (): Set<string> => { try { return new Set(JSON.parse(localStorage.getItem(LENT_KEY) || "[]")); } catch { return new Set(); } };
-const addLent = (id: string) => { const s = readLent(); s.add(norm(id)); localStorage.setItem(LENT_KEY, JSON.stringify([...s])); };
-const isLent = (id: string) => readLent().has(norm(id));
-
-type Ward = { creatureId: string; lf: JsLifeform | null; bond: BondState; pettedByMe: boolean; left: number | null; lent: boolean };
+type Ward = { creatureId: string; lf: JsLifeform | null; bond: BondState; pettedByMe: boolean; left: number | null };
 
 function clockLabel(left: number | null): { text: string; hungry: boolean } {
   if (left === null) return { text: "—", hungry: false };
@@ -63,18 +56,12 @@ function WardThumb({ lf }: { lf: JsLifeform | null }) {
 
 export default function WardsPage() {
   const { sdk } = useGolSdk();
-  const { address, connect, onSepolia, switchToSepolia, execute, waitForTx, txEpoch } = useWallet();
+  const { address, connect, onSepolia, switchToSepolia, txEpoch } = useWallet();
   const { status: petStatus, error: petError, pet, reset: petReset } = usePet();
 
   const [entries, setEntries] = useState<Ward[] | null>(null);
   const [epoch, setEpoch] = useState(0);
   const [activeId, setActiveId] = useState<string | null>(null);
-
-  // daycare transfer (per-card)
-  const [dcId, setDcId] = useState<string | null>(null);
-  const [dcTo, setDcTo] = useState("");
-  const [dcStatus, setDcStatus] = useState<"idle" | "signing" | "pending" | "confirmed" | "error">("idle");
-  const [dcErr, setDcErr] = useState<string | null>(null);
 
   // walk the bond graph: for every creature with bond activity, is it held by me? did I pet it?
   useEffect(() => {
@@ -95,7 +82,7 @@ export default function WardsPage() {
             if (!b.held && !pettedByMe) return;
             const lf = (await sdk.lifeform(cid).catch(() => null)) as JsLifeform | null;
             const bond: BondState = { held: b.held, lastPet: b.last_pet, reapable: b.reapable };
-            out.push({ creatureId: cid, lf, bond, pettedByMe, left: b.held ? daysLeft(bond) : null, lent: !b.held && isLent(cid) });
+            out.push({ creatureId: cid, lf, bond, pettedByMe, left: b.held ? daysLeft(bond) : null });
           } catch { /* skip this creature */ }
         });
         if (!cancelled) setEntries(out);
@@ -114,28 +101,10 @@ export default function WardsPage() {
   }, [petStatus, petReset]);
 
   const wards = useMemo(() => (entries ?? []).filter((e) => e.bond.held && e.pettedByMe).sort((a, b) => (a.left ?? 0) - (b.left ?? 0)), [entries]);
-  const sitting = useMemo(() => (entries ?? []).filter((e) => e.bond.held && !e.pettedByMe).sort((a, b) => (a.left ?? 0) - (b.left ?? 0)), [entries]);
-  const reaped = useMemo(() => (entries ?? []).filter((e) => !e.bond.held && e.pettedByMe && !e.lent), [entries]);
-  const lentOut = useMemo(() => (entries ?? []).filter((e) => !e.bond.held && e.pettedByMe && e.lent), [entries]);
+  const reaped = useMemo(() => (entries ?? []).filter((e) => !e.bond.held && e.pettedByMe), [entries]);
 
   const petBusy = petStatus === "signing" || petStatus === "pending";
   const doPet = useCallback((cid: string) => { setActiveId(cid); if (petStatus === "error") petReset(); void pet(cid); }, [pet, petStatus, petReset]);
-
-  const doTransfer = async (cid: string) => {
-    if (!sdk || !dcTo.trim()) return;
-    setDcErr(null); setDcStatus("signing");
-    try {
-      const hash = await execute(sdk.transferBondCall(cid, dcTo.trim()));
-      setDcStatus("pending");
-      await waitForTx(hash);
-      addLent(cid);
-      setDcStatus("confirmed");
-      setTimeout(() => { setDcId(null); setDcTo(""); setDcStatus("idle"); setEpoch((e) => e + 1); }, 1200);
-    } catch (e) {
-      setDcErr(e instanceof Error ? e.message.slice(0, 140) : String(e));
-      setDcStatus("error");
-    }
-  };
 
   const petLabel = (cid: string, adopt = false) => {
     if (activeId === cid && petStatus === "signing") return "Confirm…";
@@ -149,22 +118,6 @@ export default function WardsPage() {
       <button className="btn" onClick={switchToSepolia}>Switch to Sepolia</button>
     ) : (
       <button className="btn set-free" disabled={petBusy && activeId !== cid} onClick={() => doPet(cid)}>{petLabel(cid, adopt)}</button>
-    );
-
-  const daycareControl = (cid: string, verb: string) =>
-    dcId === cid ? (
-      <div className="daycare">
-        <input className="dc-input" placeholder="0x… friend's address" value={dcTo} onChange={(e) => setDcTo(e.target.value)} />
-        <div className="daycare-row">
-          <button className="btn set-free" disabled={dcStatus === "signing" || dcStatus === "pending" || !dcTo.trim()} onClick={() => doTransfer(cid)}>
-            {dcStatus === "signing" ? "Confirm…" : dcStatus === "pending" ? "Handing over…" : dcStatus === "confirmed" ? "Handed over" : verb}
-          </button>
-          <button className="btn ghost" onClick={() => { setDcId(null); setDcErr(null); }}>Cancel</button>
-        </div>
-        {dcErr && dcId === cid && <p className="breathe-err">{dcErr}</p>}
-      </div>
-    ) : (
-      <button className="btn ghost" onClick={() => { setDcId(cid); setDcErr(null); setDcTo(""); }}>{verb} →</button>
     );
 
   return (
@@ -181,7 +134,7 @@ export default function WardsPage() {
         </div>
       ) : entries === null ? (
         <p className="dim" style={{ marginTop: 24 }}><span className="spinner" /> reading the pack…</p>
-      ) : wards.length === 0 && sitting.length === 0 && reaped.length === 0 && lentOut.length === 0 ? (
+      ) : wards.length === 0 && reaped.length === 0 ? (
         <div className="wards-empty">
           <p className="wards-empty-line">No wards yet.</p>
           <p className="wards-empty-sub">Pet a creature in the <Link href="/" className="tx-link">garden</Link> to take one into your care.</p>
@@ -206,7 +159,6 @@ export default function WardsPage() {
                         {w.lf && (
                           <div className="ward-actions">
                             {petAction(w.creatureId)}
-                            {daycareControl(w.creatureId, "hand to daycare")}
                           </div>
                         )}
                         {activeId === w.creatureId && petStatus === "error" && petError && <p className="breathe-err">{petError}</p>}
@@ -237,50 +189,6 @@ export default function WardsPage() {
               </div>
             </section>
           )}
-
-          {/* DAYCARE */}
-          <section className="wards-group">
-            <div className="wards-group-head"><h2>Daycare</h2><span className="desc">hand a bond to a friend to pet-sit while you’re away</span></div>
-            <p className="dim" style={{ maxWidth: "56ch", marginTop: "-0.4em" }}>
-              Hand a ward to a friend and they keep it alive (and get the small NUT for each breath), then hand it back whenever. Use “hand to daycare” on any ward above.
-            </p>
-
-            {sitting.length > 0 && (
-              <>
-                <h3 className="wards-h3">Sitting for a friend</h3>
-                <div className="ward-grid">
-                  {sitting.map((w) => {
-                    const clk = clockLabel(w.left);
-                    return (
-                      <div key={w.creatureId} className={"ward-card" + (clk.hungry ? " hungry" : "")}>
-                        <Link href={`/life/${w.creatureId}`}><WardThumb lf={w.lf} /></Link>
-                        <div className="ward-body">
-                          <Link href={`/life/${w.creatureId}`} className="ward-name">{deriveName(w.lf)}</Link>
-                          <div className={"ward-clock" + (clk.hungry ? " hungry" : "")}><span className="ward-clock-dot" /> {clk.text}</div>
-                          {w.lf && <div className="ward-actions">{petAction(w.creatureId)}{daycareControl(w.creatureId, "hand back")}</div>}
-                          {activeId === w.creatureId && petStatus === "error" && petError && <p className="breathe-err">{petError}</p>}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-
-            {lentOut.length > 0 && (
-              <>
-                <h3 className="wards-h3">Out at daycare</h3>
-                <ul className="lent-list">
-                  {lentOut.map((w) => (
-                    <li key={w.creatureId}>
-                      <Link href={`/life/${w.creatureId}`} className="ward-name-sm">{deriveName(w.lf)}</Link>
-                      <span className="dim"> · with a friend, being kept alive</span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </section>
         </>
       )}
     </div>

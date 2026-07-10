@@ -246,7 +246,7 @@ export default function CreatePage() {
   };
 
   const sendToIncubator = (id: string, rows: number[], period: number, kind: "loop" | "path", loopPeriod: number) => {
-    try { addBookmark({ id, rows, period, kind, loopPeriod, savedAt: Date.now() }); } catch { /* best-effort */ }
+    try { addBookmark({ id, rows, period, kind, loopPeriod, owner: address ?? undefined, savedAt: Date.now() }); } catch { /* best-effort */ }
     router.push("/incubator");
   };
 

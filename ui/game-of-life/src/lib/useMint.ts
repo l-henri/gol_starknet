@@ -18,7 +18,7 @@ export type MintProgressState = { current: number; total: number; label: string 
 
 type PlanStep = { label: string; calls: unknown[] };
 type Plan = { steps: PlanStep[]; txCount: number; singleShot: boolean; tooLong: boolean };
-type MintMeta = { rows: number[]; period: number; kind: CreatureKind; loopPeriod?: number };
+type MintMeta = { rows: number[]; period: number; kind: CreatureKind; loopPeriod?: number; owner?: string };
 
 function humanize(e: unknown, t: (d: Dict) => string): string {
   const m = e instanceof Error ? e.message : String(e);
@@ -167,6 +167,7 @@ export function useMint() {
           period: meta.period,
           kind: meta.kind,
           loopPeriod: meta.loopPeriod,
+          owner: meta.owner,
           done,
           total,
           updatedAt: Date.now(),
@@ -246,7 +247,7 @@ export function useMint() {
         setStatus("error");
         return false;
       }
-      return runPlan(plan, id, { rows, period, kind: "loop" }, (i) => sdk.lifeform(i));
+      return runPlan(plan, id, { rows, period, kind: "loop", owner: address }, (i) => sdk.lifeform(i));
     },
     [sdk, address, prep, runPlan, chunkSteps, singleShotMax, t]
   );
@@ -283,7 +284,7 @@ export function useMint() {
       return runPlan(
         plan,
         id,
-        { rows, period: sequenceLength, kind: "path", loopPeriod },
+        { rows, period: sequenceLength, kind: "path", loopPeriod, owner: address },
         (i) => sdk.pathLifeform(i)
       );
     },
