@@ -2,16 +2,15 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Creature from "@/components/Creature";
 import BreathCanvas from "@/components/BreathCanvas";
 import { useGolSdk } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
-import { useBreathe } from "@/lib/useBreathe";
 import { usePet, useBond, daysLeft } from "@/lib/usePet";
 import { useMint } from "@/lib/useMint";
 import { findBeast } from "@/lib/bestiary";
-import { fromRows, rowsFromCoords, step, type Cells } from "@/lib/creatures";
+import { rowsFromCoords } from "@/lib/creatures";
 import { shortAddr, tokenIdDecimal } from "@/lib/format";
 import { explorerTxUrl } from "@/lib/config";
 import type { JsLifeform } from "@/lib/types";
@@ -68,10 +67,10 @@ function MintedDetail({ id }: { id: string }) {
 /* ---------- a living Bacterium: the ritual surface ---------- */
 function LoopDetail({ id }: { id: string }) {
   const { sdk, error } = useGolSdk();
-  const { onSepolia, switchToSepolia, execute, waitForTx } = useWallet();
-  const { status: bStatus, txHash: bHash, error: bErr, breathe, reset: bReset, connected } = useBreathe();
+  const { address, connect, onSepolia, switchToSepolia, execute, waitForTx } = useWallet();
   const { status: pStatus, txHash: pHash, error: pErr, pet, reset: pReset } = usePet();
   const bond = useBond(id);
+  const connected = !!address;
 
   const [lf, setLf] = useState<JsLifeform | null>(null);
   const [rp, setRp] = useState<RP | null>(null);
@@ -82,9 +81,6 @@ function LoopDetail({ id }: { id: string }) {
   const [pack, setPack] = useState<{ holder: string; left: number | null }[] | null>(null);
   const [packEpoch, setPackEpoch] = useState(0);
 
-  const [scrubGen, setScrubGen] = useState<number | null>(null);
-  const [showIframe, setShowIframe] = useState(false);
-  const [breathSignal, setBreathSignal] = useState(0);
   const [confirmMsg, setConfirmMsg] = useState<{ text: string; hash: string | null } | null>(null);
   const [shownAge, setShownAge] = useState(0);
 
@@ -135,23 +131,11 @@ function LoopDetail({ id }: { id: string }) {
     return () => { cancelled = true; };
   }, [sdk, id, packEpoch]);
 
-  // a confirmed breath → play the animation, tick the counter, refetch, settle
-  useEffect(() => {
-    if (bStatus !== "confirmed") return;
-    setShowIframe(false); setScrubGen(null);
-    setBreathSignal((s) => s + 1);
-    setShownAge((a) => a + 1);
-    setConfirmMsg({ text: "You gave it a breath.", hash: bHash });
-    load();
-    const t = setTimeout(() => bReset(), 3200);
-    return () => clearTimeout(t);
-  }, [bStatus]); // eslint-disable-line react-hooks/exhaustive-deps
+  // a confirmed breath → tick the counter, refetch state + pack, settle
   useEffect(() => {
     if (pStatus !== "confirmed") return;
-    setShowIframe(false); setScrubGen(null);
-    setBreathSignal((s) => s + 1);
     setShownAge((a) => a + 1);
-    setConfirmMsg({ text: "You gave it a breath. Bond renewed.", hash: pHash });
+    setConfirmMsg({ text: "You gave it a breath.", hash: pHash });
     load(); setPackEpoch((e) => e + 1);
     const t = setTimeout(() => pReset(), 3200);
     return () => clearTimeout(t);
@@ -166,13 +150,17 @@ function LoopDetail({ id }: { id: string }) {
   const period = lf.sequence_length;
   const displayName = lf.is_still ? "Still Life" : lf.is_loop ? `Period-${period} Loop` : "Lifeform";
   const stateWord = lf.is_dead ? "gone out" : "alive";
-  const bBusy = bStatus === "signing" || bStatus === "pending";
   const pBusy = pStatus === "signing" || pStatus === "pending";
   const left = daysLeft(bond);
   const hungry = left !== null && left <= 2;
 
-  const doBreathe = () => (bStatus === "error" ? bReset() : !connected || !onSepolia ? (onSepolia ? breathe(decId, 1) : switchToSepolia()) : breathe(decId, 1));
-  const doPet = () => (pStatus === "error" ? pReset() : !onSepolia ? switchToSepolia() : pet(decId));
+  // one action: breathing pets the creature, which adopts you as its caretaker automatically.
+  const doBreathe = () => {
+    if (pStatus === "error") return pReset();
+    if (!connected) return connect();
+    if (!onSepolia) return switchToSepolia();
+    pet(decId);
+  };
 
   const doTransfer = async () => {
     if (!sdk || !dcTo.trim()) return;
@@ -190,19 +178,15 @@ function LoopDetail({ id }: { id: string }) {
     }
   };
 
-  const scrubMax = Math.min(period - 1, 63);
-
   return (
     <Shell>
       <div className="life">
         <div className="life-main">
-          {/* LEFT — the render, framed as a microscope slide */}
+          {/* LEFT — the on-chain renderer, framed as a microscope slide */}
           <div className="life-left">
             <Slide>
-              {rp && showIframe ? (
+              {rp ? (
                 <iframe srcDoc={onchainHtml(lf.current_state, rp.bg, rp.cell, rp.speed)} title={`On-chain renderer for ${decId}`} sandbox="allow-scripts" style={{ width: "100%", height: "100%", border: 0, background: toHex(rp.bg) }} />
-              ) : rp ? (
-                <BreathCanvas rows={lf.current_state} bg={rp.bg} cell={rp.cell} speed={rp.speed} playing={scrubGen === null} scrubGen={scrubGen} breathSignal={breathSignal} />
               ) : (
                 <div className="status-line" style={{ padding: 24 }}>reading render params…</div>
               )}
@@ -212,19 +196,6 @@ function LoopDetail({ id }: { id: string }) {
               <span className="life-gen">{shownAge.toLocaleString("en-US")}</span>
               <span className="life-gen-label">generation{shownAge === 1 ? "" : "s"} lived</span>
             </div>
-
-            {period > 1 && !showIframe && (
-              <div className="life-scrub">
-                <button className={"scrub-live" + (scrubGen === null ? " on" : "")} onClick={() => setScrubGen(null)}>
-                  <span className="dot" /> live
-                </button>
-                <input type="range" min={0} max={scrubMax} value={scrubGen ?? 0} onChange={(e) => setScrubGen(Number(e.target.value))} aria-label="Replay generations" />
-                <span className="scrub-read">{scrubGen === null ? "cycle" : `phase ${scrubGen} / ${period}`}</span>
-              </div>
-            )}
-            <button className="life-onchain" onClick={() => setShowIframe((v) => !v)}>
-              {showIframe ? "← show the replayable view" : "view the on-chain renderer"}
-            </button>
           </div>
 
           {/* RIGHT — identity, facts, and the two acts of care */}
@@ -248,51 +219,39 @@ function LoopDetail({ id }: { id: string }) {
 
             {!lf.is_dead && (
               <div className="acts">
-                <button className="btn set-free breathe-act" onClick={doBreathe} disabled={bBusy || pBusy}>
+                <button className="btn set-free breathe-act" onClick={doBreathe} disabled={pBusy}>
                   {!connected ? "Connect to breathe"
                     : !onSepolia ? "Switch to Sepolia"
-                    : bStatus === "signing" ? "Drawing breath…"
-                    : bStatus === "pending" ? "The chain is writing…"
-                    : bStatus === "error" ? "Try again"
+                    : pStatus === "signing" ? "Drawing breath…"
+                    : pStatus === "pending" ? "The chain is writing…"
+                    : pStatus === "error" ? "Try again"
                     : "Breathe life"}
                 </button>
-                <p className="act-note">One generation forward. Casual, anonymous — earns you a little $NUT. No bond.</p>
+                <p className="act-note">One generation forward — and it becomes yours to keep. Breathing adopts you as its caretaker and opens a 7-day bond; come back within 7 days, or the bond wilts. Earns you a little $NUT.</p>
 
-                {connected && onSepolia && (
+                {connected && onSepolia && bond?.held && (
                   <div className="act-pet">
-                    <button className="btn pet-act" onClick={doPet} disabled={pBusy || bBusy}>
-                      {pStatus === "signing" ? "Drawing breath…"
-                        : pStatus === "pending" ? "The chain is writing…"
-                        : pStatus === "error" ? "Try again"
-                        : bond?.held ? "Pet — the committed breath" : "Adopt it — become its caretaker"}
-                    </button>
-                    {bond?.held ? (
-                      <div className={"bond-clock" + (hungry ? " hungry" : "")}>
-                        <span className="bond-dot" />
-                        {left !== null && left <= 0
-                          ? "bond wilted — a pet revives it"
-                          : `bond: ${left! >= 1 ? `${Math.floor(left!)} day${Math.floor(left!) === 1 ? "" : "s"}` : `${Math.max(1, Math.round(left! * 24))} hours`} left`}
+                    <div className={"bond-clock" + (hungry ? " hungry" : "")}>
+                      <span className="bond-dot" />
+                      {left !== null && left <= 0
+                        ? "bond wilted — a breath revives it"
+                        : `bond: ${left! >= 1 ? `${Math.floor(left!)} day${Math.floor(left!) === 1 ? "" : "s"}` : `${Math.max(1, Math.round(left! * 24))} hours`} left`}
+                    </div>
+
+                    {dcOpen ? (
+                      <div className="daycare">
+                        <input className="dc-input" placeholder="0x… friend's address" value={dcTo} onChange={(e) => setDcTo(e.target.value)} />
+                        <div className="daycare-row">
+                          <button className="btn set-free" disabled={dcStatus === "signing" || dcStatus === "pending" || !dcTo.trim()} onClick={doTransfer}>
+                            {dcStatus === "signing" ? "Confirm…" : dcStatus === "pending" ? "Handing over…" : dcStatus === "confirmed" ? "Handed over" : "Hand over"}
+                          </button>
+                          <button className="btn ghost" onClick={() => { setDcOpen(false); setDcErr(null); }}>Cancel</button>
+                        </div>
+                        {dcErr && <p className="breathe-err">{dcErr}</p>}
+                        <p className="act-note">Daycare: hand the bond to a friend to pet-sit while you’re away. The clock rides along.</p>
                       </div>
                     ) : (
-                      <p className="act-note">Petting opens your caretaker bond and a 7-day clock. Come back within 7 days, or the bond wilts.</p>
-                    )}
-
-                    {bond?.held && (
-                      dcOpen ? (
-                        <div className="daycare">
-                          <input className="dc-input" placeholder="0x… friend's address" value={dcTo} onChange={(e) => setDcTo(e.target.value)} />
-                          <div className="daycare-row">
-                            <button className="btn set-free" disabled={dcStatus === "signing" || dcStatus === "pending" || !dcTo.trim()} onClick={doTransfer}>
-                              {dcStatus === "signing" ? "Confirm…" : dcStatus === "pending" ? "Handing over…" : dcStatus === "confirmed" ? "Handed over" : "Hand over"}
-                            </button>
-                            <button className="btn ghost" onClick={() => { setDcOpen(false); setDcErr(null); }}>Cancel</button>
-                          </div>
-                          {dcErr && <p className="breathe-err">{dcErr}</p>}
-                          <p className="act-note">Daycare: hand the bond to a friend to pet-sit while you’re away. The clock rides along.</p>
-                        </div>
-                      ) : (
-                        <button className="btn ghost dc-open" onClick={() => setDcOpen(true)}>hand to daycare →</button>
-                      )
+                      <button className="btn ghost dc-open" onClick={() => setDcOpen(true)}>hand to daycare →</button>
                     )}
                   </div>
                 )}
@@ -303,7 +262,6 @@ function LoopDetail({ id }: { id: string }) {
                     {confirmMsg.hash && <a className="tx-link" href={explorerTxUrl(confirmMsg.hash)} target="_blank" rel="noreferrer">{shortAddr(confirmMsg.hash)} ↗</a>}
                   </div>
                 )}
-                {bStatus === "error" && bErr && <p className="breathe-err">{bErr}</p>}
                 {pStatus === "error" && pErr && <p className="breathe-err">{pErr}</p>}
               </div>
             )}
@@ -331,37 +289,13 @@ function LoopDetail({ id }: { id: string }) {
               </ul>
             )}
           </section>
-          <section>
-            <h3 className="life-h3">Lived generations</h3>
-            <p className="dim">It has lived <b>{shownAge.toLocaleString("en-US")}</b> generation{shownAge === 1 ? "" : "s"}{period > 1 ? `, cycling through ${period} states` : " as a still life"}.</p>
-            {rp && <Filmstrip rows={lf.current_state} period={period} rp={rp} />}
-          </section>
         </div>
       </div>
     </Shell>
   );
 }
 
-/* the states a creature moves through (its cycle) as a filmstrip */
-function Filmstrip({ rows, period, rp }: { rows: number[]; period: number; rp: RP }) {
-  const frames = useMemo(() => {
-    const out: Cells[] = [];
-    let c = fromRows(rows);
-    for (let i = 0; i < Math.min(period, 10); i++) { out.push(c); c = step(c); }
-    return out;
-  }, [rows, period]);
-  return (
-    <div className="filmstrip">
-      {frames.map((f, i) => (
-        <div className="film-frame" key={i} title={`generation ${i}`}>
-          <Creature cells={f} bg={rp.bg} cell={rp.cell} variant="living" animate={false} res={120} />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* ---------- a Wanderer: a static travelling portrait (no care) ---------- */
+/* ---------- a Wanderer: a travelling portrait, playing out its journey (no care) ---------- */
 type JsPath = {
   token_id: string; owner: string; life_state: string; sequence_length: number;
   start_state: number[]; target_loop_id: string; target_period: number; minted_at: number; escrow: string;

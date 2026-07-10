@@ -18,6 +18,30 @@
 
 ---
 
+## 2026-07-10 (evening, 6) — /life loop detail: one act, on-chain renderer only
+- **Goal:** Henri wants the loop detail stripped down: (1) a single "Breathe life" button that
+  *pets* (adoption is automatic — no separate adopt/pet button); (2) drop the replay progress bar;
+  (3) make the on-chain renderer the only view (no "view the on-chain renderer" toggle, no
+  replayable BreathCanvas); (4) remove the redundant "Lived generations" section.
+- **Branch:** `new_design` · **Commits:** uncommitted WIP
+- **Changed (`ui/game-of-life/src/app/life/[id]/page.tsx`, `LoopDetail`):**
+  - **One action:** removed `useBreathe` and the anonymous "Breathe life" path entirely. The single
+    button now runs `doBreathe → connect / switchToSepolia / pet(id)`, so breathing = petting =
+    automatic adoption + a renewed 7-day bond. Reworded the note to say so. The bond clock + daycare
+    hand-over stay (they only surface once you're connected and hold a bond).
+  - **Renderer:** the left slide is now always the on-chain iframe (`onchainHtml`); dropped the
+    `showIframe` toggle, the `BreathCanvas` instance, the replay scrubber (`.life-scrub`) + `scrubGen`
+    / `breathSignal` state, and the `view the on-chain renderer` button. Kept the generation counter.
+  - **Below:** removed the "Lived generations" section (prose duplicated the counter + loop-period
+    trait) and the now-orphaned `Filmstrip` component; `.life-below` → single column. Pruned the
+    now-unused imports (`useMemo`, `fromRows`/`step`/`Cells`, `useBreathe`).
+- **Verified (headless + CDP, live Sepolia, genesis blinker loop):** the acts row has exactly one
+  button ("Connect to breathe" logged-out); no scrubber / no range input; no on-chain toggle; the
+  slide is an `<iframe>` (on-chain renderer) with no BreathCanvas; the only `life-below` section is
+  "Caretakers"; the "344 generations lived" counter remains. tsc + eslint clean, `next build` green
+  (route 9.25 → 8.22 kB). NOT verified (needs wallet): the breathe/pet tx itself.
+- **Next:** unchanged — wallet-connected QA, then ship decision.
+
 ## 2026-07-10 (evening, 5) — Garden trims + wanderers finally wander
 - **Goal:** Henri: (1) drop the "Found a living pattern? Set it free" invite and the newly/oldest/
   hungry lens toggle from the Garden home — default to newest; (2) make the big "creature of the
