@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { RPC_URL } from "./config";
+import { RPC_URL_COMPAT } from "./config";
 import type { MeteringTier } from "./gasCaps";
 
 const SEPOLIA_CHAIN_ID = "0x534e5f5345504f4c4941"; // SN_SEPOLIA
@@ -102,7 +102,7 @@ async function detectTier(addr: string): Promise<MeteringTier> {
   if (cached) return cached;
   try {
     const { RpcProvider } = await import("starknet");
-    const provider = new RpcProvider({ nodeUrl: RPC_URL });
+    const provider = new RpcProvider({ nodeUrl: RPC_URL_COMPAT });
     const classHash = await provider.getClassHashAt(addr, "latest");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cls = (await provider.getClass(classHash, "latest")) as any;
@@ -225,7 +225,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   // waitForTransaction would treat a revert as success, since ACCEPTED_ON_L2 finality matches).
   const pollTx = useCallback(async (hash: string, requireAccepted: boolean): Promise<void> => {
     const { RpcProvider } = await import("starknet");
-    const provider = new RpcProvider({ nodeUrl: RPC_URL });
+    const provider = new RpcProvider({ nodeUrl: RPC_URL_COMPAT });
     for (let i = 0; i < 200; i++) {
       let st: { finality_status?: string; execution_status?: string } | null = null;
       try {

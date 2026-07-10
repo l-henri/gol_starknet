@@ -18,6 +18,39 @@
 
 ---
 
+## 2026-07-10 (evening, 14) — ROOT CAUSE of "Set it free": a malformed multicall (+ v0.10/starknet.js split)
+- **Goal:** finally fix "Set it free". After the direct-wallet rewrite it stopped hanging and
+  surfaced the wallet's generic `Error: Execute failed` (inpage.js) with `txCalls: Array(3)`.
+- **Branch:** `new_design` · **Commits:** uncommitted WIP
+- **How it was found:** loaded the WASM SDK **in Node** (the call-builders are pure), rebuilt a real
+  mint's calls, and ran `estimateInvokeFee(skipValidate)` against the agent account to surface the
+  hidden revert. Two findings:
+  1. **The real bug:** every SDK call-builder returns an **array** of calls (`[{...}]`).
+     `useMint` did `plan.steps[last].calls.push(sdk.setRenderParamsCall(...))` — pushing the *array*
+     as one nested element → the mint multicall became `[approve, mint_loop, [set_render_params]]`.
+     The 3rd element has no `contractAddress`/`entrypoint`, so the wallet rejects the whole tx with a
+     generic "Execute failed". The appearance feature is always on now (random roll), so EVERY
+     `/create` mint was broken. **Fix: spread it** — `push(...sdk.setRenderParamsCall(...))`. With the
+     spread, a fresh (unminted) toad **estimates OK** (overall_fee returned) → the mint is valid.
+  2. **Bonus incompat:** the official **v0.10 node is unusable by starknet.js 7.6.4** — it speaks RPC
+     0.8.1 and the node refuses it ("spec not supported"; also rejects `block_id:"pending"`). That
+     silently broke our `pollTx` (tx confirmation) and `detectTier` (gas tier). The Rust/WASM SDK
+     handles v0.10 fine (reads load).
+- **Changed (`ui/game-of-life`):**
+  - `src/lib/useMint.ts`: spread `setRenderParamsCall` / `setPathRenderParamsCall` into the plan's
+    calls (both loop + path).
+  - `src/lib/config.ts`: `UPSTREAM_RPC` (v0.10, SDK) + new `UPSTREAM_RPC_COMPAT` (v0.8, starknet.js);
+    `RPC_URL` = proxy default, `RPC_URL_COMPAT` = proxy `?spec=compat`.
+  - `src/app/api/rpc/route.ts`: `?spec=compat` forwards to the node's v0_8 endpoint; default → v0.10.
+  - `src/lib/wallet.tsx`: `pollTx` + `detectTier` now use `RPC_URL_COMPAT` (v0.8) so starknet.js can
+    actually talk to the node. (The write path already goes straight to the wallet, its own node.)
+- **Verified:** Node estimate — fresh toad mint **ESTIMATE OK** (spread fix). Proxy: `/api/rpc`
+  → 0.10.3-rc.0, `/api/rpc?spec=compat` → 0.8.1. Garden loads through the v0.10 proxy (no CORS).
+  tsc + eslint clean, `next build` green. NOT verifiable headlessly: the wallet popup + a real mint
+  (needs Henri, and his account needs `period` NUT — earned by breathing).
+- **Next:** Henri retests "Set it free" — it should now prompt and go through (given NUT balance).
+  Then breathe/pet QA and the ship decision.
+
 ## 2026-07-10 (evening, 13) — wallet write path: hand tx straight to the wallet; /create play-on-click
 - **Goal:** Henri: (1) `/create` right grid should play immediately when a pixel is clicked; (2)
   "Set it free" STILL stuck — now hangs on "Confirm in your wallet…" with NO console error and no

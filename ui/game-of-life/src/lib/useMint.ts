@@ -249,8 +249,11 @@ export function useMint() {
         id = sdk.familyTokenId(r, period) as string; // v3: the orbit-family id
         plan = sdk.planLoopMint(r, period, address, chunkSteps, singleShotMax, MAX_TX) as Plan;
         if (appearance && !plan.tooLong && plan.steps.length > 0) {
+          // setRenderParamsCall returns an ARRAY of calls ([{...}]) like every SDK builder — spread
+          // it, don't push the array as one nested element (that malforms the multicall and the
+          // wallet rejects the whole tx with a generic "Execute failed").
           plan.steps[plan.steps.length - 1].calls.push(
-            sdk.setRenderParamsCall(id, appearance.bg, appearance.cell, appearance.speed)
+            ...(sdk.setRenderParamsCall(id, appearance.bg, appearance.cell, appearance.speed) as unknown[])
           );
         }
       } catch (e) {
@@ -283,8 +286,9 @@ export function useMint() {
           MAX_TX
         ) as Plan;
         if (appearance && !plan.tooLong && plan.steps.length > 0) {
+          // spread — setPathRenderParamsCall returns an array of calls (see the loop mint above).
           plan.steps[plan.steps.length - 1].calls.push(
-            sdk.setPathRenderParamsCall(id, appearance.bg, appearance.cell, appearance.speed)
+            ...(sdk.setPathRenderParamsCall(id, appearance.bg, appearance.cell, appearance.speed) as unknown[])
           );
         }
       } catch (e) {
