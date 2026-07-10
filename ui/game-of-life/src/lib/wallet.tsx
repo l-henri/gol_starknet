@@ -135,8 +135,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [txEpoch, setTxEpoch] = useState(0);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const swoRef = useRef<any>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const accountRef = useRef<any>(null);
 
   const connect = useCallback(async () => {
     setConnecting(true);
@@ -149,11 +147,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         return;
       }
       swoRef.current = swo;
-      accountRef.current = null; // rebuild on next execute
       // react to in-wallet network/account changes so onSepolia + address stay current after a
       // switch (this is why the button could get stuck on "Switch to Sepolia" after switching).
       swo.on?.("networkChanged", () => {
-        accountRef.current = null;
         void readChainId(swo).then(setChainId);
       });
       swo.on?.("accountsChanged", () => void readAddress(swo).then(setAddress));
@@ -184,32 +180,39 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       /* ignore */
     }
     swoRef.current = null;
-    accountRef.current = null;
     setAddress(null);
     setChainId(null);
   }, []);
 
   const execute = useCallback(async (calls: unknown): Promise<string> => {
-    if (!swoRef.current) throw new Error("Connect a wallet first.");
+    const swo = swoRef.current;
+    if (!swo?.request) throw new Error("Connect a wallet first.");
+    // Hand the calls straight to the wallet via `wallet_addInvokeTransaction` — the wallet does the
+    // nonce, estimation, resource bounds, UI and signing with ITS OWN node, so our RPC node/spec can
+    // never stall the signature prompt. This is exactly what WalletAccount.execute does internally
+    // (see starknet.js), minus the extra `requestAccounts` round-trip on first use — and we force
+    // calldata to felt STRINGS, since some wallets silently hang on numeric/BigInt calldata (which
+    // WalletAccount.execute passes through untouched).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const arr = (Array.isArray(calls) ? calls : [calls]) as any[];
+    const toFelt = (x: unknown): string => {
+      if (typeof x === "string") return x;
+      try { return BigInt(x as never).toString(); } catch { return String(x); }
+    };
+    const txCalls = arr.map((it) => ({
+      contract_address: it.contractAddress ?? it.contract_address,
+      entry_point: it.entrypoint ?? it.entry_point,
+      calldata: (it.calldata ?? []).map(toFelt),
+    }));
     try {
-      const { RpcProvider, WalletAccount } = await import("starknet");
-      if (!accountRef.current) {
-        const provider = new RpcProvider({ nodeUrl: RPC_URL });
-        // starknet.js v7 static connect; fall back to the constructor for older minors.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const WA = WalletAccount as any;
-        accountRef.current = WA.connect
-          ? await WA.connect(provider, swoRef.current)
-          : new WA(provider, swoRef.current);
-      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await accountRef.current.execute(calls as any);
-      return res.transaction_hash;
+      const res: any = await swo.request({ type: "wallet_addInvokeTransaction", params: { calls: txCalls } });
+      const hash = res?.transaction_hash ?? (typeof res === "string" ? res : null);
+      if (!hash) throw new Error("The wallet returned no transaction hash.");
+      return hash as string;
     } catch (e) {
-      // Surface the *raw* failure — the wallet write path is the hardest thing to debug remotely,
-      // and callers only ever see a humanized/truncated message. Log the calls too, in case the
-      // SDK's call shape is what the wallet is choking on.
-      console.error("[gol] wallet execute failed:", e, { calls });
+      // Surface the raw failure — the wallet write path is the hardest thing to debug remotely.
+      console.error("[gol] wallet execute failed:", e, { txCalls });
       throw e;
     }
   }, []);
@@ -260,7 +263,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       await requestSwitch(swo);
-      accountRef.current = null; // rebuild the account for the new chain
       setChainId(await readChainId(swo));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -276,10 +278,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       if (!swo) return;
       void readChainId(swo).then((c) => {
         if (!c) return;
-        setChainId((prev) => {
-          if (c !== prev) accountRef.current = null; // chain changed → rebuild the account
-          return c;
-        });
+        setChainId((prev) => (c !== prev ? c : prev));
       });
     }, 3000);
     return () => clearInterval(poll);

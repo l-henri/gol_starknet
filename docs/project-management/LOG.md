@@ -18,6 +18,35 @@
 
 ---
 
+## 2026-07-10 (evening, 13) — wallet write path: hand tx straight to the wallet; /create play-on-click
+- **Goal:** Henri: (1) `/create` right grid should play immediately when a pixel is clicked; (2)
+  "Set it free" STILL stuck — now hangs on "Confirm in your wallet…" with NO console error and no
+  popup (so `execute()` isn't throwing — it's hanging with no signature prompt).
+- **Branch:** `new_design` · **Commits:** uncommitted WIP
+- **Root cause (write path):** read starknet.js 7.6.4's `WalletAccount.execute` — it does NOT
+  estimate via the provider; it reformats the calls and calls `swo.request("wallet_addInvokeTransaction")`,
+  passing `calldata` THROUGH UNMODIFIED, and `WalletAccount.connect` adds a `requestAccounts` round
+  trip on first use. The most likely hang is the wallet silently choking on numeric/BigInt calldata
+  (or the extra connect step) — either way it never pops and never rejects, so nothing is logged.
+- **Changed (`ui/game-of-life`):**
+  - `src/lib/wallet.tsx`: `execute()` now bypasses `WalletAccount` entirely and calls
+    `swo.request({ type:"wallet_addInvokeTransaction", params:{ calls }})` directly, normalising each
+    call to `{contract_address, entry_point, calldata}` with **calldata forced to felt strings**
+    (`BigInt(x).toString()`). No provider, no estimate, no extra connect → our RPC node/spec can't
+    block the prompt, and numeric calldata can't hang the wallet. Removed the now-dead `accountRef`
+    (+ its resets in connect/disconnect/switch/poll). Raw failures still `console.error`'d.
+  - `src/app/create/page.tsx`: the drawing-changed effect now `setPlaying(true)` so any click on the
+    seed plays the right grid immediately — fixes the freeze after a pattern died (`detect` had set
+    `playing=false` and nothing turned it back on). Also wired the mint **stall recovery** into the
+    verdict: if the wallet doesn't open within ~25 s, a "The wallet didn't open — knock again" button
+    appears (`stalled`/`continueMint`) so a hang is recoverable instead of an infinite spinner.
+- **Verified (headless + CDP, live Sepolia):** play-on-click — a `?rows=` single cell dies
+  ("gone at gen 1", playing=false), then drawing a block replays to "wandered 1 · still life"
+  [REPLAYED]. tsc + eslint clean, `next build` green. NOT verifiable headlessly (no wallet): whether
+  the direct `wallet_addInvokeTransaction` path fixes the prompt — needs Henri to retest.
+- **Next:** Henri retests "Set it free". If it now pops → great; if not, the `[gol] wallet execute
+  failed` line (or the "knock again" button appearing) tells us if it's reaching/leaving the wallet.
+
 ## 2026-07-10 (evening, 12) — RPC → official v0.10 nodes via a same-origin proxy
 - **Goal:** Henri: use the official Starknet nodes — `https://sepolia.nodes.starknet.org/rpc/v0_10`
   and `https://mainnet.nodes.starknet.org/rpc/v0_10` (given in response to the wallet write-path

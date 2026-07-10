@@ -71,7 +71,7 @@ const pickRandom = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.lengt
 export default function CreatePage() {
   const { sdk } = useGolSdk();
   const { address, connect, onSepolia, switchToSepolia } = useWallet();
-  const { status, error: mintError, mint, mintPath, reset } = useMint();
+  const { status, error: mintError, mint, mintPath, reset, stalled, continueMint } = useMint();
   const caps = useGasCaps();
   const router = useRouter();
 
@@ -161,6 +161,7 @@ export default function CreatePage() {
     } else {
       seenRef.current.set(rowsKey(leftRows), 0);
       historyRef.current.push(leftRows);
+      setPlaying(true); // any click on the seed plays the right grid immediately (even after one died)
       setFate({ kind: "watching" });
     }
   }, [leftRows, reset]);
@@ -341,7 +342,10 @@ export default function CreatePage() {
 
             <div className="verdict-actions">
               {busy ? (
-                <p className="verdict-line"><span className="spinner" /> {status === "signing" ? "Confirm in your wallet…" : "Breathing it to life…"}</p>
+                <>
+                  <p className="verdict-line"><span className="spinner" /> {status === "signing" ? "Confirm in your wallet…" : "Breathing it to life…"}</p>
+                  {stalled && <button className="btn primary" onClick={continueMint}>The wallet didn’t open — knock again</button>}
+                </>
               ) : status === "error" ? (
                 <>
                   <button className="btn primary" onClick={reset}>Try again</button>
