@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import GolCanvas from "@/components/GolCanvas";
 import { useGolSdk } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
@@ -12,16 +12,18 @@ import { N, type Cells, fromRows, rowsFromCells } from "@/lib/creatures";
 import { addBookmark, listBookmarks } from "@/lib/incubator";
 
 /* ------------------------------------------------------------------ *
- * /create — the "slot machine of life": draw a seed, watch what it
- * becomes, and set the living ones free. Kid-first: playful, warm,
- * never punitive. The grid is 41×41 (the contract size).
+ * /create — the "slot machine of life". Two 41×41 grids, a matched
+ * pair: draw the seed on the LEFT, watch it come alive on the RIGHT.
+ * The right grid steps via the SDK's on-chain stepper (matches the
+ * contract exactly); its destiny is read from that live evolution.
+ * Kid-first: playful, warm, never punitive.
  * ------------------------------------------------------------------ */
 
 const EMPTY: Cells = new Array(N * N).fill(false);
 const CENTER = Math.floor(N / 2);
+const WATCH_CAP = 4096; // give up looking for a loop after this many generations
 
 const isEmptyRows = (rows: number[]) => rows.every((r) => r === 0);
-const isEmptyCells = (c: Cells) => !c.some(Boolean);
 const rowsKey = (rows: number[]) => rows.join(",");
 const rowsLt = (a: number[], b: number[]) => {
   for (let i = 0; i < N; i++) if (a[i] !== b[i]) return a[i] < b[i];
@@ -29,8 +31,6 @@ const rowsLt = (a: number[], b: number[]) => {
 };
 const stepRows = (sdk: { stepRows: (r: Float64Array) => unknown }, rows: number[]) =>
   Array.from(sdk.stepRows(new Float64Array(rows)) as ArrayLike<number>);
-const stepCells = (sdk: { stepRows: (r: Float64Array) => unknown }, cells: Cells) =>
-  fromRows(stepRows(sdk, rowsFromCells(cells)));
 const hexToInt = (h: string) => parseInt(h.replace("#", ""), 16);
 
 /** Center a small pattern (list of [row,col]) on the grid. */
@@ -55,33 +55,10 @@ const PRESETS: { name: string; coords: [number, number][] }[] = [
 
 type Fate =
   | { kind: "empty" }
-  | { kind: "computing" }
+  | { kind: "watching" }
   | { kind: "dead"; steps: number }
   | { kind: "transient" }
   | { kind: "loop"; period: number; steps: number; canonical: number[] };
-
-/** Step the seed until it repeats (loops), empties (goes out), or gives up (transient). */
-function computeFate(sdk: { stepRows: (r: Float64Array) => unknown }, seedRows: number[]): Fate {
-  let cur = seedRows;
-  const seen = new Map<string, number>();
-  const history: number[][] = [];
-  const CAP = 10000;
-  for (let s = 0; s < CAP; s++) {
-    if (isEmptyRows(cur)) return { kind: "dead", steps: s };
-    const key = rowsKey(cur);
-    const first = seen.get(key);
-    if (first !== undefined) {
-      const loop = history.slice(first);
-      let canonical = loop[0];
-      for (const st of loop) if (rowsLt(st, canonical)) canonical = st;
-      return { kind: "loop", period: history.length - first, steps: first, canonical };
-    }
-    seen.set(key, s);
-    history.push(cur);
-    cur = stepRows(sdk, cur);
-  }
-  return { kind: "transient" };
-}
 
 /* ------- appearance (the owner-defined colours, set at birth) ------- */
 const CELL_SWATCHES = ["#22c55e", "#5ad1ff", "#c8ff7a", "#ffb454", "#ff6b6b", "#b98cff", "#ff8fd0", "#f2f2f5"];
@@ -97,10 +74,10 @@ export default function CreatePage() {
   const caps = useGasCaps();
   const router = useRouter();
 
-  const [seed, setSeed] = useState<Cells>(EMPTY);
-  const [live, setLive] = useState<Cells>(EMPTY);
+  const [left, setLeft] = useState<Cells>(EMPTY);        // the drawing (input)
+  const [rightRows, setRightRows] = useState<number[]>(() => rowsFromCells(EMPTY)); // the live sim (output)
   const [gen, setGen] = useState(0);
-  const [playing, setPlaying] = useState(false);
+  const [playing, setPlaying] = useState(true);
   const [speed, setSpeed] = useState(10);
   const [fate, setFate] = useState<Fate>({ kind: "empty" });
 
@@ -115,58 +92,83 @@ export default function CreatePage() {
   const [spd, setSpd] = useState(2);
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  const seedRows = useMemo(() => rowsFromCells(seed), [seed]);
-  const hasDrawing = !isEmptyCells(live);
+  // detection state for the right grid's evolution
+  const simRef = useRef<number[]>(rowsFromCells(EMPTY));
+  const seenRef = useRef<Map<string, number>>(new Map());
+  const historyRef = useRef<number[][]>([]);
+  const resolvedRef = useRef(false);
 
-  // set a brand-new seed (clear / preset / randomize / invert). Editing goes through `paint`.
-  const applySeed = useCallback((cells: Cells, play = false) => {
-    setSeed(cells);
-    setLive(cells);
-    setGen(0);
-    setPlaying(play);
-  }, []);
+  const leftRows = useMemo(() => rowsFromCells(left), [left]);
+  const rightCells = useMemo(() => fromRows(rightRows), [rightRows]);
+  const hasDrawing = !isEmptyRows(leftRows);
 
   const paint = useCallback((i: number, value: boolean) => {
-    setSeed((prev) => (prev[i] === value ? prev : prev.map((v, k) => (k === i ? value : v))));
+    setLeft((prev) => (prev[i] === value ? prev : prev.map((v, k) => (k === i ? value : v))));
   }, []);
 
-  // opened from the Incubator with a saved pattern (?load=<id>) → drop it onto the grid to edit/free
+  // opened from the Incubator with a saved pattern (?load=<id>) → drop it onto the left grid
   useEffect(() => {
     if (typeof window === "undefined") return;
     const loadId = new URLSearchParams(window.location.search).get("load");
     if (!loadId) return;
     const bm = listBookmarks().find((b) => b.id === loadId);
-    if (bm) applySeed(fromRows(bm.rows));
-    window.history.replaceState(null, "", "/create"); // clean the URL so refresh doesn't reload
-  }, [applySeed]);
+    if (bm) setLeft(fromRows(bm.rows));
+    window.history.replaceState(null, "", "/create");
+  }, []);
 
-  // any change to the drawing rewinds the sim to gen 0 and clears a prior mint attempt
+  // read the destiny AS the right grid evolves: watch each new generation for a repeat (loop) or
+  // an empty grid (goes out). Called once per step, so it's safe from StrictMode double-effects.
+  const detect = useCallback((state: number[]) => {
+    if (resolvedRef.current) return;
+    const idx = historyRef.current.length;
+    if (isEmptyRows(state)) { resolvedRef.current = true; setFate({ kind: "dead", steps: idx }); setPlaying(false); return; }
+    const key = rowsKey(state);
+    const first = seenRef.current.get(key);
+    if (first !== undefined && first < idx) {
+      const loop = historyRef.current.slice(first);
+      let canonical = loop[0] ?? state;
+      for (const st of loop) if (rowsLt(st, canonical)) canonical = st;
+      resolvedRef.current = true;
+      setFate({ kind: "loop", period: idx - first, steps: first, canonical });
+      return;
+    }
+    if (first === undefined) { seenRef.current.set(key, idx); historyRef.current.push(state); }
+    if (idx >= WATCH_CAP) { resolvedRef.current = true; setFate({ kind: "transient" }); }
+  }, []);
+
+  // the left drawing changed → rewind the right sim to gen 0 (= the seed), restart detection, clear
+  // any in-flight mint. The seed itself is recorded as generation 0 so a still-life is caught at once.
   useEffect(() => {
-    setLive(seed);
+    simRef.current = leftRows;
+    setRightRows(leftRows);
     setGen(0);
+    seenRef.current = new Map();
+    historyRef.current = [];
+    resolvedRef.current = false;
     setActiveId(null);
     setFreeing(null);
     reset();
-  }, [seed, reset]);
+    if (isEmptyRows(leftRows)) {
+      setFate({ kind: "empty" });
+    } else {
+      seenRef.current.set(rowsKey(leftRows), 0);
+      historyRef.current.push(leftRows);
+      setFate({ kind: "watching" });
+    }
+  }, [leftRows, reset]);
 
-  // live evolution (Play) — the SDK stepper, so it matches the contract exactly
+  // the right grid's evolution — one on-chain generation per tick (matches the contract exactly)
   useEffect(() => {
-    if (!sdk || !playing) return;
+    if (!sdk || !playing || !hasDrawing) return;
     const id = setInterval(() => {
-      setLive((prev) => stepCells(sdk, prev));
+      const next = stepRows(sdk, simRef.current);
+      simRef.current = next;
+      setRightRows(next);
       setGen((g) => g + 1);
+      detect(next);
     }, Math.max(1000 / speed, 40));
     return () => clearInterval(id);
-  }, [sdk, playing, speed]);
-
-  // destiny (debounced), always from the seed — independent of the animation
-  useEffect(() => {
-    if (!sdk) return;
-    if (isEmptyRows(seedRows)) { setFate({ kind: "empty" }); return; }
-    setFate({ kind: "computing" });
-    const h = setTimeout(() => setFate(computeFate(sdk, seedRows)), 220);
-    return () => clearTimeout(h);
-  }, [sdk, seedRows]);
+  }, [sdk, playing, hasDrawing, speed, detect]);
 
   // the loop it becomes → token id + already-alive check
   useEffect(() => {
@@ -184,12 +186,12 @@ export default function CreatePage() {
   useEffect(() => {
     if (!sdk || !pathMintable) { setPathTokenId(null); setPathMinted(false); return; }
     let cancelled = false;
-    const id = sdk.familyTokenId(new Float64Array(seedRows), 0) as string;
+    const id = sdk.familyTokenId(new Float64Array(leftRows), 0) as string;
     setPathTokenId(id);
     setPathMinted(false);
     sdk.pathLifeform(id).then((p) => { if (!cancelled && p) setPathMinted(true); });
     return () => { cancelled = true; };
-  }, [sdk, pathMintable, seedRows]);
+  }, [sdk, pathMintable, leftRows]);
 
   // born → drop into the garden (meet the newborn)
   useEffect(() => {
@@ -199,14 +201,14 @@ export default function CreatePage() {
     }
   }, [status, activeId, router]);
 
-  const editable = !playing && gen === 0;
   const busy = status === "signing" || status === "pending";
   const born = status === "confirmed" && !!activeId;
 
   const randomize = () => {
     const cells = EMPTY.slice();
     for (let r = 14; r < 27; r++) for (let c = 14; c < 27; c++) if (Math.random() < 0.32) cells[r * N + c] = true;
-    applySeed(cells, true); // pull the lever → watch it come alive
+    setLeft(cells);
+    setPlaying(true); // pull the lever → watch it come alive
   };
 
   const loopTx = fate.kind === "loop" ? plannedTxCount(fate.period, caps) : 0;
@@ -223,13 +225,13 @@ export default function CreatePage() {
     });
   };
   const openPath = () => {
-    if (!pathTokenId || fate.kind === "empty" || fate.kind === "computing" || fate.kind === "transient") return;
+    if (!pathTokenId || fate.kind === "empty" || fate.kind === "watching" || fate.kind === "transient") return;
     const loopPeriod = fate.kind === "loop" ? fate.period : 1;
     setFreeing({
       kind: "path",
       tokenId: pathTokenId,
-      previewCells: seed,
-      run: (app) => { setActiveId(pathTokenId); void mintPath(seedRows, pathSteps, loopPeriod, app); },
+      previewCells: left,
+      run: (app) => { setActiveId(pathTokenId); void mintPath(leftRows, pathSteps, loopPeriod, app); },
     });
   };
 
@@ -244,71 +246,62 @@ export default function CreatePage() {
     <div className="wrap create">
       <header className="create-lead">
         <span className="eyebrow">Create · the slot machine of life</span>
-        <h1 className="create-title">Draw a seed. See what it becomes.</h1>
-        <p className="create-sub">Some patterns fade. A few find a rhythm and live forever. Pull the lever and find out.</p>
+        <h1 className="create-title">Draw a seed. Watch it come alive.</h1>
+        <p className="create-sub">Draw on the left; watch its destiny play out on the right. Some patterns fade. A few find a rhythm and live forever.</p>
       </header>
 
       <div className="create-stage">
-        <div className="create-grid-wrap">
-          <GolCanvas
-            cells={live}
-            editable={editable}
-            onPaint={editable ? paint : undefined}
-            cellColor="#22c55e"
-            bg="#070709"
-          />
-          {!hasDrawing && (
-            <div className="create-hint">
-              <p>Tap and drag to draw — or</p>
-              <button className="btn primary lever" onClick={randomize}>Randomize</button>
-            </div>
-          )}
-        </div>
-
-        <div className="create-side">
-          {/* toolbar */}
+        {/* LEFT — the seed you draw (yours, not yet alive) */}
+        <div className="board">
+          <div className="board-cap"><span className="board-name">your seed</span><span className="board-hint dim">yours — not yet alive</span></div>
+          <div className="create-grid-wrap">
+            <GolCanvas cells={left} editable onPaint={paint} cellColor="#9ad1ff" bg="#070709" />
+            {!hasDrawing && (
+              <div className="create-hint">
+                <p>Tap and drag to draw — or</p>
+                <button className="btn primary lever" onClick={randomize}>Randomize</button>
+              </div>
+            )}
+          </div>
           <div className="create-tools">
-            <button className="btn" onClick={() => applySeed(EMPTY)} disabled={!hasDrawing}>Clear</button>
-            <button className="btn" onClick={() => applySeed(seed.map((v) => !v))} disabled={!hasDrawing}>Invert</button>
+            <button className="btn" onClick={() => setLeft(EMPTY)} disabled={!hasDrawing}>Clear</button>
+            <button className="btn" onClick={() => setLeft((l) => l.map((v) => !v))} disabled={!hasDrawing}>Invert</button>
             <button className="btn lever" onClick={randomize}>Randomize</button>
           </div>
           <div className="create-presets">
             <span className="create-tools-label">place</span>
             {PRESETS.map((p) => (
-              <button key={p.name} className="chip" onClick={() => applySeed(place(p.coords))}>{p.name}</button>
+              <button key={p.name} className="chip" onClick={() => setLeft(place(p.coords))}>{p.name}</button>
             ))}
           </div>
+        </div>
 
-          {/* transport */}
-          <div className="create-transport">
-            <button className="btn" onClick={() => setPlaying((p) => !p)} disabled={!hasDrawing}>
-              {playing ? "Pause" : "Play"}
-            </button>
-            <button className="btn" onClick={() => { setPlaying(false); setLive((p) => stepCells(sdk!, p)); setGen((g) => g + 1); }} disabled={!hasDrawing || !sdk}>
-              Step
-            </button>
-            <button className="btn" onClick={() => { setPlaying(false); setLive(seed); setGen(0); }} disabled={gen === 0}>
-              Rewind
-            </button>
-            <span className="create-gen">gen {gen}</span>
+        {/* RIGHT — its life, stepped on-chain */}
+        <div className="board">
+          <div className="board-cap"><span className="board-gen mono">generation {gen}</span><span className="board-hint dim">its life, played out</span></div>
+          <div className="create-grid-wrap">
+            <GolCanvas cells={rightCells} cellColor="#7ef9a0" bg="#070709" />
           </div>
-          <label className="create-speed">
-            speed
-            <input type="range" min={2} max={30} value={speed} onChange={(e) => setSpeed(Number(e.target.value))} />
-          </label>
+          <div className="create-transport">
+            <button className="btn" onClick={() => setPlaying((p) => !p)} disabled={!hasDrawing}>{playing ? "Pause" : "Play"}</button>
+            <label className="create-speed">
+              speed
+              <input type="range" min={2} max={30} value={speed} onChange={(e) => setSpeed(Number(e.target.value))} />
+            </label>
+          </div>
 
-          {/* verdict */}
+          {/* verdict — read from the evolution above */}
           <div className={"verdict" + (living ? " lives" : fate.kind === "dead" ? " fades" : "")}>
             {!sdk ? (
               <p className="verdict-line"><span className="spinner" /> waking the petri dish…</p>
             ) : fate.kind === "empty" ? (
-              <p className="verdict-line dim">Draw a seed, or pull the lever, to see its destiny.</p>
-            ) : fate.kind === "computing" ? (
-              <p className="verdict-line"><span className="spinner" /> reading its fate…</p>
+              <p className="verdict-line dim">Draw a seed on the left to see its destiny.</p>
+            ) : fate.kind === "watching" ? (
+              <p className="verdict-line dim">watching it unfold…</p>
             ) : fate.kind === "transient" ? (
               <>
                 <p className="verdict-head">Still wandering.</p>
-                <p className="verdict-line dim">After 10,000 generations it hasn’t settled — a restless one. Try a smaller seed.</p>
+                <p className="verdict-line dim">It hasn’t settled after {WATCH_CAP.toLocaleString()} generations — a restless one. Try a smaller seed.</p>
               </>
             ) : fate.kind === "dead" ? (
               <>
@@ -327,7 +320,6 @@ export default function CreatePage() {
               </>
             )}
 
-            {/* action */}
             <div className="verdict-actions">
               {living && (
                 already ? (
@@ -347,10 +339,9 @@ export default function CreatePage() {
                 )
               )}
 
-              {/* wanderer — quiet secondary; a journey worth keeping as a portrait */}
               {pathMintable && !pathMinted && address && onSepolia && pathTokenId && (
                 pathTx > MAX_TX ? null : pathTx > 1 ? (
-                  <button className="btn ghost" onClick={() => sendToIncubator(pathTokenId, seedRows, pathSteps, "path", fate.kind === "loop" ? fate.period : 1)}>
+                  <button className="btn ghost" onClick={() => sendToIncubator(pathTokenId, leftRows, pathSteps, "path", fate.kind === "loop" ? fate.period : 1)}>
                     keep the journey as a Wanderer (Incubator) →
                   </button>
                 ) : (
@@ -433,7 +424,7 @@ export default function CreatePage() {
           <div className="free-overlay" />
           <div className="free-panel born">
             <div className="born-preview drop">
-              <GolCanvas cells={freeing?.previewCells ?? live} cellColor={cell} bg={bgc} size={260} showGrid={false} />
+              <GolCanvas cells={freeing?.previewCells ?? rightCells} cellColor={cell} bg={bgc} size={260} showGrid={false} />
             </div>
             <h2 className="free-title lives">It’s alive.</h2>
             <p className="free-sub">Dropping it into the garden…</p>

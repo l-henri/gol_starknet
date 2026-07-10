@@ -326,7 +326,13 @@ canvas.creature { display: block; width: 100%; height: 100%; }
 .create-title { font-size: clamp(1.7rem, 4vw, 2.6rem); line-height: 1.1; letter-spacing: -0.015em; margin: 0.4em 0 0; }
 .create-sub { color: var(--ink-dim); max-width: 46ch; margin: 0.7em 0 0; }
 
-.create-stage { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: clamp(20px, 3vw, 44px); align-items: start; }
+/* two 41×41 grids, a matched pair: draw left, watch right */
+.create-stage { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(16px, 3vw, 36px); align-items: start; }
+.board { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.board-cap { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6em; }
+.board-name { font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.06em; color: var(--ink); }
+.board-gen { font-family: var(--mono); font-size: 0.95rem; letter-spacing: 0.02em; color: var(--ink); }
+.board-hint { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.04em; }
 .create-grid-wrap { position: relative; }
 .create-grid-wrap canvas { border: 1px solid #1f1f28; box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.6); }
 .create-hint {
@@ -348,7 +354,7 @@ canvas.creature { display: block; width: 100%; height: 100%; }
 }
 .chip:hover { color: var(--ink); border-color: #2c2c38; }
 .create-gen { font-family: var(--mono); font-size: 0.74rem; color: var(--ink-faint); margin-left: auto; }
-.create-speed { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 0.74rem; color: var(--ink-dim); }
+.create-speed { display: flex; align-items: center; gap: 10px; flex: 1; font-family: var(--mono); font-size: 0.74rem; color: var(--ink-dim); }
 .create-speed input { flex: 1; accent-color: #22c55e; }
 
 .btn.lever { border-color: rgba(34, 197, 94, 0.4); color: #22c55e; }

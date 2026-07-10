@@ -18,6 +18,31 @@
 
 ---
 
+## 2026-07-10 (evening, 4) — /create amendment: back to two grids
+- **Goal:** Henri: restore the old two-grid "draw left, watch right" layout (it was the best part).
+  The single-grid + background-fate version replaced it this session; bring the matched pair back.
+- **Branch:** `new_design` · **Commits:** uncommitted WIP
+- **Changed (`ui/game-of-life`):** `src/app/create/page.tsx` — top half rewritten to TWO 41×41 grids:
+  - **LEFT** = the seed (input), always editable, light blue `#9ad1ff` ("yours — not yet alive");
+    toolbar Clear / Invert / Randomize + Blinker/Glider/Block presets.
+  - **RIGHT** = the live sim (output), read-only green `#7ef9a0`, generation number in mono above,
+    Play/Pause + speed below. Advances one Conway gen per tick via `sdk.stepRows` (no separate JS
+    engine — matches the contract). Resets to gen 0 whenever the left drawing changes.
+  - **Destiny is now read FROM the right grid's evolution** (not a background full-run): a `detect()`
+    called once per step accumulates visited states, catching a repeat (LOOPS, with period +
+    canonical from the visited loop), an empty grid (GOES OUT), or giving up after 4,096 gens
+    (still wandering). StrictMode-safe (detection runs in the interval tick + seed recorded on reset).
+  - Kept intact: the warm verdict, the set-free colours ritual (cell + bg via `set_render_params`,
+    no name input — name shown in the success state), the multi-sig → /incubator handoff, the
+    wanderer secondary, and the "it's alive" drop → garden.
+  - `globals.css`: `.create-stage` → two equal columns; added `.board` / `.board-cap` / `.board-gen`;
+    stacks under 900px (both grids stay visible).
+- **Verified (headless + CDP, live Sepolia):** 2 grids render (blue seed / green life), the right
+  grid evolves (gen 5 → 30), and the verdict is read from that evolution — Blinker → "loops every 2
+  beats" (+ already-lives link for the genesis one), Block → "still life". tsc + eslint clean,
+  `next build` green. NOT re-verified (needs wallet): the set-free tx (unchanged from prior QA).
+- **Next:** unchanged — wallet-connected QA, then ship decision.
+
 ## 2026-07-10 (evening, 3) — Garden amendment: fewer, bigger creatures
 - **Goal:** Henri: the dense mosaic rendered 41×41 creatures as "green confetti" — prefer FEWER,
   LARGER tiles so a creature is legible and its owner-defined colours read. Wonder over density.
