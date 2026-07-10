@@ -77,32 +77,48 @@ export function BacteriaTile({ lf, hungry }: { lf: JsLifeform; hungry: boolean }
   );
 }
 
+/** The creature-of-the-moment can be a living loop (most-breathed) or a wanderer (longest journey). */
+export type FeatureData =
+  | { kind: "loop"; lf: JsLifeform }
+  | { kind: "path"; pf: JsPath };
+
 /**
- * CREATURE OF THE MOMENT — one bacterium given room to be watched: a large render beside a quiet
- * caption. Featured because it's the hungriest (needs a breath) or the eldest in the dish.
+ * CREATURE OF THE MOMENT — one creature given room to be watched: a large render beside a quiet
+ * caption. Drawn from the dish's most-breathed loops or its longest journeys (see Garden). A loop
+ * cycles in place; a wanderer plays out its journey from where it began.
  */
-export function FeatureTile({ lf, hungry }: { lf: JsLifeform; hungry: boolean }) {
+export function FeatureTile({ data, hungry }: { data: FeatureData; hungry?: boolean }) {
   const { sdk } = useGolSdk();
   const [rp, setRp] = useState<RenderParams | null>(null);
-  const id = shortAddr(lf.token_id);
-  const name = lf.is_still ? "Still Life" : `Period-${lf.sequence_length} Loop`;
-  const state: TileState = lf.is_dead ? "gone" : hungry ? "hungry" : "alive";
-  const line = hungry ? "Growing hungry — a breath would keep it going." : "The eldest in the dish, still breathing.";
+  const isLoop = data.kind === "loop";
+  const tokenId = isLoop ? data.lf.token_id : data.pf.token_id;
+  const id = shortAddr(tokenId);
+  const dead = isLoop ? data.lf.is_dead : data.pf.life_state === "dead";
+  const state: TileState = dead ? "gone" : isLoop && hungry ? "hungry" : "alive";
+
+  const name = isLoop ? (data.lf.is_still ? "Still Life" : `Period-${data.lf.sequence_length} Loop`) : "Wanderer";
+  const line = isLoop
+    ? (hungry
+        ? "One of the dish’s elders, now growing hungry — a breath keeps it going."
+        : `One of the most-breathed lives in the dish — ${data.lf.age.toLocaleString("en-US")} generations and counting.`)
+    : `One of the longest journeys — ${data.pf.sequence_length.toLocaleString("en-US")} generations before it settles into a loop.`;
+  const rows = isLoop ? data.lf.current_state : data.pf.start_state;
 
   useEffect(() => {
     if (!sdk) return;
     let cancelled = false;
-    sdk.renderParams(lf.token_id).then((p) => { if (!cancelled && p) setRp(p as RenderParams); });
+    const call = isLoop ? sdk.renderParams(tokenId) : sdk.pathRenderParams(tokenId);
+    call.then((p) => { if (!cancelled && p) setRp(p as RenderParams); });
     return () => { cancelled = true; };
-  }, [sdk, lf.token_id]);
+  }, [sdk, tokenId, isLoop]);
 
   return (
-    <Link href={`/life/${lf.token_id}`} className="petri-feature" data-state={state} aria-label={`Creature of the moment: ${name} ${id}`}>
+    <Link href={`/life/${tokenId}`} className="petri-feature" data-state={state} aria-label={`Creature of the moment: ${name} ${id}`}>
       <div className="feature-dish">
         <div className="feature-render">
-          <Creature rows={lf.current_state} age={ageToScale(lf.age)} bg={rp?.bg} cell={rp?.cell} speed={rp?.speed} variant={lf.is_dead ? "dead" : "living"} animate={!lf.is_dead} res={560} ariaLabel={`${name} ${id}`} />
+          <Creature rows={rows} age={isLoop ? ageToScale(data.lf.age) : undefined} bg={rp?.bg} cell={rp?.cell} speed={rp?.speed} variant={dead ? "dead" : "living"} animate={!dead} res={560} ariaLabel={`${name} ${id}`} />
         </div>
-        {!lf.is_dead && <span className="petri-breathe" aria-hidden="true"><span className="ring" />breathe</span>}
+        {isLoop && !dead && <span className="petri-breathe" aria-hidden="true"><span className="ring" />breathe</span>}
       </div>
       <div className="feature-caption">
         <span className="feature-eyebrow">Creature of the moment</span>

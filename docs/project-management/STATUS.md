@@ -3,15 +3,17 @@
 > Snapshot of where the project stands. Keep this short and current — rewrite it each session.
 > History lives in [LOG.md](LOG.md); the plan lives in [ROADMAP.md](ROADMAP.md).
 
-**Last updated:** 2026-07-09
+**Last updated:** 2026-07-10
 **Framing:** WIP **art piece**, not a commercial product — the outcome is burning gas and creating art.
 **Active branch:** `new_design` — website design overhaul in progress. Done so far: the Garden
-home (living gallery), the global chrome (the "petri" top bar + Conway-blinker favicon), `/create`
-(the "slot machine of life"), `/incubator` (warming-egg workbench), and `/life/[id]` (the ritual
+home (living gallery — newest-first walls, no lens toggle; the big "creature of the moment" is a
+random pick from the top-10 most-fed loops or top-10 longest methuselahs), the global chrome (the
+"petri" top bar + Conway-blinker favicon), `/create` (the "slot machine of life" — two grids,
+draw-left/watch-right), `/incubator` (warming-egg workbench), and `/life/[id]` (the ritual
 surface — microscope-slide render, one-generation breath animation, breathe/pet/bond/daycare,
-caretaker pack, filmstrip; Wanderers render as static portraits), `/pets` (Wards — windowsill
-of wards + hunger clocks, the reaper's rounds, daycare), and `/leaderboards` (Records — the census:
-three toggleable boards, #1 glow). **The redesign sweep is COMPLETE — every page is in the petri look.**
+caretaker pack, filmstrip; Wanderers now play out their journey from their start state), `/pets`
+(Wards — windowsill of wards + hunger clocks, the reaper's rounds, daycare), and `/leaderboards`
+(Records — the census: three toggleable boards, #1 glow). **The redesign sweep is COMPLETE — every page is in the petri look.**
 Site renamed **petri** (loop/wanderer collections keep their names). See LOG 2026-07-09/07-10.
 `main` remains the shipped trunk. ⚠️ `new_design` not yet QA'd with a connected wallet
 (set-free mint, hatch, breathe/pet/daycare) and not yet pushed/merged.

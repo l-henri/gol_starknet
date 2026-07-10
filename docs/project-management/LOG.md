@@ -18,6 +18,38 @@
 
 ---
 
+## 2026-07-10 (evening, 5) — Garden trims + wanderers finally wander
+- **Goal:** Henri: (1) drop the "Found a living pattern? Set it free" invite and the newly/oldest/
+  hungry lens toggle from the Garden home — default to newest; (2) make the big "creature of the
+  moment" one of the top-10 most-fed loops OR one of the top-10 longest methuselahs (not just the
+  hungriest/eldest); (3) answer why the wanderer render sits frozen and fix it.
+- **Branch:** `new_design` · **Commits:** uncommitted WIP
+- **Changed (`ui/game-of-life`):**
+  - `src/app/page.tsx`: removed the `.invite` "Set it free" link (and the now-unused `Link` import).
+    The lead is just eyebrow + thesis now.
+  - `src/components/Garden.tsx`: removed the lens toggle (`Lens` type, `LENS_LABEL`, the button
+    group, and the page-reset-on-lens effect) — the walls are always newest-first. The **feature is
+    now picked once** (when both loops+paths have loaded) from a pool of the top-`FEATURE_POOL=10`
+    most-fed *living* loops (by `age`) + the top-10 longest *live* methuselahs (paths by
+    `sequence_length`), chosen at random so the spotlight rotates between visits. Both walls exclude
+    whoever's featured so nobody appears twice.
+  - `src/components/CreatureCard.tsx`: `FeatureTile` now takes a `FeatureData` union
+    (`{kind:"loop",lf} | {kind:"path",pf}`) so it can spotlight a wanderer too — a loop cycles in
+    place (with the breathe affordance), a wanderer plays out its journey (`animate`, no breathe).
+    Its caption line reflects why it's featured (most-breathed count / journey length).
+  - `src/app/life/[id]/page.tsx` (`PathDetail`): the wanderer was **deliberately frozen** —
+    `BreathCanvas playing={false} scrubGen={0}` pinned it to frame 0 (it was never the on-chain JS
+    renderer; that's the iframe, loop-only). Now `playing={true} scrubGen={null}` so it steps its
+    start-state forward at the on-chain speed — i.e. it travels toward its loop. Reworded the eyebrow
+    ("a journey toward a loop") and the description (dropped "portrait / caught moment", now "a
+    journey, not a pet … playing out from where it began").
+- **Verified (headless + CDP, live Sepolia):** Garden home shows no invite line and no lens toggle;
+  feature = "Period-164 Loop · one of the most-breathed lives — 1,927 generations"; walls render in
+  on-chain colours. On a wanderer's `/life` the slide canvas `toDataURL()` differs across a 1.5 s gap
+  (frozen → moving, confirmed) and the new copy renders. tsc + eslint clean, `next build` green.
+  NOT changed/re-verified: any wallet-connected tx.
+- **Next:** unchanged — wallet-connected QA, then ship decision.
+
 ## 2026-07-10 (evening, 4) — /create amendment: back to two grids
 - **Goal:** Henri: restore the old two-grid "draw left, watch right" layout (it was the best part).
   The single-grid + background-fate version replaced it this session; bring the matched pair back.

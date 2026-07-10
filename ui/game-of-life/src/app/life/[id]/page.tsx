@@ -397,7 +397,7 @@ function PathDetail({ id }: { id: string }) {
           <div className="life-left">
             <Slide>
               {rp ? (
-                <BreathCanvas rows={pf.start_state} bg={rp.bg} cell={rp.cell} speed={rp.speed} playing={false} scrubGen={0} breathSignal={0} />
+                <BreathCanvas rows={pf.start_state} bg={rp.bg} cell={rp.cell} speed={rp.speed} playing={true} scrubGen={null} breathSignal={0} />
               ) : (
                 <div className="status-line" style={{ padding: 24 }}>reading render params…</div>
               )}
@@ -408,7 +408,7 @@ function PathDetail({ id }: { id: string }) {
             </div>
           </div>
           <div className="life-right">
-            <span className="eyebrow">a wanderer · a moment of travel, caught</span>
+            <span className="eyebrow">a wanderer · a journey toward a loop</span>
             <h1 className="life-name">Wanderer <span className="life-id">{shortAddr(pf.token_id)}</span></h1>
             <div className="life-facts">
               <span>born · <span className="mono">{born !== null ? `block ${born.toLocaleString("en-US")}` : "…"}</span></span>
@@ -423,7 +423,7 @@ function PathDetail({ id }: { id: string }) {
               {rp && <Trait t="Background" v={<Swatch color={toHex(rp.bg)} />} />}
             </div>
             <p className="dim" style={{ maxWidth: "44ch", marginTop: 14 }}>
-              A wanderer is a portrait, not a pet — a single caught moment of a pattern travelling toward its fate. It isn’t fed and holds no bond. Its rarity is the length of its journey: the farther it wandered from its loop, the rarer.
+              A wanderer is a journey, not a pet — a pattern playing out from where it began, travelling toward its fate. It isn’t fed and holds no bond. Its rarity is the length of that journey: the farther it wandered from its loop, the rarer.
             </p>
           </div>
         </div>
