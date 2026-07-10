@@ -172,7 +172,7 @@ export default function CreatePage() {
       const next = stepRows(sdk, simRef.current);
       simRef.current = next;
       setRightRows(next);
-      setGen((g) => g + 1);
+      if (!resolvedRef.current) setGen((g) => g + 1); // freeze the counter once it settles/dies
       detect(next);
     }, Math.max(1000 / speed, 40));
     return () => clearInterval(id);
@@ -288,7 +288,16 @@ export default function CreatePage() {
 
         {/* RIGHT — its life, stepped on-chain */}
         <div className="board">
-          <div className="board-cap"><span className="board-gen mono">generation {gen}</span><span className="board-hint dim">its life, played out</span></div>
+          <div className="board-cap">
+            <span className="board-gen mono">
+              {fate.kind === "loop"
+                ? `${fate.steps > 0 ? `wandered ${fate.steps} · ` : ""}${fate.period === 1 ? "still life" : `loops every ${fate.period}`}`
+                : fate.kind === "dead"
+                ? `gone at gen ${fate.steps}`
+                : `generation ${gen}`}
+            </span>
+            <span className="board-hint dim">its life, played out</span>
+          </div>
           <div className="create-grid-wrap">
             <GolCanvas cells={rightCells} cellColor="#7ef9a0" bg="#070709" />
           </div>

@@ -191,19 +191,27 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const execute = useCallback(async (calls: unknown): Promise<string> => {
     if (!swoRef.current) throw new Error("Connect a wallet first.");
-    const { RpcProvider, WalletAccount } = await import("starknet");
-    if (!accountRef.current) {
-      const provider = new RpcProvider({ nodeUrl: RPC_URL });
-      // starknet.js v7 static connect; fall back to the constructor for older minors.
+    try {
+      const { RpcProvider, WalletAccount } = await import("starknet");
+      if (!accountRef.current) {
+        const provider = new RpcProvider({ nodeUrl: RPC_URL });
+        // starknet.js v7 static connect; fall back to the constructor for older minors.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const WA = WalletAccount as any;
+        accountRef.current = WA.connect
+          ? await WA.connect(provider, swoRef.current)
+          : new WA(provider, swoRef.current);
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const WA = WalletAccount as any;
-      accountRef.current = WA.connect
-        ? await WA.connect(provider, swoRef.current)
-        : new WA(provider, swoRef.current);
+      const res = await accountRef.current.execute(calls as any);
+      return res.transaction_hash;
+    } catch (e) {
+      // Surface the *raw* failure — the wallet write path is the hardest thing to debug remotely,
+      // and callers only ever see a humanized/truncated message. Log the calls too, in case the
+      // SDK's call shape is what the wallet is choking on.
+      console.error("[gol] wallet execute failed:", e, { calls });
+      throw e;
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await accountRef.current.execute(calls as any);
-    return res.transaction_hash;
   }, []);
 
   // Poll a tx to completion. `requireAccepted` waits for ACCEPTED_ON_L2 — needed when a *later* tx

@@ -30,8 +30,12 @@ export interface GasCaps {
 const LEGACY: GasCaps = { feedCap: 82, singleShotMax: 60, chunkSteps: 60 };
 const MODERN: GasCaps = { feedCap: 340, singleShotMax: 280, chunkSteps: 280 };
 
-/** Hard ceiling on how many txs a single mint may fan out to (partial-path tiling). */
-export const MAX_TX = 8;
+// Hard ceiling on how many txs a single mint may fan out to (partial-path tiling). Sized so a
+// ~2500-generation creature is mintable in the WORST case (legacy metering, chunkSteps 60):
+// a 2500-step loop tiles to ⌈2499/60⌉+1 = 43 txs; a 2500-step path to ~44. Modern accounts
+// (chunkSteps 280) reach 2500 in ~10 tx. Big ones warm in the Incubator (resumable, one sig at a
+// time), so the ceiling is a UX guard, not a protocol limit. See plannedTxCount / [[gol-feed-gas-cap]].
+export const MAX_TX = 48;
 
 export function capsForTier(tier: MeteringTier): GasCaps {
   return tier === "modern" ? MODERN : LEGACY;

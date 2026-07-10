@@ -18,6 +18,32 @@
 
 ---
 
+## 2026-07-10 (evening, 11) — /create: settle-counter + bigger mints; wallet-execute logging
+- **Goal:** Henri: (1) on `/create`, freeze the right-grid generation counter once a creature
+  settles, and disclose the wanderer length (transient) + final loop length; (2) raise the mint tx
+  ceiling so creatures up to ~2500 generations are mintable; (3) "Set it free" STILL doesn't prompt
+  — now shows "Confirm in your wallet…" then "Try again" with no popup, so the failure moved into
+  `execute()` itself.
+- **Branch:** `new_design` · **Commits:** uncommitted WIP
+- **Changed (`ui/game-of-life`):**
+  - `src/app/create/page.tsx`: the sim only increments `gen` while `!resolvedRef.current`, so the
+    counter freezes the moment the fate resolves (the grid keeps cycling the loop). The right board
+    caption now reads the fate instead of the live counter: loop → `wandered {steps} · loops every
+    {period}` (or `still life`; the `wandered …` prefix only when steps>0), dead → `gone at gen
+    {steps}`, else `generation {gen}`.
+  - `src/lib/gasCaps.ts`: `MAX_TX` 8 → **48**, sized so a ~2500-gen creature is mintable even under
+    legacy metering (2500-step loop ≈ 43 tx; modern ≈ 10). Big ones route to the Incubator
+    (resumable). This value gates both the client `plannedTxCount` checks and the SDK planner.
+  - `src/lib/wallet.tsx`: wrapped `execute()` in try/catch that `console.error`s the *raw* failure
+    plus the `calls` payload — the humanized/truncated UI message hides the real cause, and the write
+    path can't be driven headlessly, so we need the actual error to fix the no-prompt bug.
+- **Verified (headless + CDP, live Sepolia):** counter freezes and discloses — blinker
+  "loops every 2", block "still life", single cell "gone at gen 1", row-of-4 "wandered 2 · still
+  life" (all stable across 2.2 s). tsc + eslint clean, `next build` green. NOT resolved: the
+  wallet-execute failure — needs Henri's console error (now logged as `[gol] wallet execute failed`).
+- **Next:** Henri to paste the `[gol] wallet execute failed` console output so the write path can be
+  fixed; then the ~2500-gen mint can actually be exercised.
+
 ## 2026-07-10 (evening, 10) — fix: "Set it free" not prompting the wallet
 - **Goal:** Henri: on `/create`, clicking "Set it free" doesn't prompt a wallet action.
 - **Branch:** `new_design` · **Commits:** uncommitted WIP
