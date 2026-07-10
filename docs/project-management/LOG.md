@@ -18,6 +18,31 @@
 
 ---
 
+## 2026-07-10 (evening, 2) — /leaderboards (Records) rebuilt: the garden's census — sweep complete
+- **Goal:** rebuild `/leaderboards` per the brief — a discovery census / hall of fame, celebratory
+  and communal, never a competition for money. Finishes the redesign sweep.
+- **Branch:** `new_design` · **Commits:** uncommitted WIP
+- **Changed (frontend, `ui/game-of-life`):** `src/app/leaderboards/page.tsx` rewritten from six
+  stacked boards to **three toggleable** ones:
+  - **Longest-lived** — creatures by generations lived (`recentLifeforms` sorted by `age`).
+  - **Methuselahs** — longest transients before settling (wanderers by `sequence_length`).
+  - **Most devoted** — addresses by total breaths given (`topBreathers`).
+  Each row: rank in mono, a tiny live on-chain thumbnail (creature boards), name/short-id or
+  truncated address, and the metric in **#22c55e**. Rank #1 gets a green glow + larger thumbnail +
+  green rank + row tint. Clean dark table on **#0c0c10** panels, **#1f1f28** dividers. No medals, no
+  emoji, no money figures. Creature rows → `/life/[id]`. All values from chain.
+  - `globals.css`: `.records-*` / `.record-row` / `.rec-tab` styles.
+- **Verified (headless Chrome + CDP, live Sepolia):** all three boards populate with real data —
+  Longest-lived #1 "Period-164 Loop" 1,927 gen (glow + larger thumb), Methuselahs #1 Wanderer 821
+  gen, Most devoted #1 addr 2,884 breaths; toggle switches boards; on-chain thumbnail colours
+  faithful. tsc + eslint clean, `next build` green.
+- **Redesign sweep COMPLETE:** Garden, global chrome, Create, Incubator, Life, Wards, Records — all
+  in the petri look. No pages left on the old design.
+- **Next:** wallet-connected QA pass across the whole flow (set-free mint, hatch, breathe/pet/
+  daycare — the only parts not exercisable headlessly); then decide about pushing `new_design` /
+  opening a PR / merging to `main`.
+- **Blockers:** none.
+
 ## 2026-07-10 (evening) — /pets (Wards) rebuilt: the caretaker home
 - **Goal:** rebuild `/pets` per the brief — a windowsill of the creatures you keep alive. Tender,
   never a scold; loss-aversion as the gentle engine; hunger shown as warmth, never alarm-red.

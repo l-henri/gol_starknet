@@ -9,12 +9,12 @@
 home (living gallery), the global chrome (the "petri" top bar + Conway-blinker favicon), `/create`
 (the "slot machine of life"), `/incubator` (warming-egg workbench), and `/life/[id]` (the ritual
 surface — microscope-slide render, one-generation breath animation, breathe/pet/bond/daycare,
-caretaker pack, filmstrip; Wanderers render as static portraits), and `/pets` (Wards — windowsill
-of wards + hunger clocks, the reaper's rounds, daycare).
-Still on the old design: `/leaderboards` (Records) only.
+caretaker pack, filmstrip; Wanderers render as static portraits), `/pets` (Wards — windowsill
+of wards + hunger clocks, the reaper's rounds, daycare), and `/leaderboards` (Records — the census:
+three toggleable boards, #1 glow). **The redesign sweep is COMPLETE — every page is in the petri look.**
 Site renamed **petri** (loop/wanderer collections keep their names). See LOG 2026-07-09/07-10.
-`main` remains the shipped trunk. ⚠️ Redesign pages not yet QA'd with a connected wallet
-(set-free mint, hatch, breathe/pet/daycare).
+`main` remains the shipped trunk. ⚠️ `new_design` not yet QA'd with a connected wallet
+(set-free mint, hatch, breathe/pet/daycare) and not yet pushed/merged.
 **Build/test:** `scarb build` ✅ · `snforge test` ✅ (91) · `cargo test -p gol-sdk` ✅ (43) · `next build` ✅
 **Live site:** https://gol-starknet.vercel.app — Vercel git integration auto-deploys every push to `main` (verified current 2026-07-06)
 **Tx tooling:** all on-chain transactions via **strkd** — pair with `kind:"agent"`; never sncast/raw keys
