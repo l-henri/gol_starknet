@@ -714,8 +714,39 @@ a.record-row.top1:hover { background: rgba(34, 197, 94, 0.08); }
 .collection-head .desc { font-size: 0.9rem; color: var(--ink-dim); }
 .collection-head .count { margin-left: auto; font-family: var(--mono); font-size: 0.76rem; color: var(--ink-faint); }
 
-/* the dense grid of tiles */
-.petri-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: clamp(12px, 1.6vw, 18px); }
+/* fewer, bigger tiles — ~3 large columns on desktop so a 41×41 loop is legible and can breathe */
+.petri-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: clamp(16px, 2.2vw, 28px); }
+
+/* creature of the moment — one large tile beside a quiet caption, above the supporting wall */
+.petri-feature {
+  display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: clamp(20px, 4vw, 48px); align-items: center; margin-bottom: clamp(30px, 5vw, 56px);
+}
+.feature-dish {
+  position: relative; aspect-ratio: 1 / 1; padding: 9px; border-radius: 14px;
+  background: #070709; border: 1px solid #1f1f28;
+  background-image: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.02) 0.5px, transparent 0.5px);
+  background-size: 11px 11px;
+  transition: border-color var(--dur) var(--ease-quiet);
+}
+.petri-feature:hover .feature-dish, .petri-feature:focus-visible .feature-dish { border-color: #2c2c38; }
+.feature-render { position: relative; width: 100%; height: 100%; border-radius: 8px; overflow: hidden; }
+.feature-caption { display: flex; flex-direction: column; gap: 0.4em; }
+.feature-eyebrow { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-faint); }
+.feature-name { font-size: clamp(1.3rem, 2.6vw, 1.9rem); letter-spacing: -0.01em; margin: 0.15em 0 0; color: var(--ink); }
+.feature-id { font-family: var(--mono); font-size: 0.55em; color: var(--ink-faint); font-weight: 400; }
+.feature-line { color: var(--ink-dim); max-width: 34ch; margin: 0.25em 0 0; }
+.feature-state { display: inline-flex; align-items: center; gap: 0.5em; font-family: var(--mono); font-size: 0.78rem; color: var(--ink-dim); margin-top: 0.5em; }
+.feature-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.petri-feature[data-state="alive"] .feature-dot { background: #22c55e; box-shadow: 0 0 8px rgba(34, 197, 94, 0.7); }
+.petri-feature[data-state="hungry"] .feature-dot { background: #f97316; box-shadow: 0 0 8px rgba(249, 115, 22, 0.7); }
+.petri-feature[data-state="hungry"] .feature-state { color: #f9a06b; }
+.petri-feature[data-state="gone"] .feature-dot { background: #4a4a56; }
+
+/* reveal the rest of a wall on demand */
+.petri-more { display: flex; justify-content: center; margin-top: clamp(18px, 3vw, 28px); }
+
+@media (max-width: 720px) { .petri-feature { grid-template-columns: 1fr; } }
 
 /* a tile — FRAME ONLY. The render is the creature's own on-chain appearance. */
 .petri-tile { display: block; outline: none; border-radius: 12px; }
@@ -739,7 +770,8 @@ a.record-row.top1:hover { background: rgba(34, 197, 94, 0.08); }
   opacity: 0; transform: translateY(5px); pointer-events: none;
   transition: opacity var(--dur) var(--ease-quiet), transform var(--dur) var(--ease-organic);
 }
-.petri-tile:hover .petri-breathe, .petri-tile:focus-visible .petri-breathe { opacity: 1; transform: none; }
+.petri-tile:hover .petri-breathe, .petri-tile:focus-visible .petri-breathe,
+.petri-feature:hover .petri-breathe, .petri-feature:focus-visible .petri-breathe { opacity: 1; transform: none; }
 .petri-breathe .ring {
   width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid #22c55e;
   box-shadow: 0 0 8px rgba(34, 197, 94, 0.6); animation: breathe-ring 3.6s var(--ease-quiet) infinite;

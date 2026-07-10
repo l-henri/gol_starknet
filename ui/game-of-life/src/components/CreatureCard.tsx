@@ -60,7 +60,7 @@ export function BacteriaTile({ lf, hungry }: { lf: JsLifeform; hungry: boolean }
             speed={rp?.speed}
             variant={lf.is_dead ? "dead" : "living"}
             animate={!lf.is_dead}
-            res={280}
+            res={440}
             ariaLabel={`bacteria ${id}`}
           />
         </div>
@@ -72,6 +72,43 @@ export function BacteriaTile({ lf, hungry }: { lf: JsLifeform; hungry: boolean }
         <span className="petri-dot" />
         <span className="petri-state">{STATE_WORD[state]}</span>
         <span className="petri-id mono">{id}</span>
+      </div>
+    </Link>
+  );
+}
+
+/**
+ * CREATURE OF THE MOMENT — one bacterium given room to be watched: a large render beside a quiet
+ * caption. Featured because it's the hungriest (needs a breath) or the eldest in the dish.
+ */
+export function FeatureTile({ lf, hungry }: { lf: JsLifeform; hungry: boolean }) {
+  const { sdk } = useGolSdk();
+  const [rp, setRp] = useState<RenderParams | null>(null);
+  const id = shortAddr(lf.token_id);
+  const name = lf.is_still ? "Still Life" : `Period-${lf.sequence_length} Loop`;
+  const state: TileState = lf.is_dead ? "gone" : hungry ? "hungry" : "alive";
+  const line = hungry ? "Growing hungry — a breath would keep it going." : "The eldest in the dish, still breathing.";
+
+  useEffect(() => {
+    if (!sdk) return;
+    let cancelled = false;
+    sdk.renderParams(lf.token_id).then((p) => { if (!cancelled && p) setRp(p as RenderParams); });
+    return () => { cancelled = true; };
+  }, [sdk, lf.token_id]);
+
+  return (
+    <Link href={`/life/${lf.token_id}`} className="petri-feature" data-state={state} aria-label={`Creature of the moment: ${name} ${id}`}>
+      <div className="feature-dish">
+        <div className="feature-render">
+          <Creature rows={lf.current_state} age={ageToScale(lf.age)} bg={rp?.bg} cell={rp?.cell} speed={rp?.speed} variant={lf.is_dead ? "dead" : "living"} animate={!lf.is_dead} res={560} ariaLabel={`${name} ${id}`} />
+        </div>
+        {!lf.is_dead && <span className="petri-breathe" aria-hidden="true"><span className="ring" />breathe</span>}
+      </div>
+      <div className="feature-caption">
+        <span className="feature-eyebrow">Creature of the moment</span>
+        <h3 className="feature-name">{name} <span className="feature-id">{id}</span></h3>
+        <p className="feature-line">{line}</p>
+        <div className="feature-state"><span className="feature-dot" />{STATE_WORD[state]}</div>
       </div>
     </Link>
   );
@@ -106,7 +143,7 @@ export function WandererTile({ pf }: { pf: JsPath }) {
             speed={rp?.speed}
             variant={dead ? "dead" : "living"}
             animate={false}
-            res={280}
+            res={440}
             ariaLabel={`wanderer ${id}`}
           />
         </div>

@@ -18,6 +18,23 @@
 
 ---
 
+## 2026-07-10 (evening, 3) — Garden amendment: fewer, bigger creatures
+- **Goal:** Henri: the dense mosaic rendered 41×41 creatures as "green confetti" — prefer FEWER,
+  LARGER tiles so a creature is legible and its owner-defined colours read. Wonder over density.
+- **Branch:** `new_design` · **Commits:** uncommitted WIP
+- **Changed (`ui/game-of-life`):**
+  - `globals.css`: `.petri-grid` min tile 148px → `min(100%, 300px)` → ~3 large columns on desktop
+    (was 6–8); bigger gap. Added `.petri-feature` / `.feature-*` (the hero) and `.petri-more`.
+  - `CreatureCard.tsx`: tile canvas res 280 → 440 for crispness at the larger size; new
+    **FeatureTile** — a large render beside a caption.
+  - `Garden.tsx`: on the default lens, feature a **"creature of the moment"** above the wall — the
+    hungriest living bacterium, else the eldest (by age) — excluded from the wall so nobody repeats.
+    Per-collection **"show more"** pagination (`PAGE=8`) reveals the rest; resets when the lens changes.
+- **Verified (headless + CDP, live Sepolia):** feature = "Period-164 Loop" (the eldest), 3 large
+  bacteria-wall tiles with distinct on-chain colours (teal/green/magenta, legible — not confetti),
+  1 feature + 2 collection headings (no dup), pagination wired. tsc + eslint clean, `next build` green.
+- **Next:** unchanged — wallet-connected QA, then ship decision.
+
 ## 2026-07-10 (evening, 2) — /leaderboards (Records) rebuilt: the garden's census — sweep complete
 - **Goal:** rebuild `/leaderboards` per the brief — a discovery census / hall of fame, celebratory
   and communal, never a competition for money. Finishes the redesign sweep.

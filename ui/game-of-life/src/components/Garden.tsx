@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BacteriaTile, WandererTile, type JsPath } from "./CreatureCard";
+import { BacteriaTile, WandererTile, FeatureTile, type JsPath } from "./CreatureCard";
 import { useGolSdk } from "@/lib/sdk";
 import type { JsLifeform } from "@/lib/types";
 import { daysLeft } from "@/lib/usePet";
@@ -11,6 +11,7 @@ const LENS_LABEL: Record<Lens, string> = { newly: "newly set free", oldest: "old
 
 const SCAN = 120; // how deep to read the mint feed
 const HUNGRY_DAYS = 2; // a bond within 2 days of wilting reads as "hungry"
+const PAGE = 8; // fewer, bigger tiles — reveal the rest on demand
 
 /** Normalise a token id (hex or decimal) to a comparable key. */
 const norm = (id: string) => BigInt(id).toString();
@@ -33,6 +34,9 @@ export default function Garden() {
   const [paths, setPaths] = useState<JsPath[] | null>(null);
   const [hungry, setHungry] = useState<Set<string>>(new Set());
   const [lens, setLens] = useState<Lens>("newly");
+  const [bactLimit, setBactLimit] = useState(PAGE);
+  const [wndrLimit, setWndrLimit] = useState(PAGE);
+  useEffect(() => { setBactLimit(PAGE); setWndrLimit(PAGE); }, [lens]); // fresh page when the lens changes
 
   // The living loops (Digital Bacteria) — one confirmed-live scan, newest first.
   useEffect(() => {
@@ -108,6 +112,22 @@ export default function Garden() {
     return paths;
   }, [paths, lens]);
 
+  // the "creature of the moment" (default view only): the hungriest living bacterium, else the eldest
+  const featured = useMemo(() => {
+    if (lens !== "newly" || !loops) return null;
+    const living = loops.filter((l) => !l.is_dead);
+    if (!living.length) return null;
+    const hungryOnes = living.filter((l) => hungry.has(norm(l.token_id)));
+    if (hungryOnes.length) return hungryOnes[0];
+    return living.reduce((a, b) => (b.age > a.age ? b : a));
+  }, [loops, lens, hungry]);
+
+  // the supporting wall excludes whoever's featured, so nobody appears twice
+  const bactWall = useMemo(() => {
+    const arr = orderedLoops ?? [];
+    return featured ? arr.filter((l) => l.token_id !== featured.token_id) : arr;
+  }, [orderedLoops, featured]);
+
   const booting = !sdk && !error;
   const scanning = !!sdk && loops === null && paths === null && !error;
   const anyReady = (loops !== null || paths !== null) && !error;
@@ -134,18 +154,27 @@ export default function Garden() {
             <p className="status-line">the dish is empty — be the first to set a creature free.</p>
           )}
 
-          {orderedLoops && orderedLoops.length > 0 && (
+          {featured && (
+            <FeatureTile lf={featured} hungry={hungry.has(norm(featured.token_id))} />
+          )}
+
+          {bactWall.length > 0 && (
             <section className="collection">
               <div className="collection-head">
                 <h2>Digital Bacteria</h2>
                 <span className="desc">living loops — kept alive by breath</span>
-                <span className="count">{orderedLoops.length}</span>
+                <span className="count">{orderedLoops?.length ?? 0}</span>
               </div>
               <div className="petri-grid">
-                {orderedLoops.map((lf) => (
+                {bactWall.slice(0, bactLimit).map((lf) => (
                   <BacteriaTile key={lf.token_id} lf={lf} hungry={hungry.has(norm(lf.token_id))} />
                 ))}
               </div>
+              {bactWall.length > bactLimit && (
+                <div className="petri-more">
+                  <button className="lens-btn" onClick={() => setBactLimit((n) => n + PAGE)}>show more</button>
+                </div>
+              )}
             </section>
           )}
 
@@ -161,8 +190,13 @@ export default function Garden() {
                 <span className="count">{orderedPaths.length}</span>
               </div>
               <div className="petri-grid">
-                {orderedPaths.map((pf) => <WandererTile key={pf.token_id} pf={pf} />)}
+                {orderedPaths.slice(0, wndrLimit).map((pf) => <WandererTile key={pf.token_id} pf={pf} />)}
               </div>
+              {orderedPaths.length > wndrLimit && (
+                <div className="petri-more">
+                  <button className="lens-btn" onClick={() => setWndrLimit((n) => n + PAGE)}>show more</button>
+                </div>
+              )}
             </section>
           )}
         </>
