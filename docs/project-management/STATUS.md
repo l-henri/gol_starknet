@@ -11,7 +11,8 @@ random pick from the top-10 most-fed loops or top-10 longest methuselahs), the g
 "petri" top bar + Conway-blinker favicon), `/create` (the "slot machine of life" — two grids,
 draw-left/watch-right), `/incubator` (warming-egg workbench), and `/life/[id]` (the ritual
 surface — microscope-slide on-chain renderer, a single "Breathe life" act that pets/adopts,
-bond clock + daycare, caretaker pack; Wanderers now play out their journey from their start state), `/pets`
+bond clock + daycare, caretaker pack; Wanderers play out their journey from their start state, and
+"bound for a loop" links to that loop if it's minted or to /create with it preloaded if not), `/pets`
 (Wards — windowsill of wards + hunger clocks, the reaper's rounds, daycare), and `/leaderboards`
 (Records — the census: three toggleable boards, #1 glow). **The redesign sweep is COMPLETE — every page is in the petri look.**
 Site renamed **petri** (loop/wanderer collections keep their names). See LOG 2026-07-09/07-10.

@@ -18,6 +18,28 @@
 
 ---
 
+## 2026-07-10 (evening, 7) — /life wanderers: "bound for" resolves to a real loop
+- **Goal:** Henri: a wanderer's "bound for a loop" should point somewhere real. If the loop it
+  settles into already exists on-chain, link to that loop's page; if it isn't born yet, hand it to
+  /create with the loop preloaded so it can be set free.
+- **Branch:** `new_design` · **Commits:** uncommitted WIP
+- **Changed (`ui/game-of-life`):**
+  - `src/app/life/[id]/page.tsx` (`PathDetail`): after loading a wanderer, check
+    `sdk.lifeform(target_loop_id)`. The "Bound for" trait now resolves three ways: `a loop…`
+    (checking) → `a loop →` linking to `/life/<loop>` when it exists → `a loop — not yet born, set
+    it free →` linking to `/create?rows=<canonical>` when it doesn't. The canonical rows come from
+    `sdk.findLoop(start_state, sequence_length + period + 8).smallest` (falls back to `start_state`).
+  - `src/app/create/page.tsx`: the load effect now also accepts `?rows=a,b,c…` (41 row bitmasks) and
+    drops them onto the left seed grid, then rewrites the URL to `/create` (same pattern as the
+    existing `?load=<bookmark>` hand-off from the Incubator).
+- **Verified (headless + CDP, live Sepolia):** a wanderer whose loop is NOT minted shows
+  "a loop — not yet born, set it free →" linking to `/create?rows=<encoded canonical>`; following a
+  `?rows=` link drops the pattern on the left grid, the right grid evolves it (gen 89), and the
+  verdict reads "This one lives — a rhythm every 2 beats" (blinker), URL rewritten to `/create`.
+  The existence check resolves (returned `false` for that wanderer, so the on-chain call works); the
+  loop-exists branch is the pre-existing `/life/<loop>` link. tsc + eslint clean, `next build` green.
+- **Next:** unchanged — wallet-connected QA, then ship decision.
+
 ## 2026-07-10 (evening, 6) — /life loop detail: one act, on-chain renderer only
 - **Goal:** Henri wants the loop detail stripped down: (1) a single "Breathe life" button that
   *pets* (adoption is automatic — no separate adopt/pet button); (2) drop the replay progress bar;

@@ -306,6 +306,8 @@ function PathDetail({ id }: { id: string }) {
   const [rp, setRp] = useState<RP | null>(null);
   const [born, setBorn] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loopExists, setLoopExists] = useState<boolean | null>(null);
+  const [loopRows, setLoopRows] = useState<number[] | null>(null); // canonical rows of the bound-for loop (if it isn't born yet)
 
   useEffect(() => {
     if (!sdk) return;
@@ -317,6 +319,26 @@ function PathDetail({ id }: { id: string }) {
     sdk.recentPathMints().then((m) => { const hit = (m as { token_id: string; block: number }[]).find((x) => sameId(x.token_id, id)); if (!c) setBorn(hit?.block ?? null); }).catch(() => {});
     return () => { c = true; };
   }, [sdk, id]);
+
+  // Where does this wanderer settle? If the loop it's bound for is already on-chain we link to it;
+  // if not, we hand the loop's canonical rows to /create so it can be set free. `findLoop` walks the
+  // journey to the loop; its `smallest` is the canonical representative dropped onto the create grid.
+  useEffect(() => {
+    if (!sdk || !pf || pf.life_state === "dead") return;
+    let cancelled = false;
+    (async () => {
+      const lf = await sdk.lifeform(pf.target_loop_id).catch(() => null);
+      if (cancelled) return;
+      setLoopExists(!!lf);
+      if (lf) return;
+      try {
+        const cap = pf.sequence_length + pf.target_period + 8;
+        const loop = sdk.findLoop(new Float64Array(pf.start_state), cap) as { period: number; smallest: number[] } | null;
+        if (!cancelled) setLoopRows(loop?.smallest ?? pf.start_state);
+      } catch { if (!cancelled) setLoopRows(pf.start_state); }
+    })();
+    return () => { cancelled = true; };
+  }, [sdk, pf]);
 
   if (loading) return <Shell><p className="status-line"><span className="spinner" /> reading the chain…</p></Shell>;
   if (!pf) return <Shell><p className="status-line">no wanderer #{id} is minted on Sepolia.</p></Shell>;
@@ -352,7 +374,15 @@ function PathDetail({ id }: { id: string }) {
               <Trait t="Kind" v="Wanderer" />
               <Trait t="State" v={stateLabel} />
               <Trait t="Journey" v={`${pf.sequence_length} generations`} />
-              {!dead && <Trait t="Bound for" v={<Link className="tx-link" href={`/life/${pf.target_loop_id}`}>a loop →</Link>} />}
+              {!dead && (
+                <Trait t="Bound for" v={
+                  loopExists === null
+                    ? <span className="dim">a loop…</span>
+                    : loopExists
+                    ? <Link className="tx-link" href={`/life/${pf.target_loop_id}`}>a loop →</Link>
+                    : <Link className="tx-link" href={`/create?rows=${encodeURIComponent((loopRows ?? pf.start_state).join(","))}`}>a loop — not yet born, set it free →</Link>
+                } />
+              )}
               {rp && <Trait t="Cell" v={<Swatch color={toHex(rp.cell)} />} />}
               {rp && <Trait t="Background" v={<Swatch color={toHex(rp.bg)} />} />}
             </div>

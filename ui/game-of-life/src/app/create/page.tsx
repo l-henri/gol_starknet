@@ -106,10 +106,19 @@ export default function CreatePage() {
     setLeft((prev) => (prev[i] === value ? prev : prev.map((v, k) => (k === i ? value : v))));
   }, []);
 
-  // opened from the Incubator with a saved pattern (?load=<id>) → drop it onto the left grid
+  // opened with a pattern to drop onto the left grid: either raw row bitmasks (?rows=a,b,c… — e.g.
+  // a wanderer handing over the loop it's bound for) or a saved Incubator bookmark (?load=<id>).
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const loadId = new URLSearchParams(window.location.search).get("load");
+    const params = new URLSearchParams(window.location.search);
+    const rowsParam = params.get("rows");
+    if (rowsParam) {
+      const rows = rowsParam.split(",").map((n) => Number(n));
+      if (rows.length === N && rows.every((n) => Number.isFinite(n) && n >= 0)) setLeft(fromRows(rows));
+      window.history.replaceState(null, "", "/create");
+      return;
+    }
+    const loadId = params.get("load");
     if (!loadId) return;
     const bm = listBookmarks().find((b) => b.id === loadId);
     if (bm) setLeft(fromRows(bm.rows));
