@@ -18,6 +18,38 @@
 
 ---
 
+## 2026-07-10 (evening, 12) — RPC → official v0.10 nodes via a same-origin proxy
+- **Goal:** Henri: use the official Starknet nodes — `https://sepolia.nodes.starknet.org/rpc/v0_10`
+  and `https://mainnet.nodes.starknet.org/rpc/v0_10` (given in response to the wallet write-path
+  debugging; the v0.10 spec may matter for the wallet).
+- **Branch:** `new_design` · **Commits:** uncommitted WIP
+- **Finding:** those nodes send **no CORS headers** (verified: `starknet_specVersion` → 200
+  `0.10.3-rc.0`, but the OPTIONS preflight is 405 and there's no `Access-Control-Allow-Origin`).
+  Pointing the browser at them directly broke every read — the Garden loaded empty with CORS errors
+  in the console. This is exactly why the config previously used the Cartridge gateway.
+- **Changed (`ui/game-of-life`):**
+  - `src/app/api/rpc/route.ts` (new): a same-origin JSON-RPC proxy. The browser POSTs to `/api/rpc`
+    (no CORS), and the route forwards to `UPSTREAM_RPC[NETWORK]` server-side, passing the body
+    through. `force-dynamic`, no caching, 502 on upstream failure.
+  - `src/lib/config.ts`: `UPSTREAM_RPC` holds the two official v0.10 node URLs; `RPC_URL` now
+    defaults to the same-origin `/api/rpc` (absolute in the browser via `window.location.origin`),
+    still overridable with `NEXT_PUBLIC_GOL_RPC_URL` to hit a CORS-enabled node directly.
+  - Both the WASM SDK reads and the wallet's `RpcProvider` now flow through the proxy → the official
+    node.
+- **Verified (headless + CDP, live Sepolia):** `/api/rpc` returns spec `0.10.3-rc.0`; the Garden
+  loads creatures through the proxy with ZERO CORS errors (feature + 4 bacteria). tsc + eslint clean,
+  `next build` green (`/api/rpc` is a dynamic route). NOT verified (needs wallet): whether routing
+  the wallet provider through the v0.10 node fixes "Set it free" — retest + the `[gol] wallet execute
+  failed` console line will confirm.
+- **Tradeoff / note:** every SDK read + wallet-provider read is now one function invocation on
+  Vercel (the Garden fans out to many). If that's too heavy, set `NEXT_PUBLIC_GOL_RPC_URL` to a
+  CORS-enabled gateway to let the browser read a node directly and bypass the proxy. Also: the
+  existing `.env.local` sets `NEXT_PUBLIC_RPC_URL` (wrong name — inert; the config reads
+  `NEXT_PUBLIC_GOL_RPC_URL`), so the proxy default is what's active locally; check the Vercel env
+  before merging to `main`.
+- **Next:** Henri retests "Set it free" on the v0.10 proxy; if still no prompt, the console error
+  pins the write-path fix.
+
 ## 2026-07-10 (evening, 11) — /create: settle-counter + bigger mints; wallet-execute logging
 - **Goal:** Henri: (1) on `/create`, freeze the right-grid generation counter once a creature
   settles, and disclose the wanderer length (transient) + final loop length; (2) raise the mint tx
