@@ -143,10 +143,21 @@ export function useMint() {
         return false;
       }
 
+      // Reflect the click right away so the button can't look dead while we pre-check.
+      setStatus("signing");
+
       // Already minted on-chain? A prior run may have finished while its local progress lingered (e.g.
       // the tab reloaded mid-mint). Don't re-mint — the final step would revert; report success.
+      // CRUCIAL: never let this read block the wallet prompt. The browser RPC gateway can stall, and
+      // if it does, awaiting it here means execute() (the signature request) is never reached and the
+      // wallet never pops. So race it against a short timeout and, on timeout/error, mint anyway — a
+      // duplicate final mint reverts harmlessly on-chain, which is far better than a dead button.
       try {
-        if (await alreadyMinted(tokenId)) {
+        const existing = await Promise.race([
+          alreadyMinted(tokenId),
+          new Promise((res) => setTimeout(() => res(null), 2500)),
+        ]);
+        if (existing) {
           clearMintProgress(tokenId);
           setProgress(null);
           setStatus("confirmed");

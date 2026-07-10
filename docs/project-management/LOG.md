@@ -18,6 +18,25 @@
 
 ---
 
+## 2026-07-10 (evening, 10) — fix: "Set it free" not prompting the wallet
+- **Goal:** Henri: on `/create`, clicking "Set it free" doesn't prompt a wallet action.
+- **Branch:** `new_design` · **Commits:** uncommitted WIP
+- **Diagnosis:** in `useMint.runPlan`, a pre-flight on-chain read (`alreadyMinted` → `sdk.lifeform`,
+  a self-heal for interrupted mints) is `await`ed *before* the mint loop sets `signing` and calls
+  `execute()` (the signature request). If that read stalls — and the browser RPC gateway does stall
+  on `lifeform` reads (seen this session: a `/life` loop hung ~23 s on the same call) — then
+  `execute()` is never reached: the wallet never pops and the button looks dead (status is still
+  `idle`). Not caused by the modal removal; that just made the first click the mint trigger.
+- **Changed (`ui/game-of-life/src/lib/useMint.ts`, `runPlan`):** set `status="signing"` immediately
+  (the click can't look dead), then race the `alreadyMinted` read against a 2.5 s timeout — on
+  timeout/error, proceed to mint anyway (a duplicate final mint reverts harmlessly on-chain, as the
+  existing comment notes). A healthy read (<½ s) still short-circuits an already-minted creature; a
+  stalled read can no longer block the wallet prompt. Covers both `mint` and `mintPath`.
+- **Verified:** tsc + eslint clean, `next build` green. NOT verifiable headlessly (no wallet): the
+  actual prompt — needs Henri to retry with a connected wallet.
+- **Next:** Henri to confirm the wallet now prompts on "Set it free"; then wallet-connected QA of
+  the rest (breathe/pet, hatch), then ship decision.
+
 ## 2026-07-10 (evening, 9) — Incubator per-wallet + auto-clean; daycare removed
 - **Goal:** Henri, on `/incubator`: rename "Mints in progress"→"Hatches in progress" and
   "Saved patterns"→"Saved creatures"; remove a creature from the incubator once it's hatched;
