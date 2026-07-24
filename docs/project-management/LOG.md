@@ -18,6 +18,34 @@
 
 ---
 
+## 2026-07-24 (7) — docs: how to display lifeforms safely (integration guide)
+- **Goal:** document how a third-party surface (wallet, explorer, marketplace) should read the
+  on-chain metadata and render each visual field **safely** — the companion to LOG (6)'s dual-field
+  metadata. Prompted by the MC Wallet integration, where the untrusted `animation_url` needed a
+  sandbox and the (not-yet-deployed) static `image` is the easy path.
+- **Branch:** `docs/nft-rendering` · **Commits:** committed this session.
+- **Changed:** new [nft-metadata-rendering.md](../nft-metadata-rendering.md) — decode `token_uri`;
+  render `image` (`data:image/svg+xml`) in an `<img>` (script-less, safe); render `animation_url`
+  (`data:text/html`, untrusted code) only in a cross-origin sandboxed iframe **plus** an
+  egress-blocking CSP (the sandbox attribute alone does NOT stop `fetch`/beacons — the IP↔address
+  leak), inject via `srcdoc`/`document.write` not a `data:` frame, reveal on user action, fail closed
+  to the image. Documents the **version skew** (v2/v3 source emits both fields, but deployed Sepolia
+  tokens are an earlier build with `animation_url` only). Wired into the docs index, the
+  `development.md` docs-sync map, and cross-linked from STATUS's on-chain-render bullet. Links the
+  MC Wallet reference implementation (starknet-innovation/mc-wallet#166).
+- **Verified:** docs-only, no contract/frontend code touched. Baseline confirmed: `scarb build` ✅,
+  `snforge test` ✅ **101 passed, 0 failed, 11 ignored**. Relative links and `path:line` refs checked
+  against the current sources.
+- **Decisions:** its own doc (new "Integration" category) rather than a section in frontend.md,
+  since it targets any consumer, not the project's own app (which rebuilds the renderer locally).
+  Kept the "emit a static `image`" recommendation OUT — it's already implemented in
+  `gol_metadata_v2` (LOG 6); documented rendering, not a contract change.
+- **Next:** unchanged from (6) — ship the `gol_metadata_v2` `image` upgrade (confirm token_uri
+  survives a real Sepolia `starknet_call`, then upgrade the live classes) so deployed tokens carry
+  the `image` this guide tells wallets to prefer.
+- **Blockers:** none for the docs. The image-in-wallets outcome is still blocked on the v2/v3
+  metadata redeploy (STATUS "Next up" #5).
+
 ## 2026-07-24 (6) — v2 metadata: static SVG `image` re-added (run-length), gas-measured
 - **Goal:** a wallet couldn't show GoL NFTs — `gol_metadata_v2` emits only `animation_url` (untrusted
   on-chain HTML/JS the wallet won't execute), so it fell back to a placeholder. Re-add a static

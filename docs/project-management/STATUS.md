@@ -52,7 +52,9 @@ direct) is sane for prod.
   deployed 38.6M). Code-complete on `new_design`. **NOT yet deployed** — and the gating check is a
   real `starknet_call` on the target Sepolia RPC: the budget is a window (38.6M works, ~162M reverts)
   and the image sits at ~64–87M INSIDE it. See [v2-grid-redesign.md](../v2-grid-redesign.md) + LOG
-  2026-07-24 (6).
+  2026-07-24 (6). How third-party surfaces should render the two fields safely (static `image` vs
+  sandboxed `animation_url`) is documented in
+  [nft-metadata-rendering.md](../nft-metadata-rendering.md).
 - **Frontend** (`ui/game-of-life`): garden, `/create` editor, incubator, `/leaderboards` (4 boards,
   data live-verified; ⚠️ page not yet eyeballed in a browser) — [frontend.md](../frontend.md).
   **FR temporarily disabled (2026-07-09):** site is English-only, toggle removed; all `{ fr, en }`

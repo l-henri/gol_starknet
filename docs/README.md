@@ -17,6 +17,7 @@ Docs are grouped by what you're trying to do. One topic per file.
 | **v3 (live)** | [v3-identity-spec.md](v3-identity-spec.md), [v3-deployment.md](v3-deployment.md) | The orbit-canonical identity model: one id system, copies prevented at mint — live on Sepolia |
 | **Product ideas** | [leaderboards.md](leaderboards.md), [audience-research.md](audience-research.md), [pet-mechanism-spec.md](pet-mechanism-spec.md), [copy-review.md](copy-review.md) | Leaderboard catalogue, audience research, pet-bond spec, and the website copy review |
 | **Frontend** | [frontend.md](frontend.md) | Understand or extend the Next.js web app and its Starknet integration |
+| **Integration** | [nft-metadata-rendering.md](nft-metadata-rendering.md) | Display a lifeform from a third-party surface (wallet, explorer, marketplace) — how to read the on-chain metadata and render the static image and untrusted HTML animation safely |
 | **Development** | [development.md](development.md) | Build, test, deploy, run CI, bump dependencies |
 | **Usage** | [usage-guide.md](usage-guide.md) | Learn how an end user interacts with the deployed system |
 | **Project management** | [project-management/](project-management/) | See what's done, what's left, and how work is tracked |
@@ -25,6 +26,7 @@ Docs are grouped by what you're trying to do. One topic per file.
 
 - **"How do I run the tests / build?"** → [development.md](development.md)
 - **"How does the web app talk to the chain?"** → [frontend.md](frontend.md)
+- **"How do I safely display a lifeform in my own wallet/app?"** → [nft-metadata-rendering.md](nft-metadata-rendering.md)
 - **"What's the state of the project / what should I work on next?"** → [project-management/STATUS.md](project-management/STATUS.md) and [project-management/ROADMAP.md](project-management/ROADMAP.md)
 - **"How do I pick up where the last person left off?"** → [project-management/README.md](project-management/README.md)
 - **"What do these terms (loop, path, sequence) mean?"** → [overview.md](overview.md#key-terminology)

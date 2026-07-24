@@ -173,6 +173,7 @@ When you change code, update the matching doc in the same PR:
 | If you change… | Update… |
 |----------------|---------|
 | Contract interfaces / behavior | [technical-overview.md](technical-overview.md) + the relevant minter/token doc |
+| Metadata visual fields (`image` / `animation_url`) or how consumers render them | [nft-metadata-rendering.md](nft-metadata-rendering.md) |
 | Frontend modules or data flow | [frontend.md](frontend.md) |
 | Toolchain, build, deploy, CI | this file |
 | Project status / plan | [project-management/](project-management/) (STATUS, ROADMAP, LOG) |
