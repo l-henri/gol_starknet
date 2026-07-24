@@ -39,8 +39,10 @@
 - **Verified:** Node cost/estimate checks above; headless /life renders the depth selector + the
   care-inclusive note; tsc + eslint clean, `next build` green. NOT verifiable headlessly: the
   wallet tx (deep breath + adopt, the gates) — Henri's pass.
-- **Open (point 4):** whether Garden tiles should perform a direct ×1 breath in the gallery, or keep
-  linking to /life — rephrased for Henri, awaiting his call.
+- **Point 4 (resolved 2026-07-24):** Henri chose to keep Garden tiles as plain links — removed the
+  decorative "breathe" hover affordance (`.petri-breathe` span + CSS + keyframes) from `BacteriaTile`
+  and `FeatureTile`. The subtle dish-lift on hover stays (link affordance). No direct breathe-tx on
+  tiles; all breathing happens on `/life`.
 
 ## 2026-07-24 (2) — NUT woven in (visibility + gating) and deeper breaths (multi-gen)
 - **Goal:** Henri's amendment. NUT is sustenance (free faucet), never currency. (1) NUT visibility:

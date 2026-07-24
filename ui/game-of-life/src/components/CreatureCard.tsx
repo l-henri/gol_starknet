@@ -38,7 +38,6 @@ export function BacteriaTile({ lf, hungry }: { lf: JsLifeform; hungry: boolean }
   const [rp, setRp] = useState<RenderParams | null>(null);
   const id = shortAddr(lf.token_id);
   const state: TileState = lf.is_dead ? "gone" : hungry ? "hungry" : "alive";
-  const living = state !== "gone";
 
   // the token's on-chain look (bg/cell colour + speed) — the real palette its owner chose
   useEffect(() => {
@@ -64,9 +63,6 @@ export function BacteriaTile({ lf, hungry }: { lf: JsLifeform; hungry: boolean }
             ariaLabel={`bacteria ${id}`}
           />
         </div>
-        {living && (
-          <span className="petri-breathe" aria-hidden="true"><span className="ring" />breathe</span>
-        )}
       </div>
       <div className="petri-meta">
         <span className="petri-dot" />
@@ -118,7 +114,6 @@ export function FeatureTile({ data, hungry }: { data: FeatureData; hungry?: bool
         <div className="feature-render">
           <Creature rows={rows} age={isLoop ? ageToScale(data.lf.age) : undefined} bg={rp?.bg} cell={rp?.cell} speed={rp?.speed} variant={dead ? "dead" : "living"} animate={!dead} res={560} ariaLabel={`${name} ${id}`} />
         </div>
-        {isLoop && !dead && <span className="petri-breathe" aria-hidden="true"><span className="ring" />breathe</span>}
       </div>
       <div className="feature-caption">
         <span className="feature-eyebrow">Creature of the moment</span>
