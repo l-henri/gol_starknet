@@ -8,7 +8,7 @@ import BreathCanvas from "@/components/BreathCanvas";
 import { useGolSdk } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
 import { useBreathe } from "@/lib/useBreathe";
-import { daysLeft } from "@/lib/usePet";
+import { useBond, daysLeft } from "@/lib/usePet";
 import { useMint } from "@/lib/useMint";
 import { findBeast } from "@/lib/bestiary";
 import { rowsFromCoords } from "@/lib/creatures";
@@ -70,6 +70,7 @@ function LoopDetail({ id }: { id: string }) {
   const { sdk, error } = useGolSdk();
   const { address, connect, onSepolia, switchToSepolia } = useWallet();
   const { status: bStatus, txHash: bHash, error: bErr, breathe, reset: bReset } = useBreathe();
+  const bond = useBond(id);
   const connected = !!address;
 
   const DEPTHS = [1, 5, 10, 100] as const;
@@ -157,6 +158,8 @@ function LoopDetail({ id }: { id: string }) {
   const displayName = lf.is_still ? "Still Life" : lf.is_loop ? `Period-${period} Loop` : "Lifeform";
   const stateWord = lf.is_dead ? "gone out" : "alive";
   const bBusy = bStatus === "signing" || bStatus === "pending";
+  const left = daysLeft(bond);
+  const hungry = left !== null && left <= 2;
 
   // one action, with depth: a breath advances the creature `depth` generations in one tx and mints
   // `depth` NUT — sustenance. A deeper breath is a longer exhale.
@@ -233,7 +236,16 @@ function LoopDetail({ id }: { id: string }) {
                     : bStatus === "error" ? "Try again"
                     : depth === 1 ? "Breathe life" : `A deep breath · ×${depth}`}
                 </button>
-                <p className="act-note">One breath moves it {depth === 1 ? "a generation" : `${depth} generations`} forward in a single tx and mints you {depth === 1 ? "a NUT" : `${depth} NUT`} — sustenance for setting new creatures free. A deeper breath, more of both.</p>
+                <p className="act-note">A breath moves it {depth === 1 ? "one generation" : `${depth} generations`} forward, mints you {depth === 1 ? "a NUT" : `${depth} NUT`} — sustenance — and takes it into your care (a 7-day bond, renewed each breath). A deeper breath, more of both.</p>
+
+                {connected && onSepolia && bond?.held && (
+                  <div className={"bond-clock" + (hungry ? " hungry" : "")}>
+                    <span className="bond-dot" />
+                    {left !== null && left <= 0
+                      ? "in your care · bond wilted — a breath revives it"
+                      : `in your care · ${left! >= 1 ? `${Math.floor(left!)} day${Math.floor(left!) === 1 ? "" : "s"}` : `${Math.max(1, Math.round(left! * 24))} hours`} left`}
+                  </div>
+                )}
 
                 {confirmMsg && (
                   <div className="breath-confirm">

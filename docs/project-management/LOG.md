@@ -18,6 +18,30 @@
 
 ---
 
+## 2026-07-24 (3) — deep breath also adopts; exact NUT costs (loop=period, path=seq_len)
+- **Goal:** Henri's answers — (1) the deep breath should ALSO adopt (open/refresh the caretaker
+  bond); (3) show the exact on-chain NUT cost for whatever's being minted.
+- **Branch:** `new_design` · **Commits:** uncommitted WIP
+- **Verified the cost model in Node** (loaded the WASM SDK, read each mint plan's `approve` amount):
+  a **loop costs its period** NUT (period 2 → 2), a **wanderer costs its sequence_length** NUT
+  (seq 1 → 1, 2 → 2, 211 → 211). So cost = the creature's generation count = the `period`/`seq_len`
+  we already carry — the displayed figures are exact. Also confirmed the combined breathe+pet
+  multicall estimates fine (`move_lifeform_forward_n` + `pet`).
+- **Changed (`ui/game-of-life`):**
+  - `src/lib/useBreathe.ts`: a breath is now `move_lifeform_forward_n(id, N-1)` + `pet(id)` in ONE tx
+    (for N=1, just `pet`) — N generations forward, N NUT minted, AND the caretaker bond opened/
+    renewed. So the deep breath adopts.
+  - `src/app/life/[id]/page.tsx`: restored the bond (`useBond`) + the "in your care · N days left"
+    clock (breathing manages it again); note reworded to say the breath takes it into your care.
+  - `src/app/create/page.tsx`: the wanderer mint ("keep the journey as a Wanderer") now shows
+    "the journey costs {seq_len} NUT · you have M" and gates on it (amber note when short), matching
+    the loop's gate. Loop cost stays `period`, path cost = `sequence_length` — both exact.
+- **Verified:** Node cost/estimate checks above; headless /life renders the depth selector + the
+  care-inclusive note; tsc + eslint clean, `next build` green. NOT verifiable headlessly: the
+  wallet tx (deep breath + adopt, the gates) — Henri's pass.
+- **Open (point 4):** whether Garden tiles should perform a direct ×1 breath in the gallery, or keep
+  linking to /life — rephrased for Henri, awaiting his call.
+
 ## 2026-07-24 (2) — NUT woven in (visibility + gating) and deeper breaths (multi-gen)
 - **Goal:** Henri's amendment. NUT is sustenance (free faucet), never currency. (1) NUT visibility:
   top-bar chip, /create birth-cost gate, /incubator per-egg cost. (2) Deeper breaths: a ×1/×5/×10/×100

@@ -222,12 +222,14 @@ export default function CreatePage() {
     setPlaying(true); // pull the lever → watch it come alive
   };
 
-  // A birth costs its creature's generations in NUT (one NUT per generation the contract runs).
+  // A birth costs its creature's generations in NUT — exact on-chain: a loop costs its period, a
+  // wanderer costs its sequence_length (verified against the mint plan's `approve` amount).
   const loopCost = fate.kind === "loop" ? fate.period : 0;
   const nutShort = nut !== null && loopCost > 0 && nut < loopCost;
   const loopTx = fate.kind === "loop" ? plannedTxCount(fate.period, caps) : 0;
   const pathSteps = fate.kind === "loop" ? fate.steps : fate.kind === "dead" ? fate.steps : 0;
   const pathTx = pathMintable ? plannedPathTxCount(pathSteps, fate.kind === "loop" ? fate.period : 1, caps) : 0;
+  const nutShortPath = nut !== null && pathSteps > 0 && nut < pathSteps;
 
   // roll a random look (cell/bg/speed) and set it free straight away — no modal.
   const rollLook = () => {
@@ -398,7 +400,13 @@ export default function CreatePage() {
                         keep the journey as a Wanderer (Incubator) →
                       </button>
                     ) : (
-                      <button className="btn ghost" onClick={openPath}>keep the journey as a Wanderer</button>
+                      <div className="path-free">
+                        <p className="nut-cost mono">the journey costs {pathSteps} NUT · you have {nut ?? 0}</p>
+                        <button className="btn ghost" onClick={openPath} disabled={nutShortPath}>keep the journey as a Wanderer</button>
+                        {nutShortPath && (
+                          <p className="nut-note">Not enough NUT yet — breathing life into creatures grows your supply. <Link href="/" className="tx-link">find one that needs a breath →</Link></p>
+                        )}
+                      </div>
                     )
                   )}
                   {pathMintable && pathMinted && pathTokenId && (

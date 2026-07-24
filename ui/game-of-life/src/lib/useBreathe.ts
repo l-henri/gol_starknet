@@ -47,9 +47,12 @@ export function useBreathe() {
       setTxHash(null);
       setStatus("signing");
       try {
-        // feeding N generations is a single move_lifeform_forward_n(id, N) call — one state
-        // read/write + one mint of N NUT, cheaper than N separate moves.
-        const calls = sdk.breatheLifeCall(id, Math.max(1, count));
+        // A breath advances N generations AND takes the creature into your care (a caretaker bond),
+        // in ONE tx: `pet` is the ceremonial 1-generation breath that opens/refreshes the 7-day bond
+        // (and mints 1 NUT); for a deeper breath we prepend move_lifeform_forward_n for the other
+        // N-1 generations. Total: N gens forward, N NUT minted, bond renewed.
+        const n = Math.max(1, count);
+        const calls = n > 1 ? [...sdk.breatheLifeCall(id, n - 1), ...sdk.petCall(id)] : sdk.petCall(id);
         const hash = await execute(calls);
         // Some wallets (seen with Xverse) resolve the request without broadcasting and return no
         // hash — surface that as an error instead of silently waiting on `undefined`.
