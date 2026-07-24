@@ -5,7 +5,8 @@
 
 **Last updated:** 2026-07-24
 **Framing:** WIP **art piece**, not a commercial product — the outcome is burning gas and creating art.
-**Active branch:** `new_design` — website design overhaul in progress. Done so far: the Garden
+**Active branch:** `main` — the **petri redesign merged to `main` and deployed to production on
+2026-07-24** (Vercel auto-deploy). What shipped: the Garden
 home (living gallery — newest-first walls, no lens toggle; the big "creature of the moment" is a
 random pick from the top-10 most-fed loops or top-10 longest methuselahs), the global chrome (the
 "petri" top bar + Conway-blinker favicon + a quiet NUT balance chip when connected), `/create` (the "slot machine of life" — two grids,
@@ -19,8 +20,11 @@ cap = wallet's deepest breath), caretaker pack; Wanderers play out their journey
 (Wards — windowsill of wards + hunger clocks, the reaper's rounds), and `/leaderboards`
 (Records — the census: three toggleable boards, #1 glow). **The redesign sweep is COMPLETE — every page is in the petri look.**
 Site renamed **petri** (loop/wanderer collections keep their names). See LOG 2026-07-09/07-10.
-`main` remains the shipped trunk. ⚠️ `new_design` not yet QA'd with a connected wallet
-(set-free mint, hatch, breathe/pet/daycare) and not yet pushed/merged.
+`main` now carries the petri redesign (fast-forwarded from `new_design`, deployed to production
+2026-07-24). ⚠️ It shipped WITHOUT a connected-wallet QA pass — the wallet-signed flows (set-free
+mint, hatch, rhythmic breathe/pet) are code-verified + fee-estimated but never clicked through with
+a real wallet; verify on the live site. Confirm the Vercel `NEXT_PUBLIC_GOL_RPC_URL` env (proxy vs
+direct) is sane for prod.
 **Build/test:** `scarb build` ✅ · `snforge test` ✅ (101, +11 ignored benches) · `cargo test -p gol-sdk` ✅ (43) · `next build` ✅
 **Live site:** https://gol-starknet.vercel.app — Vercel git integration auto-deploys every push to `main` (verified current 2026-07-06)
 **Tx tooling:** all on-chain transactions via **strkd** — pair with `kind:"agent"`; never sncast/raw keys

@@ -58,6 +58,23 @@
   `image`.
 - **Blockers:** none for the code; deployment gated on Henri's go + the cap decision.
 
+## 2026-07-24 (7) — SHIP: petri redesign merged to `main` → production
+- **Goal:** Henri: "push to main." Ship the whole petri redesign + NUT/breathe work to the live site.
+- **Branch:** `main` (fast-forwarded from `new_design`) · **Commits:** e074275 (24 ahead of the old
+  963d24c trunk).
+- **What shipped:** the entire `new_design` line — Garden/chrome/`/create`/`/incubator`/`/life`/
+  `/pets`/`/leaderboards` petri redesign, the RPC v0.10 proxy (`/api/rpc`, with a v0.8 `?spec=compat`
+  lane for starknet.js), the mint-multicall fix, NUT visibility + gating, and the rhythmic-tap breathe
+  (creature page + Garden tiles + Ward cards; always feeds+adopts). Also carries the (not-yet-deployed)
+  `gol_metadata_v2` `token_uri` image commits — inert repo code, no live-site effect.
+- **How:** `git checkout main && git merge --ff-only new_design && git push origin main`. Clean
+  fast-forward (main was an ancestor). Vercel auto-deploys `main` → https://gol-starknet.vercel.app.
+- **Verified:** `next build` green at HEAD before the push; tsc/eslint clean across the session.
+  ⚠️ NOT verified: any wallet-signed flow with a real wallet (mint / breathe / pet) — code-verified
+  and fee-estimated only. Verify on the live site.
+- **Next:** live-site wallet pass (set a creature free; tap-breathe on /life, a Garden tile, a ward);
+  confirm the Vercel `NEXT_PUBLIC_GOL_RPC_URL` env; then the `gol_metadata_v2` image deploy.
+
 ## 2026-07-24 (5) — rhythmic tap on the Ward pet button too
 - **Goal:** Henri: use the rhythmic-tap breathe on `/pets` ward cards (replacing the single "Pet"/
   "Adopt again" button).
