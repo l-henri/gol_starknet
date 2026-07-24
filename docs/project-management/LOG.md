@@ -18,6 +18,24 @@
 
 ---
 
+## 2026-07-24 — /create: hatching one of a loop+wanderer pair saves the other for incubation
+- **Goal:** Henri: a loop-with-transient yields BOTH a loop and a wanderer. Hatching one redirects
+  to the newborn's page and the other is lost. Keep the non-hatched one in the incubator: hatch the
+  loop → save the wanderer; hatch the wanderer → save the loop.
+- **Branch:** `new_design` · **Commits:** uncommitted WIP
+- **Changed (`ui/game-of-life/src/app/create/page.tsx`):** extracted a `bookmark(...)` helper
+  (owner-stamped `addBookmark`). `openLoop` now bookmarks the wanderer (`pathTokenId`, when
+  `pathMintable && !pathMinted`) before minting the loop; `openPath` bookmarks the terminal loop
+  (`tokenId`, when `fate.kind==="loop" && !already`) before minting the wanderer. `sendToIncubator`
+  reuses the same helper. The saved creature lands in `/incubator` → "Saved creatures" for the
+  connected wallet (owner-scoped), and auto-clears if it's later minted.
+- **Verified:** tsc + eslint clean, `next build` green. NOT verifiable headlessly: the hatch itself
+  is wallet-gated (the `openLoop`/`openPath` buttons only appear with a connected wallet), so the
+  save-the-other behavior needs Henri's wallet pass on the preview. The bookmark write is synchronous
+  and fires before the mint, so it persists regardless of the mint outcome/redirect.
+- **Next:** Henri's wallet pass on the `new_design` preview (mint a loop-with-transient, confirm the
+  wanderer shows up in the Incubator, and vice-versa), then breathe/pet QA + ship decision.
+
 ## 2026-07-10 (evening, 14) — ROOT CAUSE of "Set it free": a malformed multicall (+ v0.10/starknet.js split)
 - **Goal:** finally fix "Set it free". After the direct-wallet rewrite it stopped hanging and
   surfaced the wallet's generic `Error: Execute failed` (inpage.js) with `txCalls: Array(3)`.

@@ -232,8 +232,15 @@ export default function CreatePage() {
     setBgc(bgHex);
     return { bg: hexToInt(bgHex), cell: hexToInt(cellHex), speed: pickRandom(SPEEDS).v };
   };
+  const bookmark = (id: string, rows: number[], period: number, kind: "loop" | "path", loopPeriod: number) => {
+    try { addBookmark({ id, rows, period, kind, loopPeriod, owner: address ?? undefined, savedAt: Date.now() }); } catch { /* best-effort */ }
+  };
+
   const openLoop = () => {
     if (fate.kind !== "loop" || !tokenId) return;
+    // A loop with a transient also yields a wanderer. Hatching the loop redirects away, so keep the
+    // wanderer in the incubator (if it's mintable and not already on-chain) instead of losing it.
+    if (pathMintable && pathTokenId && !pathMinted) bookmark(pathTokenId, leftRows, pathSteps, "path", fate.period);
     setBornPreview(fromRows(fate.canonical));
     setActiveId(tokenId);
     void mint(fate.canonical, fate.period, rollLook());
@@ -241,13 +248,16 @@ export default function CreatePage() {
   const openPath = () => {
     if (!pathTokenId || fate.kind === "empty" || fate.kind === "watching" || fate.kind === "transient") return;
     const loopPeriod = fate.kind === "loop" ? fate.period : 1;
+    // Hatching the wanderer redirects away — keep its terminal loop in the incubator (if it exists
+    // as a mintable creature and isn't already on-chain) instead of losing it.
+    if (fate.kind === "loop" && tokenId && !already) bookmark(tokenId, fate.canonical, fate.period, "loop", fate.period);
     setBornPreview(left);
     setActiveId(pathTokenId);
     void mintPath(leftRows, pathSteps, loopPeriod, rollLook());
   };
 
   const sendToIncubator = (id: string, rows: number[], period: number, kind: "loop" | "path", loopPeriod: number) => {
-    try { addBookmark({ id, rows, period, kind, loopPeriod, owner: address ?? undefined, savedAt: Date.now() }); } catch { /* best-effort */ }
+    bookmark(id, rows, period, kind, loopPeriod);
     router.push("/incubator");
   };
 
