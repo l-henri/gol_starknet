@@ -7,6 +7,7 @@ import GolCanvas from "@/components/GolCanvas";
 import { useGolSdk } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
 import { useMint } from "@/lib/useMint";
+import { useNutBalance } from "@/lib/useNut";
 import { fromRows } from "@/lib/creatures";
 import {
   listBookmarks,
@@ -55,6 +56,7 @@ export default function IncubatorPage() {
   const { sdk } = useGolSdk();
   const { address, connect, onSepolia, switchToSepolia, txEpoch } = useWallet();
   const { status, error, progress, stalled, continueMint, mint, mintPath, reset } = useMint();
+  const nut = useNutBalance();
   const router = useRouter();
 
   const [pending, setPending] = useState<MintProgress[]>([]);
@@ -162,6 +164,7 @@ export default function IncubatorPage() {
                 {pending.map((p) => {
                   const pct = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0;
                   const active = activeId === p.id;
+                  const short = nut !== null && nut < p.period; // NUT no longer covers the cost
                   return (
                     <div key={p.id} className="egg-card">
                       <Egg rows={p.rows} pct={pct} warm />
@@ -169,6 +172,10 @@ export default function IncubatorPage() {
                         <span className="egg-kind">{kindLabel(p.kind, p.period)}</span>
                         <span className="egg-sig">{`signatures ${p.done}/${p.total}`}</span>
                       </div>
+                      <p className="nut-cost mono">costs {p.period} NUT · you have {nut ?? 0}</p>
+                      {short && (
+                        <p className="nut-note">Not enough NUT yet — breathing life into creatures grows your supply. <Link href="/" className="tx-link">find one that needs a breath →</Link></p>
+                      )}
                       <div className="egg-actions">
                         <button className="btn set-free" disabled={busy || !onSepolia} onClick={() => hatch(p)}>
                           {active && progress ? `Hatching ${progress.current}/${progress.total}…` : "Continue hatching"}

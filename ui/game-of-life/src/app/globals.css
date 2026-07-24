@@ -174,6 +174,15 @@ canvas.creature { display: block; width: 100%; height: 100%; }
 .tb-census { font-size: 0.72rem; letter-spacing: 0.06em; color: var(--ink-faint); white-space: nowrap; }
 .tb-census b { color: var(--ink-dim); font-weight: 600; }
 .tb-account { display: inline-flex; align-items: center; gap: 0.6em; }
+/* NUT chip — sustenance, never money: ambient grey mono, never highlighted. */
+.tb-nut { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.04em; color: #7a7a88; text-decoration: none; white-space: nowrap; }
+.tb-nut:hover { color: var(--ink-dim); }
+
+/* NUT cost + shortfall (Create / Incubator). Cost is quiet mono; the shortfall is warm amber
+   (onboarding into the care loop), never red, never an error tone. */
+.nut-cost { font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.03em; color: #7a7a88; margin: 0 0 0.5em; }
+.nut-note { color: #f97316; font-size: 0.82rem; line-height: 1.5; max-width: 44ch; margin: 0.6em 0 0; }
+.nut-note a { color: #f97316; text-decoration: underline; }
 .tb-connect {
   font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.03em; white-space: nowrap;
   padding: 0.5em 0.9em; border-radius: 999px; border: 1px solid #1f1f28;
@@ -526,6 +535,16 @@ canvas.creature { display: block; width: 100%; height: 100%; }
 /* the two acts of care */
 .acts { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
 .breathe-act { min-width: 220px; }
+/* breath depth — care intensity, not a max/optimize control. Capped ×1 / ×5 / ×10 / ×100. */
+.breath-depths { display: inline-flex; gap: 6px; }
+.depth-chip {
+  font-family: var(--mono); font-size: 0.76rem; letter-spacing: 0.02em;
+  padding: 0.32em 0.7em; border-radius: 999px; cursor: pointer;
+  color: var(--ink-dim); background: var(--panel); border: 1px solid var(--line);
+}
+.depth-chip:hover:not(:disabled) { color: var(--ink); border-color: #2e2e3a; }
+.depth-chip.on { color: #0a0a0c; background: #4ade80; border-color: #4ade80; }
+.depth-chip:disabled { opacity: 0.5; cursor: default; }
 .act-note { font-family: var(--mono); font-size: 0.74rem; color: var(--ink-faint); line-height: 1.55; margin: 0; max-width: 42ch; }
 .act-pet { margin-top: 6px; padding-top: 14px; border-top: 1px dashed var(--line); display: flex; flex-direction: column; gap: 8px; align-items: flex-start; width: 100%; }
 .btn.pet-act { min-width: 220px; background: rgba(34, 197, 94, 0.14); border-color: rgba(34, 197, 94, 0.55); color: #4ade80; }

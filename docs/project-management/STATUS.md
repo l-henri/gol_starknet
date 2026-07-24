@@ -8,12 +8,12 @@
 **Active branch:** `new_design` — website design overhaul in progress. Done so far: the Garden
 home (living gallery — newest-first walls, no lens toggle; the big "creature of the moment" is a
 random pick from the top-10 most-fed loops or top-10 longest methuselahs), the global chrome (the
-"petri" top bar + Conway-blinker favicon), `/create` (the "slot machine of life" — two grids,
+"petri" top bar + Conway-blinker favicon + a quiet NUT balance chip when connected), `/create` (the "slot machine of life" — two grids,
 draw-left/watch-right at 15 fps; "Set it free" mints straight away with a randomly-rolled look, no
 colour picker), `/incubator` (warming-egg workbench — per-wallet: hatches-in-progress + saved
 creatures for the connected account only; hatched creatures auto-leave), and `/life/[id]` (the ritual
-surface — microscope-slide on-chain renderer, a single "Breathe life" act that pets/adopts,
-bond clock, caretaker pack; Wanderers play out their journey from their start state, and
+surface — microscope-slide on-chain renderer, a "Breathe life" act with a ×1/×5/×10/×100 depth
+(N gens + N NUT in one tx, render fast-forwards), caretaker pack; Wanderers play out their journey from their start state, and
 "bound for a loop" links to that loop if it's minted or to /create with it preloaded if not), `/pets`
 (Wards — windowsill of wards + hunger clocks, the reaper's rounds), and `/leaderboards`
 (Records — the census: three toggleable boards, #1 glow). **The redesign sweep is COMPLETE — every page is in the petri look.**

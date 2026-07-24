@@ -31,7 +31,8 @@ export interface BreathCanvasProps {
   speed: number;
   playing: boolean;
   scrubGen: number | null; // null = live/autoplay; number = hold that generation
-  breathSignal: number; // increment to play a one-generation breath
+  breathSignal: number; // increment to play a breath
+  breathDepth?: number; // generations a breath advances (a deeper breath = a longer, faster exhale)
   onBreathDone?: () => void;
   res?: number;
 }
@@ -47,18 +48,21 @@ export default function BreathCanvas(props: BreathCanvasProps) {
   const playingRef = useRef(props.playing);
   const scrubRef = useRef(props.scrubGen);
   const breathRef = useRef(props.breathSignal);
+  const depthRef = useRef(props.breathDepth ?? 1);
   const doneRef = useRef(props.onBreathDone);
   bgRef.current = props.bg;
   cellRef.current = props.cell;
   speedRef.current = props.speed;
   playingRef.current = props.playing;
   scrubRef.current = props.scrubGen;
+  depthRef.current = props.breathDepth ?? 1;
   doneRef.current = props.onBreathDone;
 
   const baseRef = useRef<Cells>(fromRows(props.rows)); // the current on-chain state
   const displayRef = useRef<Cells>(baseRef.current); // what's shown (autoplay advances this)
   const scrubCellsRef = useRef<Cells>(baseRef.current);
-  const animRef = useRef<{ start: number; from: Cells; to: Cells } | null>(null);
+  const animRef = useRef<{ start: number; from: Cells; to: Cells; dur: number } | null>(null);
+  const reelRef = useRef<{ remaining: number; perGen: number } | null>(null);
   const lastStepRef = useRef(0);
   const lastBreathRef = useRef(props.breathSignal);
 
@@ -157,26 +161,40 @@ export default function BreathCanvas(props: BreathCanvasProps) {
 
     let raf = 0;
     const loop = (now: number) => {
-      // start a breath?
+      // start a breath (of `depth` generations — a deeper breath is a longer, faster fast-forward)?
       if (breathRef.current !== lastBreathRef.current) {
         lastBreathRef.current = breathRef.current;
-        const from = displayRef.current.slice();
-        animRef.current = { start: now, from, to: step(from) };
+        const depth = Math.max(1, Math.round(depthRef.current));
         if (reduced) {
-          displayRef.current = animRef.current.to;
+          displayRef.current = stepN(displayRef.current, depth);
+          reelRef.current = null;
           animRef.current = null;
           doneRef.current?.();
+        } else {
+          // one full breath at ×1; deeper breaths reel faster so the whole exhale stays ~2.8s.
+          const perGen = depth === 1 ? BREATH_MS : Math.max(90, Math.min(560, 2800 / depth));
+          reelRef.current = { remaining: depth, perGen };
+          const from = displayRef.current.slice();
+          animRef.current = { start: now, from, to: step(from), dur: perGen };
         }
       }
 
       if (animRef.current) {
         const a = animRef.current;
-        const p = (now - a.start) / BREATH_MS;
+        const p = (now - a.start) / a.dur;
         if (p >= 1) {
           displayRef.current = a.to;
-          animRef.current = null;
-          drawStatic(displayRef.current);
-          doneRef.current?.();
+          const reel = reelRef.current;
+          if (reel && reel.remaining > 1) {
+            reel.remaining -= 1; // keep exhaling the next generation
+            const from = displayRef.current.slice();
+            animRef.current = { start: now, from, to: step(from), dur: reel.perGen };
+          } else {
+            reelRef.current = null;
+            animRef.current = null;
+            drawStatic(displayRef.current);
+            doneRef.current?.();
+          }
         } else {
           drawBreath(a.from, a.to, p);
         }
@@ -196,7 +214,6 @@ export default function BreathCanvas(props: BreathCanvasProps) {
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

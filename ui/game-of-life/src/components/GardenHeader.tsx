@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useGolSdk } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
+import { useNutBalance } from "@/lib/useNut";
 import { shortAddr } from "@/lib/format";
 import { daysLeft } from "@/lib/usePet";
 import type { JsLifeform } from "@/lib/types";
@@ -27,6 +28,7 @@ export default function GardenHeader() {
   const pathname = usePathname() || "/";
   const { sdk } = useGolSdk();
   const { address, connecting, connect, disconnect, onSepolia, switchToSepolia, txEpoch } = useWallet();
+  const nut = useNutBalance();
   const [census, setCensus] = useState<number | null>(null);
   const [wardsHungry, setWardsHungry] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -96,6 +98,9 @@ export default function GardenHeader() {
         <span className="tb-account">
           {wardsHungry && (
             <Link href="/pets" className="tb-hungry" title="A ward is hungry — pet it before its bond wilts" aria-label="A ward is hungry" />
+          )}
+          {nut !== null && (
+            <Link href="/pets" className="tb-nut" title="Your NUT — sustenance, grown by breathing life into creatures">NUT {nut.toLocaleString("en-US")}</Link>
           )}
           <button className="tb-connect" onClick={disconnect} title="Disconnect">{shortAddr(address)}</button>
         </span>

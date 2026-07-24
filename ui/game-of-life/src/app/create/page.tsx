@@ -7,6 +7,7 @@ import GolCanvas from "@/components/GolCanvas";
 import { useGolSdk } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
 import { useMint } from "@/lib/useMint";
+import { useNutBalance } from "@/lib/useNut";
 import { useGasCaps, plannedTxCount, plannedPathTxCount, MAX_TX } from "@/lib/gasCaps";
 import { N, type Cells, fromRows, rowsFromCells } from "@/lib/creatures";
 import { addBookmark, listBookmarks } from "@/lib/incubator";
@@ -72,6 +73,7 @@ export default function CreatePage() {
   const { sdk } = useGolSdk();
   const { address, connect, onSepolia, switchToSepolia } = useWallet();
   const { status, error: mintError, mint, mintPath, reset, stalled, continueMint } = useMint();
+  const nut = useNutBalance();
   const caps = useGasCaps();
   const router = useRouter();
 
@@ -220,6 +222,9 @@ export default function CreatePage() {
     setPlaying(true); // pull the lever → watch it come alive
   };
 
+  // A birth costs its creature's generations in NUT (one NUT per generation the contract runs).
+  const loopCost = fate.kind === "loop" ? fate.period : 0;
+  const nutShort = nut !== null && loopCost > 0 && nut < loopCost;
   const loopTx = fate.kind === "loop" ? plannedTxCount(fate.period, caps) : 0;
   const pathSteps = fate.kind === "loop" ? fate.steps : fate.kind === "dead" ? fate.steps : 0;
   const pathTx = pathMintable ? plannedPathTxCount(pathSteps, fate.kind === "loop" ? fate.period : 1, caps) : 0;
@@ -377,7 +382,13 @@ export default function CreatePage() {
                         This one’s big — set it free in the Incubator →
                       </button>
                     ) : (
-                      <button className="btn primary set-free" onClick={openLoop}>Set it free</button>
+                      <>
+                        <p className="nut-cost mono">This birth costs {loopCost} NUT · you have {nut ?? 0}</p>
+                        <button className="btn primary set-free" onClick={openLoop} disabled={nutShort}>Set it free</button>
+                        {nutShort && (
+                          <p className="nut-note">Not enough NUT yet — breathing life into creatures grows your supply. <Link href="/" className="tx-link">find one that needs a breath →</Link></p>
+                        )}
+                      </>
                     )
                   )}
 

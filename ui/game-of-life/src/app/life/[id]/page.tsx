@@ -7,7 +7,8 @@ import Creature from "@/components/Creature";
 import BreathCanvas from "@/components/BreathCanvas";
 import { useGolSdk } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
-import { usePet, useBond, daysLeft } from "@/lib/usePet";
+import { useBreathe } from "@/lib/useBreathe";
+import { daysLeft } from "@/lib/usePet";
 import { useMint } from "@/lib/useMint";
 import { findBeast } from "@/lib/bestiary";
 import { rowsFromCoords } from "@/lib/creatures";
@@ -68,9 +69,10 @@ function MintedDetail({ id }: { id: string }) {
 function LoopDetail({ id }: { id: string }) {
   const { sdk, error } = useGolSdk();
   const { address, connect, onSepolia, switchToSepolia } = useWallet();
-  const { status: pStatus, txHash: pHash, error: pErr, pet, reset: pReset } = usePet();
-  const bond = useBond(id);
+  const { status: bStatus, txHash: bHash, error: bErr, breathe, reset: bReset } = useBreathe();
   const connected = !!address;
+
+  const DEPTHS = [1, 5, 10, 100] as const;
 
   const [lf, setLf] = useState<JsLifeform | null>(null);
   const [rp, setRp] = useState<RP | null>(null);
@@ -83,6 +85,10 @@ function LoopDetail({ id }: { id: string }) {
 
   const [confirmMsg, setConfirmMsg] = useState<{ text: string; hash: string | null } | null>(null);
   const [shownAge, setShownAge] = useState(0);
+  const [depth, setDepth] = useState<number>(1);       // chosen breath depth (×1 / ×5 / ×10 / ×100)
+  const [breathN, setBreathN] = useState(1);           // depth of the breath currently animating
+  const [breathSignal, setBreathSignal] = useState(0); // increment → BreathCanvas plays the exhale
+  const [breathing, setBreathing] = useState(false);   // during the fast-forward, show BreathCanvas over the iframe
 
   const load = useCallback(async () => {
     if (!sdk) return;
@@ -97,7 +103,7 @@ function LoopDetail({ id }: { id: string }) {
   }, [sdk, id]);
   useEffect(() => { setLoading(true); load(); }, [load]);
 
-  useEffect(() => { if (lf) setShownAge(lf.age); }, [lf?.age]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (lf && !breathing) setShownAge(lf.age); }, [lf?.age, breathing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // lazy: the birth block (the on-chain name is just "Lifeform <id>"; we show a cleaner type name)
   useEffect(() => { if (!sdk) return; let c = false; sdk.recentMints().then((m) => { const hit = (m as { token_id: string; block: number }[]).find((x) => sameId(x.token_id, id)); if (!c) setBorn(hit?.block ?? null); }).catch(() => {}); return () => { c = true; }; }, [sdk, id]);
@@ -126,15 +132,20 @@ function LoopDetail({ id }: { id: string }) {
     return () => { cancelled = true; };
   }, [sdk, id, packEpoch]);
 
-  // a confirmed breath → tick the counter, refetch state + pack, settle
+  // a confirmed breath → play the fast-forward, roll the counter up by its depth, reward, then settle
   useEffect(() => {
-    if (pStatus !== "confirmed") return;
-    setShownAge((a) => a + 1);
-    setConfirmMsg({ text: "You gave it a breath.", hash: pHash });
-    load(); setPackEpoch((e) => e + 1);
-    const t = setTimeout(() => pReset(), 3200);
-    return () => clearTimeout(t);
-  }, [pStatus]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (bStatus !== "confirmed") return;
+    const n = breathN;
+    setBreathing(true);
+    setBreathSignal((s) => s + 1);
+    setConfirmMsg({ text: `You gave it ${n} breath${n === 1 ? "" : "s"}. +${n} NUT.`, hash: bHash });
+    // roll the generation counter up by n, roughly in step with the reel
+    let done = 0;
+    const per = Math.max(24, Math.min(180, 2600 / n));
+    const roll = setInterval(() => { done += 1; setShownAge((a) => a + 1); if (done >= n) clearInterval(roll); }, per);
+    const t = setTimeout(() => bReset(), 3800);
+    return () => { clearInterval(roll); clearTimeout(t); };
+  }, [bStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (error) return <Shell><p className="status-line">the petri dish is offline — {error}</p></Shell>;
   if (loading) return <Shell><p className="status-line"><span className="spinner" /> reading the chain…</p></Shell>;
@@ -145,27 +156,38 @@ function LoopDetail({ id }: { id: string }) {
   const period = lf.sequence_length;
   const displayName = lf.is_still ? "Still Life" : lf.is_loop ? `Period-${period} Loop` : "Lifeform";
   const stateWord = lf.is_dead ? "gone out" : "alive";
-  const pBusy = pStatus === "signing" || pStatus === "pending";
-  const left = daysLeft(bond);
-  const hungry = left !== null && left <= 2;
+  const bBusy = bStatus === "signing" || bStatus === "pending";
 
-  // one action: breathing pets the creature, which adopts you as its caretaker automatically.
+  // one action, with depth: a breath advances the creature `depth` generations in one tx and mints
+  // `depth` NUT — sustenance. A deeper breath is a longer exhale.
   const doBreathe = () => {
-    if (pStatus === "error") return pReset();
+    if (bStatus === "error") return bReset();
     if (!connected) return connect();
     if (!onSepolia) return switchToSepolia();
-    pet(decId);
+    setBreathN(depth);
+    breathe(decId, depth);
   };
+  // when the fast-forward finishes, settle back to the on-chain renderer with the advanced state
+  const onBreathDone = () => { setBreathing(false); load(); setPackEpoch((e) => e + 1); };
 
   return (
     <Shell>
       <div className="life">
         <div className="life-main">
-          {/* LEFT — the on-chain renderer, framed as a microscope slide */}
+          {/* LEFT — the on-chain renderer, framed as a microscope slide. During a breath we overlay
+              BreathCanvas (mounted throughout, so the signal fires) to fast-forward the N generations,
+              then settle back to the on-chain renderer with the advanced state. */}
           <div className="life-left">
             <Slide>
               {rp ? (
-                <iframe srcDoc={onchainHtml(lf.current_state, rp.bg, rp.cell, rp.speed)} title={`On-chain renderer for ${decId}`} sandbox="allow-scripts" style={{ width: "100%", height: "100%", border: 0, background: toHex(rp.bg) }} />
+                <>
+                  <div style={{ width: "100%", height: "100%", display: breathing ? "none" : "block" }}>
+                    <iframe srcDoc={onchainHtml(lf.current_state, rp.bg, rp.cell, rp.speed)} title={`On-chain renderer for ${decId}`} sandbox="allow-scripts" style={{ width: "100%", height: "100%", border: 0, background: toHex(rp.bg) }} />
+                  </div>
+                  <div style={{ width: "100%", height: "100%", display: breathing ? "block" : "none" }}>
+                    <BreathCanvas rows={lf.current_state} bg={rp.bg} cell={rp.cell} speed={rp.speed} playing={false} scrubGen={null} breathSignal={breathSignal} breathDepth={breathN} onBreathDone={onBreathDone} />
+                  </div>
+                </>
               ) : (
                 <div className="status-line" style={{ padding: 24 }}>reading render params…</div>
               )}
@@ -198,26 +220,20 @@ function LoopDetail({ id }: { id: string }) {
 
             {!lf.is_dead && (
               <div className="acts">
-                <button className="btn set-free breathe-act" onClick={doBreathe} disabled={pBusy}>
+                <div className="breath-depths" role="group" aria-label="How deep a breath">
+                  {DEPTHS.map((d) => (
+                    <button key={d} type="button" className={"depth-chip" + (depth === d ? " on" : "")} aria-pressed={depth === d} disabled={bBusy} onClick={() => setDepth(d)}>×{d}</button>
+                  ))}
+                </div>
+                <button className="btn set-free breathe-act" onClick={doBreathe} disabled={bBusy}>
                   {!connected ? "Connect to breathe"
                     : !onSepolia ? "Switch to Sepolia"
-                    : pStatus === "signing" ? "Drawing breath…"
-                    : pStatus === "pending" ? "Breathing…"
-                    : pStatus === "error" ? "Try again"
-                    : "Breathe life"}
+                    : bStatus === "signing" ? "Drawing breath…"
+                    : bStatus === "pending" ? "Breathing…"
+                    : bStatus === "error" ? "Try again"
+                    : depth === 1 ? "Breathe life" : `A deep breath · ×${depth}`}
                 </button>
-                <p className="act-note">One generation forward — and it becomes yours to keep. Breathing adopts you as its caretaker and opens a 7-day bond; come back within 7 days, or the bond wilts. Earns you a little $NUT.</p>
-
-                {connected && onSepolia && bond?.held && (
-                  <div className="act-pet">
-                    <div className={"bond-clock" + (hungry ? " hungry" : "")}>
-                      <span className="bond-dot" />
-                      {left !== null && left <= 0
-                        ? "bond wilted — a breath revives it"
-                        : `bond: ${left! >= 1 ? `${Math.floor(left!)} day${Math.floor(left!) === 1 ? "" : "s"}` : `${Math.max(1, Math.round(left! * 24))} hours`} left`}
-                    </div>
-                  </div>
-                )}
+                <p className="act-note">One breath moves it {depth === 1 ? "a generation" : `${depth} generations`} forward in a single tx and mints you {depth === 1 ? "a NUT" : `${depth} NUT`} — sustenance for setting new creatures free. A deeper breath, more of both.</p>
 
                 {confirmMsg && (
                   <div className="breath-confirm">
@@ -225,7 +241,7 @@ function LoopDetail({ id }: { id: string }) {
                     {confirmMsg.hash && <a className="tx-link" href={explorerTxUrl(confirmMsg.hash)} target="_blank" rel="noreferrer">{shortAddr(confirmMsg.hash)} ↗</a>}
                   </div>
                 )}
-                {pStatus === "error" && pErr && <p className="breathe-err">{pErr}</p>}
+                {bStatus === "error" && bErr && <p className="breathe-err">{bErr}</p>}
               </div>
             )}
             {lf.is_dead && <p className="dim" style={{ marginTop: 16 }}>This one has gone out. It rests on-chain, a record of a life.</p>}

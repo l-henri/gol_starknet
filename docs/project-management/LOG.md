@@ -18,6 +18,46 @@
 
 ---
 
+## 2026-07-24 (2) — NUT woven in (visibility + gating) and deeper breaths (multi-gen)
+- **Goal:** Henri's amendment. NUT is sustenance (free faucet), never currency. (1) NUT visibility:
+  top-bar chip, /create birth-cost gate, /incubator per-egg cost. (2) Deeper breaths: a ×1/×5/×10/×100
+  depth on the breathe control — one tx, N generations, N NUT — with the render fast-forwarding.
+- **Branch:** `new_design` · **Commits:** uncommitted WIP
+- **Changed (`ui/game-of-life`):**
+  - `src/lib/useNut.ts` (new): `useNutBalance()` — reads `sdk.nutBalance(address)` (18-dec → whole
+    NUT), refetched on `txEpoch`.
+  - `GardenHeader`: quiet mono NUT chip (`.tb-nut`, #7a7a88) next to the address when connected,
+    linking to /pets.
+  - `/create`: birth cost = the loop's period in NUT. Before the single-tx "Set it free" shows
+    "This birth costs N NUT · you have M"; if short, the button is disabled and a warm amber note
+    (`.nut-note`, #f97316, never red) invites breathing, linking to the Garden. `useNutBalance`.
+  - `/incubator`: each hatch-in-progress egg shows "costs N NUT · you have M" + the same amber note
+    when short.
+  - `BreathCanvas`: new `breathDepth` prop — a breath now reels through N generations (perGen scaled
+    so the whole exhale stays ~2.8 s), reduced-motion snaps N gens instantly.
+  - `/life` `LoopDetail`: **reframed "Breathe life" as a deep breath** — a ×1/×5/×10/×100 selector
+    (`.depth-chip`) → `useBreathe.breathe(id, depth)` (`move_lifeform_forward_n`, N gens + N NUT).
+    During the breath the on-chain iframe is overlaid by BreathCanvas fast-forwarding the N gens
+    (mounted throughout so the signal fires), the counter rolls up by N, and the reward reads
+    "You gave it N breaths. +N NUT.", then it settles back to the iframe with the advanced state.
+- **Decisions / flags (need Henri):**
+  - The breathe button previously *petted* (1 gen + opened a caretaker bond / "adopt automatically").
+    The amendment reframes it as the deep breath (`breatheLife`, no bond), so I **removed the pet
+    call + bond clock from /life**. Net effect: no caretaker bond is created from /life anymore
+    (the /pets ward list + reaper still read existing bonds). If breathing should also adopt, or if
+    adoption wants its own control, say so — small change.
+  - The amber note links to the Garden home (the "needs a breath" lens was removed earlier).
+  - `/incubator` cost uses the egg's `period` (loop length); the on-chain NUT cost for *paths* may
+    differ — using `period` as the shown figure for now.
+  - Garden tile hover stays a link into /life (where ×1 is default); I did not add a direct
+    breathe-tx on tiles.
+- **Verified (headless + CDP, live Sepolia):** /life shows the ×1/×5/×10/×100 selector (×1 default),
+  reframed note, on-chain iframe as the resting view; NUT chip correctly absent without a wallet.
+  tsc + eslint clean, `next build` green. NOT verifiable headlessly (wallet-gated): the NUT chip
+  value, the /create + /incubator gates, and the actual deep breath + fast-forward animation.
+- **Next:** Henri's wallet pass on the preview — breathe ×5/×10, watch the fast-forward + NUT tick;
+  set a creature free and hit the NUT gate. Then the pet/bond decision above.
+
 ## 2026-07-24 — /create: hatching one of a loop+wanderer pair saves the other for incubation
 - **Goal:** Henri: a loop-with-transient yields BOTH a loop and a wanderer. Hatching one redirects
   to the newborn's page and the other is lost. Keep the non-hatched one in the incubator: hatch the
