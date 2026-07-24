@@ -18,6 +18,20 @@
 
 ---
 
+## 2026-07-24 (5) — rhythmic tap on the Ward pet button too
+- **Goal:** Henri: use the rhythmic-tap breathe on `/pets` ward cards (replacing the single "Pet"/
+  "Adopt again" button).
+- **Branch:** `new_design` · **Commits:** uncommitted WIP
+- **Changed (`src/app/pets/page.tsx`):** new `WardBreathe` sub-component — its own `useBreathe` +
+  `useBreathCap` + a compact `<BreatheControl>`; `onExhale(n) → breathe(cid, n)` (breatheLife(n-1)+
+  pet → N gens, N NUT, bond renewed). Dropped the old `usePet`/`doPet`/`petLabel`/`petAction`, the
+  `activeId`/`epoch` state and the pet-confirm effect — a confirmed breath bumps `txEpoch`, which the
+  ward-walk already depends on, so the list + clocks refresh automatically. Used in both "Your wards"
+  and "The reaper's rounds" (a breath there re-adopts). Header/reaper copy nudged to "breathe / tap
+  again to go deeper".
+- **Verified:** tsc + eslint clean, `next build` green. The control itself was verified earlier
+  (harness); ward cards are wallet-gated so the live tap+exhale is part of Henri's wallet pass.
+
 ## 2026-07-24 (4) — BREATHE reframed as a rhythmic tap (creature page + Garden tiles)
 - **Goal:** Henri's amendment — replace the ×1/×5/×10/×100 selector with a RHYTHMIC TAP: tap opens a
   1-second window; each tap within it +1 gen and refills the window; when the window empties the

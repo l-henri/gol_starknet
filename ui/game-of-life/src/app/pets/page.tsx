@@ -1,11 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Creature from "@/components/Creature";
+import BreatheControl from "@/components/BreatheControl";
 import { useGolSdk } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
-import { usePet, daysLeft, type BondState } from "@/lib/usePet";
+import { useBreathe } from "@/lib/useBreathe";
+import { useBreathCap } from "@/lib/gasCaps";
+import { daysLeft, type BondState } from "@/lib/usePet";
+import { tokenIdDecimal } from "@/lib/format";
 import type { JsLifeform } from "@/lib/types";
 
 /* ------------------------------------------------------------------ *
@@ -54,14 +58,34 @@ function WardThumb({ lf }: { lf: JsLifeform | null }) {
   );
 }
 
+/* The per-ward breathe: the same rhythmic tap as the creature page — tap to accumulate a depth,
+   release to send one tx (N gens + N NUT + bond renewed). Its own useBreathe so cards are
+   independent; a confirmed breath bumps txEpoch, which refreshes the ward list + clocks. */
+function WardBreathe({ creatureId }: { creatureId: string }) {
+  const { address, onSepolia, connect, switchToSepolia } = useWallet();
+  const { status, error, breathe } = useBreathe();
+  const cap = useBreathCap();
+  return (
+    <div className="ward-breathe">
+      <BreatheControl
+        compact
+        cap={cap}
+        connected={!!address}
+        onSepolia={onSepolia}
+        onConnect={connect}
+        onSwitch={switchToSepolia}
+        onExhale={(n) => breathe(tokenIdDecimal(creatureId), n)}
+      />
+      {status === "error" && error && <p className="breathe-err">{error}</p>}
+    </div>
+  );
+}
+
 export default function WardsPage() {
   const { sdk } = useGolSdk();
-  const { address, connect, onSepolia, switchToSepolia, txEpoch } = useWallet();
-  const { status: petStatus, error: petError, pet, reset: petReset } = usePet();
+  const { address, connect, txEpoch } = useWallet();
 
   const [entries, setEntries] = useState<Ward[] | null>(null);
-  const [epoch, setEpoch] = useState(0);
-  const [activeId, setActiveId] = useState<string | null>(null);
 
   // walk the bond graph: for every creature with bond activity, is it held by me? did I pet it?
   useEffect(() => {
@@ -89,43 +113,17 @@ export default function WardsPage() {
       } catch { if (!cancelled) setEntries([]); }
     })();
     return () => { cancelled = true; };
-  }, [sdk, address, epoch, txEpoch]);
-
-  // a confirmed pet → refresh the clocks
-  useEffect(() => {
-    if (petStatus === "confirmed") {
-      setEpoch((e) => e + 1);
-      const t = setTimeout(() => petReset(), 1800);
-      return () => clearTimeout(t);
-    }
-  }, [petStatus, petReset]);
+  }, [sdk, address, txEpoch]);
 
   const wards = useMemo(() => (entries ?? []).filter((e) => e.bond.held && e.pettedByMe).sort((a, b) => (a.left ?? 0) - (b.left ?? 0)), [entries]);
   const reaped = useMemo(() => (entries ?? []).filter((e) => !e.bond.held && e.pettedByMe), [entries]);
-
-  const petBusy = petStatus === "signing" || petStatus === "pending";
-  const doPet = useCallback((cid: string) => { setActiveId(cid); if (petStatus === "error") petReset(); void pet(cid); }, [pet, petStatus, petReset]);
-
-  const petLabel = (cid: string, adopt = false) => {
-    if (activeId === cid && petStatus === "signing") return "Confirm…";
-    if (activeId === cid && petStatus === "pending") return "A breath…";
-    if (activeId === cid && petStatus === "error") return "Try again";
-    return adopt ? "Adopt again" : "Pet";
-  };
-
-  const petAction = (cid: string, adopt = false) =>
-    !onSepolia ? (
-      <button className="btn" onClick={switchToSepolia}>Switch to Sepolia</button>
-    ) : (
-      <button className="btn set-free" disabled={petBusy && activeId !== cid} onClick={() => doPet(cid)}>{petLabel(cid, adopt)}</button>
-    );
 
   return (
     <div className="wrap wards">
       <header className="wards-lead">
         <span className="eyebrow">Wards</span>
         <h1 className="wards-title">The ones you keep alive.</h1>
-        <p className="wards-sub">A windowsill of small creatures in your care. Pet one and its clock resets for another seven days. NUT is a small thank-you for the breath — nothing more.</p>
+        <p className="wards-sub">A windowsill of small creatures in your care. Breathe one — tap, tap again to go deeper — and its clock resets for another seven days. NUT is a small thank-you for the breath, nothing more.</p>
       </header>
 
       {!address ? (
@@ -158,10 +156,9 @@ export default function WardsPage() {
                         </div>
                         {w.lf && (
                           <div className="ward-actions">
-                            {petAction(w.creatureId)}
+                            <WardBreathe creatureId={w.creatureId} />
                           </div>
                         )}
-                        {activeId === w.creatureId && petStatus === "error" && petError && <p className="breathe-err">{petError}</p>}
                       </div>
                     </div>
                   );
@@ -180,9 +177,8 @@ export default function WardsPage() {
                     <Link href={`/life/${w.creatureId}`}><WardThumb lf={w.lf} /></Link>
                     <div className="ward-body">
                       <Link href={`/life/${w.creatureId}`} className="ward-name">{deriveName(w.lf)}</Link>
-                      <p className="reaper-note">The reaper passed. You’re no longer its keeper — but it lives on if others tend it.</p>
-                      {w.lf && <div className="ward-actions">{petAction(w.creatureId, true)}</div>}
-                      {activeId === w.creatureId && petStatus === "error" && petError && <p className="breathe-err">{petError}</p>}
+                      <p className="reaper-note">The reaper passed. You’re no longer its keeper — but it lives on if others tend it. A breath takes it back into your care.</p>
+                      {w.lf && <div className="ward-actions"><WardBreathe creatureId={w.creatureId} /></div>}
                     </div>
                   </div>
                 ))}
