@@ -13,7 +13,6 @@ const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
 const GATHER = 0.34; // fraction of the breath spent drawing in before the ripple
-const BREATH_MS = 1250;
 const CENTER = (N - 1) / 2;
 const MAXDIST = Math.hypot(CENTER, CENTER);
 const RING = 7; // ripple front width, in cells
@@ -171,8 +170,9 @@ export default function BreathCanvas(props: BreathCanvasProps) {
           animRef.current = null;
           doneRef.current?.();
         } else {
-          // one full breath at ×1; deeper breaths reel faster so the whole exhale stays ~2.8s.
-          const perGen = depth === 1 ? BREATH_MS : Math.max(90, Math.min(560, 2800 / depth));
+          // ~250ms per generation (a fuller single breath at ×1); deep breaths reel faster so the
+          // whole exhale stays under ~6s.
+          const perGen = depth === 1 ? 900 : Math.max(60, Math.min(250, 6000 / depth));
           reelRef.current = { remaining: depth, perGen };
           const from = displayRef.current.slice();
           animRef.current = { start: now, from, to: step(from), dur: perGen };

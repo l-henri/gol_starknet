@@ -37,11 +37,11 @@ export function useBreathe() {
   const [error, setError] = useState<string | null>(null);
 
   const breathe = useCallback(
-    async (id: string, count = 1) => {
-      if (!sdk) return;
+    async (id: string, count = 1): Promise<boolean> => {
+      if (!sdk) return false;
       if (!address) {
         await connect();
-        return;
+        return false;
       }
       setError(null);
       setTxHash(null);
@@ -61,12 +61,14 @@ export function useBreathe() {
         setStatus("pending");
         await waitForTx(hash);
         setStatus("confirmed");
+        return true;
       } catch (e) {
         // Log the raw wallet/provider error — humanize() collapses it for the UI, but the original is
         // what we need when a wallet (e.g. Xverse) fails the handoff.
         console.error("[breathe] feed failed:", e);
         setError(humanize(e, t));
         setStatus("error");
+        return false;
       }
     },
     [sdk, address, connect, execute, waitForTx, t]

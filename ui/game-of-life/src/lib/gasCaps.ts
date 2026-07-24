@@ -60,3 +60,14 @@ export function useGasCaps(): GasCaps & { tier: MeteringTier } {
   const { meteringTier } = useWallet();
   return { ...capsForTier(meteringTier), tier: meteringTier };
 }
+
+/**
+ * The deepest single breath the connected wallet can execute in one tx — its `feedCap` (the max
+ * `move_lifeform_forward_n` under the ~1.2B per-tx wallet cap, set by the account's metering tier).
+ * Disconnected or unresolved tier → a conservative ×10 (never guess high for an unknown account).
+ */
+export function useBreathCap(): number {
+  const { address, meteringTier } = useWallet();
+  if (!address || meteringTier === "unknown") return 10;
+  return capsForTier(meteringTier).feedCap;
+}

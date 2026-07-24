@@ -505,6 +505,8 @@ canvas.creature { display: block; width: 100%; height: 100%; }
   box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.55);
 }
 .slide-glass canvas, .slide-glass iframe { display: block; width: 100%; height: 100%; }
+/* a breath's shimmer — flashed per tap (WAAPI), no cell stepping. Grid only advances on exhale. */
+.slide-shimmer { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(circle at 50% 50%, rgba(126, 249, 160, 0.22), transparent 68%); }
 .tick { position: absolute; width: 11px; height: 11px; border: 1px solid rgba(255, 255, 255, 0.16); pointer-events: none; }
 .tick.tl { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
 .tick.tr { top: -1px; right: -1px; border-left: 0; border-bottom: 0; }
@@ -535,16 +537,24 @@ canvas.creature { display: block; width: 100%; height: 100%; }
 /* the two acts of care */
 .acts { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
 .breathe-act { min-width: 220px; }
-/* breath depth — care intensity, not a max/optimize control. Capped ×1 / ×5 / ×10 / ×100. */
-.breath-depths { display: inline-flex; gap: 6px; }
-.depth-chip {
-  font-family: var(--mono); font-size: 0.76rem; letter-spacing: 0.02em;
-  padding: 0.32em 0.7em; border-radius: 999px; cursor: pointer;
-  color: var(--ink-dim); background: var(--panel); border: 1px solid var(--line);
-}
-.depth-chip:hover:not(:disabled) { color: var(--ink); border-color: #2e2e3a; }
-.depth-chip.on { color: #0a0a0c; background: #4ade80; border-color: #4ade80; }
-.depth-chip:disabled { opacity: 0.5; cursor: default; }
+
+/* RHYTHMIC BREATH control — tap to accumulate, window drains, release sends. Mono throughout. */
+.breathe { display: flex; flex-direction: column; gap: 9px; align-items: flex-start; width: 100%; }
+.breathe-row { display: flex; align-items: center; gap: 14px; }
+.breathe-count { font-family: var(--mono); font-size: clamp(1.7rem, 4vw, 2.3rem); font-weight: 600; letter-spacing: -0.01em; color: #4ade80; line-height: 1; animation: count-pop 220ms var(--ease-organic); }
+.breathe-count.full { color: #7ef9a0; text-shadow: 0 0 14px rgba(126, 249, 160, 0.45); }
+@keyframes count-pop { 0% { transform: scale(0.72); opacity: 0.5; } 60% { transform: scale(1.12); } 100% { transform: scale(1); opacity: 1; } }
+.breathe-bar { width: 240px; max-width: 100%; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.breathe-bar-fill { display: block; height: 100%; width: 100%; background: #4ade80; animation: breathe-drain 1000ms linear forwards; }
+@keyframes breathe-drain { from { width: 100%; } to { width: 0%; } }
+.breathe-countdown { font-family: var(--mono); font-size: 0.74rem; color: var(--ink-dim); }
+.breathe-hint { font-family: var(--mono); font-size: 0.74rem; color: var(--ink-faint); margin: 0; }
+.breathe.compact { gap: 5px; }
+.breathe.compact .breathe-count { font-size: 1.25rem; }
+.breathe.compact .breathe-bar { width: 100%; }
+.breathe.compact .breathe-hint, .breathe.compact .breathe-countdown { font-size: 0.64rem; }
+@media (prefers-reduced-motion: reduce) { .breathe-count { animation: none; } }
+
 .act-note { font-family: var(--mono); font-size: 0.74rem; color: var(--ink-faint); line-height: 1.55; margin: 0; max-width: 42ch; }
 .act-pet { margin-top: 6px; padding-top: 14px; border-top: 1px dashed var(--line); display: flex; flex-direction: column; gap: 8px; align-items: flex-start; width: 100%; }
 .btn.pet-act { min-width: 220px; background: rgba(34, 197, 94, 0.14); border-color: rgba(34, 197, 94, 0.55); color: #4ade80; }
@@ -774,7 +784,19 @@ a.record-row.top1:hover { background: rgba(34, 197, 94, 0.08); }
 @media (max-width: 720px) { .petri-feature { grid-template-columns: 1fr; } }
 
 /* a tile — FRAME ONLY. The render is the creature's own on-chain appearance. */
-.petri-tile { display: block; outline: none; border-radius: 12px; }
+.petri-tile { position: relative; display: block; outline: none; border-radius: 12px; }
+.petri-tile-link { display: block; color: inherit; text-decoration: none; outline: none; }
+/* on hover, a compact rhythmic BREATHE control rises over the dish — sits outside the link so
+   tapping it never navigates. Hidden (and non-interactive) until hover/focus. */
+.petri-hover-breathe {
+  position: absolute; left: 8px; right: 8px; bottom: 42px; z-index: 3;
+  padding: 10px; border-radius: 9px; background: rgba(4, 8, 6, 0.82); backdrop-filter: blur(3px);
+  border: 1px solid rgba(74, 222, 128, 0.28);
+  opacity: 0; transform: translateY(6px); pointer-events: none;
+  transition: opacity var(--dur) var(--ease-quiet), transform var(--dur) var(--ease-organic);
+}
+.petri-tile:hover .petri-hover-breathe, .petri-tile:focus-within .petri-hover-breathe { opacity: 1; transform: none; pointer-events: auto; }
+.petri-hover-breathe .breathe-act { min-width: 0; width: 100%; font-size: 0.78rem; padding: 0.5em 0.8em; }
 .petri-dish {
   position: relative; aspect-ratio: 1 / 1; padding: 7px; border-radius: 11px;
   background: #070709; border: 1px solid #1f1f28;
@@ -784,7 +806,7 @@ a.record-row.top1:hover { background: rgba(34, 197, 94, 0.08); }
   transition: border-color var(--dur) var(--ease-quiet), transform var(--dur) var(--ease-organic);
 }
 .petri-render { position: relative; width: 100%; height: 100%; border-radius: 6px; overflow: hidden; }
-.petri-tile:hover .petri-dish, .petri-tile:focus-visible .petri-dish { transform: translateY(-3px); border-color: #2c2c38; }
+.petri-tile:hover .petri-dish, .petri-tile-link:focus-visible .petri-dish { transform: translateY(-3px); border-color: #2c2c38; }
 
 /* state dot + minimal caption */
 .petri-meta { display: flex; align-items: center; gap: 0.5em; margin-top: 9px; font-family: var(--mono); font-size: 0.72rem; overflow: hidden; }

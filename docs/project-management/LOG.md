@@ -18,6 +18,42 @@
 
 ---
 
+## 2026-07-24 (4) — BREATHE reframed as a rhythmic tap (creature page + Garden tiles)
+- **Goal:** Henri's amendment — replace the ×1/×5/×10/×100 selector with a RHYTHMIC TAP: tap opens a
+  1-second window; each tap within it +1 gen and refills the window; when the window empties the
+  accumulated breath sends as ONE tx (N gens, N NUT, bond renewed — never auto-signed). Dynamic cap =
+  the wallet's deepest single breath (×10 fallback). Full feedback: depth counter, draining window
+  bar, hint line, exhale state with fast-forward. Feel: tap = button pulse + grid shimmer (NO
+  stepping during accumulation — grid advances only on the confirmed exhale). Reduced-motion aware,
+  spacebar taps, JetBrains Mono. Creature page primary; also the Garden tile hover affordance.
+- **Branch:** `new_design` · **Commits:** uncommitted WIP
+- **Changed (`ui/game-of-life`):**
+  - `src/components/BreatheControl.tsx` (new, reusable): the tap state machine (idle → accumulating →
+    exhaling), 1s window via timer + a key-restarted CSS drain bar (or a numeric countdown under
+    reduced motion), depth counter (`×N`, rolls, pulses/shakes at cap), hint line, spacebar/Enter,
+    button scale-pulse (WAAPI), `onExhale(n) → Promise<boolean>`, `onTap` for the grid shimmer. Taps
+    past the cap pulse + refill but don't add.
+  - `src/lib/gasCaps.ts`: `useBreathCap()` — `feedCap` for the connected tier (82 legacy / 340
+    modern), ×10 when disconnected/unknown.
+  - `src/lib/useBreathe.ts`: `breathe` now resolves `boolean` (confirm/reject) so the control can
+    leave "exhaling…". (Still breatheLife(N-1)+pet → N gens, N NUT, bond.)
+  - `src/components/BreathCanvas.tsx`: reel now ~250ms/gen (capped ~6s); dropped the unused BREATH_MS.
+  - `src/app/life/[id]/page.tsx`: replaced the depth chips with `<BreatheControl>`; on confirm the
+    on-chain render fast-forwards the N gens (BreathCanvas overlay) while the counter rolls, reward
+    "You gave it N breaths. +N NUT."; a per-tap shimmer flashes the slide (WAAPI, reduced-motion off).
+  - `src/components/CreatureCard.tsx`: `BacteriaTile` restructured — the dish+meta are a `.petri-tile-link`;
+    a compact `<BreatheControl>` sits OUTSIDE the link, revealed on hover/focus (so tapping it never
+    navigates). Wanderers (portraits) unchanged.
+- **Verified (headless + CDP):** temp harness — 3 quick taps → "×3" + "breathe deeper" + drain bar;
+  window closes → one exhale of 3 → confirmed (log `tap tap tap exhale:3 confirmed:3`); 14 fast taps
+  cap at "×10" ("a full breath — release to send"). Garden — 7 bacteria tiles carry the hover control
+  (opacity 0 until hover, "Connect to breathe" / "tap to give a breath"), links to /life intact,
+  wanderers untouched. tsc + eslint clean, `next build` green. NOT verifiable headlessly: the wallet
+  exhale itself + the on-render fast-forward (Henri's pass).
+- **Note:** cap uses `feedCap` (max single move_lifeform_forward_n); the breath is breatheLife(N-1)+pet
+  so ~N gens total — within the same budget. The tile control has no fast-forward reel (secondary
+  surface); the creature page is the full treatment.
+
 ## 2026-07-24 (3) — deep breath also adopts; exact NUT costs (loop=period, path=seq_len)
 - **Goal:** Henri's answers — (1) the deep breath should ALSO adopt (open/refresh the caretaker
   bond); (3) show the exact on-chain NUT cost for whatever's being minted.

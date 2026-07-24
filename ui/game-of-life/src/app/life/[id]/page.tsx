@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Creature from "@/components/Creature";
 import BreathCanvas from "@/components/BreathCanvas";
+import BreatheControl from "@/components/BreatheControl";
 import { useGolSdk } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
 import { useBreathe } from "@/lib/useBreathe";
 import { useBond, daysLeft } from "@/lib/usePet";
+import { useBreathCap } from "@/lib/gasCaps";
 import { useMint } from "@/lib/useMint";
 import { findBeast } from "@/lib/bestiary";
 import { rowsFromCoords } from "@/lib/creatures";
@@ -72,8 +74,7 @@ function LoopDetail({ id }: { id: string }) {
   const { status: bStatus, txHash: bHash, error: bErr, breathe, reset: bReset } = useBreathe();
   const bond = useBond(id);
   const connected = !!address;
-
-  const DEPTHS = [1, 5, 10, 100] as const;
+  const breathCap = useBreathCap(); // the wallet's deepest single breath (×MAX), ×10 when unknown
 
   const [lf, setLf] = useState<JsLifeform | null>(null);
   const [rp, setRp] = useState<RP | null>(null);
@@ -86,10 +87,10 @@ function LoopDetail({ id }: { id: string }) {
 
   const [confirmMsg, setConfirmMsg] = useState<{ text: string; hash: string | null } | null>(null);
   const [shownAge, setShownAge] = useState(0);
-  const [depth, setDepth] = useState<number>(1);       // chosen breath depth (×1 / ×5 / ×10 / ×100)
-  const [breathN, setBreathN] = useState(1);           // depth of the breath currently animating
+  const [breathN, setBreathN] = useState(1);           // depth of the breath currently exhaling
   const [breathSignal, setBreathSignal] = useState(0); // increment → BreathCanvas plays the exhale
   const [breathing, setBreathing] = useState(false);   // during the fast-forward, show BreathCanvas over the iframe
+  const shimmerRef = useRef<HTMLSpanElement>(null);    // render-frame shimmer flashed on each tap
 
   const load = useCallback(async () => {
     if (!sdk) return;
@@ -140,11 +141,11 @@ function LoopDetail({ id }: { id: string }) {
     setBreathing(true);
     setBreathSignal((s) => s + 1);
     setConfirmMsg({ text: `You gave it ${n} breath${n === 1 ? "" : "s"}. +${n} NUT.`, hash: bHash });
-    // roll the generation counter up by n, roughly in step with the reel
+    // roll the generation counter up by n, in step with the reel (~250ms/gen, capped for deep breaths)
     let done = 0;
-    const per = Math.max(24, Math.min(180, 2600 / n));
+    const per = n === 1 ? 900 : Math.max(60, Math.min(250, 6000 / n));
     const roll = setInterval(() => { done += 1; setShownAge((a) => a + 1); if (done >= n) clearInterval(roll); }, per);
-    const t = setTimeout(() => bReset(), 3800);
+    const t = setTimeout(() => bReset(), Math.min(9000, 1400 + n * per));
     return () => { clearInterval(roll); clearTimeout(t); };
   }, [bStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -157,18 +158,21 @@ function LoopDetail({ id }: { id: string }) {
   const period = lf.sequence_length;
   const displayName = lf.is_still ? "Still Life" : lf.is_loop ? `Period-${period} Loop` : "Lifeform";
   const stateWord = lf.is_dead ? "gone out" : "alive";
-  const bBusy = bStatus === "signing" || bStatus === "pending";
   const left = daysLeft(bond);
   const hungry = left !== null && left <= 2;
 
-  // one action, with depth: a breath advances the creature `depth` generations in one tx and mints
-  // `depth` NUT — sustenance. A deeper breath is a longer exhale.
-  const doBreathe = () => {
-    if (bStatus === "error") return bReset();
-    if (!connected) return connect();
-    if (!onSepolia) return switchToSepolia();
-    setBreathN(depth);
-    breathe(decId, depth);
+  // the rhythmic-tap control accumulates a depth, then hands us the whole breath to send as one tx:
+  // N generations forward + N NUT + bond renewed. Resolves true on confirm so the control can settle.
+  const handleExhale = async (n: number): Promise<boolean> => {
+    if (bStatus === "error") bReset();
+    setBreathN(n);
+    return breathe(decId, n);
+  };
+  // each tap shimmers the render frame (motion = computation stays off — the grid only advances on
+  // the confirmed exhale). Skipped under reduced motion.
+  const handleTap = () => {
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    shimmerRef.current?.animate([{ opacity: 0 }, { opacity: 0.55 }, { opacity: 0 }], { duration: 300, easing: "ease-out" });
   };
   // when the fast-forward finishes, settle back to the on-chain renderer with the advanced state
   const onBreathDone = () => { setBreathing(false); load(); setPackEpoch((e) => e + 1); };
@@ -190,6 +194,7 @@ function LoopDetail({ id }: { id: string }) {
                   <div style={{ width: "100%", height: "100%", display: breathing ? "block" : "none" }}>
                     <BreathCanvas rows={lf.current_state} bg={rp.bg} cell={rp.cell} speed={rp.speed} playing={false} scrubGen={null} breathSignal={breathSignal} breathDepth={breathN} onBreathDone={onBreathDone} />
                   </div>
+                  <span ref={shimmerRef} className="slide-shimmer" aria-hidden="true" />
                 </>
               ) : (
                 <div className="status-line" style={{ padding: 24 }}>reading render params…</div>
@@ -223,20 +228,16 @@ function LoopDetail({ id }: { id: string }) {
 
             {!lf.is_dead && (
               <div className="acts">
-                <div className="breath-depths" role="group" aria-label="How deep a breath">
-                  {DEPTHS.map((d) => (
-                    <button key={d} type="button" className={"depth-chip" + (depth === d ? " on" : "")} aria-pressed={depth === d} disabled={bBusy} onClick={() => setDepth(d)}>×{d}</button>
-                  ))}
-                </div>
-                <button className="btn set-free breathe-act" onClick={doBreathe} disabled={bBusy}>
-                  {!connected ? "Connect to breathe"
-                    : !onSepolia ? "Switch to Sepolia"
-                    : bStatus === "signing" ? "Drawing breath…"
-                    : bStatus === "pending" ? "Breathing…"
-                    : bStatus === "error" ? "Try again"
-                    : depth === 1 ? "Breathe life" : `A deep breath · ×${depth}`}
-                </button>
-                <p className="act-note">A breath moves it {depth === 1 ? "one generation" : `${depth} generations`} forward, mints you {depth === 1 ? "a NUT" : `${depth} NUT`} — sustenance — and takes it into your care (a 7-day bond, renewed each breath). A deeper breath, more of both.</p>
+                <BreatheControl
+                  cap={breathCap}
+                  connected={connected}
+                  onSepolia={onSepolia}
+                  onConnect={connect}
+                  onSwitch={switchToSepolia}
+                  onExhale={handleExhale}
+                  onTap={handleTap}
+                />
+                <p className="act-note">Tap to breathe; tap again within the moment to breathe deeper. When you stop, it goes forward that many generations in one breath — a NUT for each — and stays in your care (a 7-day bond, renewed each breath).</p>
 
                 {connected && onSepolia && bond?.held && (
                   <div className={"bond-clock" + (hungry ? " hungry" : "")}>

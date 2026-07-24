@@ -12,8 +12,9 @@ random pick from the top-10 most-fed loops or top-10 longest methuselahs), the g
 draw-left/watch-right at 15 fps; "Set it free" mints straight away with a randomly-rolled look, no
 colour picker), `/incubator` (warming-egg workbench — per-wallet: hatches-in-progress + saved
 creatures for the connected account only; hatched creatures auto-leave), and `/life/[id]` (the ritual
-surface — microscope-slide on-chain renderer, a "Breathe life" act with a ×1/×5/×10/×100 depth
-(N gens + N NUT in one tx, render fast-forwards), caretaker pack; Wanderers play out their journey from their start state, and
+surface — microscope-slide on-chain renderer, a rhythmic-tap "Breathe" (tap to accumulate a depth,
+sends as one tx — N gens + N NUT + bond — render fast-forwards; also on Garden-tile hover; dynamic
+cap = wallet's deepest breath), caretaker pack; Wanderers play out their journey from their start state, and
 "bound for a loop" links to that loop if it's minted or to /create with it preloaded if not), `/pets`
 (Wards — windowsill of wards + hunger clocks, the reaper's rounds), and `/leaderboards`
 (Records — the census: three toggleable boards, #1 glow). **The redesign sweep is COMPLETE — every page is in the petri look.**

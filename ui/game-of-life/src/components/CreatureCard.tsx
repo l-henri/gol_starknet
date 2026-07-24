@@ -3,10 +3,14 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import Creature from "./Creature";
+import BreatheControl from "./BreatheControl";
 import { useGolSdk } from "@/lib/sdk";
+import { useWallet } from "@/lib/wallet";
+import { useBreathe } from "@/lib/useBreathe";
+import { useBreathCap } from "@/lib/gasCaps";
 import type { JsLifeform } from "@/lib/types";
 import { ageToScale } from "@/lib/creatures";
-import { shortAddr } from "@/lib/format";
+import { shortAddr, tokenIdDecimal } from "@/lib/format";
 
 // The site owns only the FRAME (backdrop / border / petri texture, in globals.css). The render
 // inside each tile is the creature's OWN on-chain look — bg/cell/speed come from the chain and are
@@ -30,11 +34,15 @@ type TileState = "alive" | "hungry" | "gone";
 const STATE_WORD: Record<TileState, string> = { alive: "alive", hungry: "hungry", gone: "gone out" };
 
 /**
- * DIGITAL BACTERIA — a living loop. Pettable, so a living tile carries the quiet "breathe"
- * affordance that appears on hover (an invitation; the tile itself leads to the creature).
+ * DIGITAL BACTERIA — a living loop. The tile is a link to the creature; on hover a compact rhythmic
+ * BREATHE control appears (same tap mechanic as the creature page), so you can give a breath from
+ * the gallery. The control sits OUTSIDE the link so tapping it never navigates.
  */
 export function BacteriaTile({ lf, hungry }: { lf: JsLifeform; hungry: boolean }) {
   const { sdk } = useGolSdk();
+  const { address, onSepolia, connect, switchToSepolia } = useWallet();
+  const { breathe } = useBreathe();
+  const cap = useBreathCap();
   const [rp, setRp] = useState<RenderParams | null>(null);
   const id = shortAddr(lf.token_id);
   const state: TileState = lf.is_dead ? "gone" : hungry ? "hungry" : "alive";
@@ -48,28 +56,43 @@ export function BacteriaTile({ lf, hungry }: { lf: JsLifeform; hungry: boolean }
   }, [sdk, lf.token_id]);
 
   return (
-    <Link href={`/life/${lf.token_id}`} className="petri-tile" data-state={state} aria-label={`Bacteria ${id} — ${STATE_WORD[state]}`}>
-      <div className="petri-dish">
-        <div className="petri-render">
-          <Creature
-            rows={lf.current_state}
-            age={ageToScale(lf.age)}
-            bg={rp?.bg}
-            cell={rp?.cell}
-            speed={rp?.speed}
-            variant={lf.is_dead ? "dead" : "living"}
-            animate={!lf.is_dead}
-            res={440}
-            ariaLabel={`bacteria ${id}`}
+    <div className="petri-tile" data-state={state}>
+      <Link href={`/life/${lf.token_id}`} className="petri-tile-link" aria-label={`Bacteria ${id} — ${STATE_WORD[state]}`}>
+        <div className="petri-dish">
+          <div className="petri-render">
+            <Creature
+              rows={lf.current_state}
+              age={ageToScale(lf.age)}
+              bg={rp?.bg}
+              cell={rp?.cell}
+              speed={rp?.speed}
+              variant={lf.is_dead ? "dead" : "living"}
+              animate={!lf.is_dead}
+              res={440}
+              ariaLabel={`bacteria ${id}`}
+            />
+          </div>
+        </div>
+        <div className="petri-meta">
+          <span className="petri-dot" />
+          <span className="petri-state">{STATE_WORD[state]}</span>
+          <span className="petri-id mono">{id}</span>
+        </div>
+      </Link>
+      {!lf.is_dead && (
+        <div className="petri-hover-breathe">
+          <BreatheControl
+            compact
+            cap={cap}
+            connected={!!address}
+            onSepolia={onSepolia}
+            onConnect={connect}
+            onSwitch={switchToSepolia}
+            onExhale={(n) => breathe(tokenIdDecimal(lf.token_id), n)}
           />
         </div>
-      </div>
-      <div className="petri-meta">
-        <span className="petri-dot" />
-        <span className="petri-state">{STATE_WORD[state]}</span>
-        <span className="petri-id mono">{id}</span>
-      </div>
-    </Link>
+      )}
+    </div>
   );
 }
 
