@@ -18,6 +18,31 @@
 
 ---
 
+## 2026-07-24 (8) — on-chain token_uri gas probe: attempted, then shipped on evidence
+- **Goal:** confirm on-chain that the new `token_uri` (image + RUN_CAP=16, ~64–87M L2) survives the
+  canonical Sepolia node's `starknet_call` budget before upgrading the live classes.
+- **Branch:** `new_design`.
+- **Did:** read the live `token_uri` on `sepolia.nodes.starknet.org` — the OLD image-less metadata
+  returns fine (baseline). Built a throwaway probe contract (view fns calling the new `token_uri` on
+  representative states) to measure the new path on-chain. Hit two blockers and stopped short:
+  1. **strkd can't recover the funded `gol-bench` deployer.** Re-pairing gave a fresh empty client;
+     account derivation is forward-only (`createAgentAccount` → index 11, unfunded) with no
+     derive-by-index / import-by-address / recover method. Reported via STRKD-FEEDBACK (relayed to
+     Henri). Funded a fresh account (`0x073376…ec39`, ~1 STRK left) instead.
+  2. **Declaring the probe class costs ~1.03B L2 gas (~47 STRK at current Sepolia prices)** —
+     node-confirmed (`actual used: 1031526945`), NOT a strkd quirk; declare gas scales with the
+     class's Sierra size (~7.4k felts). Funding ~50 STRK for a throwaway wasn't worth it.
+- **Decision:** ship on evidence. RUN_CAP=16 caps `token_uri` at ~64–87M, comfortably under the
+  ~162M known-fail line (deployed 38.6M works), so the view call is very likely safe; on-chain
+  confirmation is deferred to the real upgrade. Probe removed (never committed).
+- **⚠️ Deploy-cost finding (for the real upgrade):** re-declaring the image-updated BACT + WNDR
+  classes — LARGER than the probe — will cost **≥ ~1B L2 gas each to DECLARE** (~50+ STRK/class at
+  current Sepolia l2 prices). Budget for it. This is a declare-fee concern, separate from the
+  (still-inferred-safe) ~87M view-call gas.
+- **Next:** at upgrade time, fund the deployer for the re-declares, then in-place upgrade BACT + WNDR
+  (reversible) and confirm `token_uri` via a node `starknet_call` — that IS the definitive view-gas
+  test. Consider raising RUN_CAP once the node's real view budget is measured.
+
 ## 2026-07-24 (7) — docs: how to display lifeforms safely (integration guide)
 - **Goal:** document how a third-party surface (wallet, explorer, marketplace) should read the
   on-chain metadata and render each visual field **safely** — the companion to LOG (6)'s dual-field

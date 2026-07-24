@@ -42,9 +42,11 @@
 > ~2.11B and would revert). **⚠️ Deploy gate:** the node view-call budget is a window — 38.6M works,
 > ~162M reverts — and the image sits at ~64–87M INSIDE it, so token_uri must be confirmed with a real
 > `starknet_call` on the target Sepolia RPC before upgrading; raise RUN_CAP if there's headroom, or
-> optimise the SVG further (raw-SVG / cheaper base64) if the node caps below ~90M. Code-complete on
-> `new_design`; NOT yet deployed — the live v2/v3 classes carry the old image-less metadata until
-> upgraded. See LOG 2026-07-24 (6).
+> optimise the SVG further (raw-SVG / cheaper base64) if the node caps below ~90M. **Deploy cost:**
+> re-declaring the (larger) BACT/WNDR classes runs ~1B+ L2 gas each to DECLARE (~50+ STRK/class at
+> current Sepolia l2 prices — node-confirmed via a probe, LOG 2026-07-24 (8)); budget for it. That is
+> a declare-fee concern, separate from the ~87M view-call gas. Code-complete on `new_design`; NOT yet
+> deployed — the live v2/v3 classes carry the old image-less metadata until upgraded. See LOG (6)/(8).
 
 ---
 
