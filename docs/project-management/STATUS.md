@@ -3,7 +3,7 @@
 > Snapshot of where the project stands. Keep this short and current — rewrite it each session.
 > History lives in [LOG.md](LOG.md); the plan lives in [ROADMAP.md](ROADMAP.md).
 
-**Last updated:** 2026-07-10
+**Last updated:** 2026-07-24
 **Framing:** WIP **art piece**, not a commercial product — the outcome is burning gas and creating art.
 **Active branch:** `new_design` — website design overhaul in progress. Done so far: the Garden
 home (living gallery — newest-first walls, no lens toggle; the big "creature of the moment" is a
@@ -21,7 +21,7 @@ cap = wallet's deepest breath), caretaker pack; Wanderers play out their journey
 Site renamed **petri** (loop/wanderer collections keep their names). See LOG 2026-07-09/07-10.
 `main` remains the shipped trunk. ⚠️ `new_design` not yet QA'd with a connected wallet
 (set-free mint, hatch, breathe/pet/daycare) and not yet pushed/merged.
-**Build/test:** `scarb build` ✅ · `snforge test` ✅ (91) · `cargo test -p gol-sdk` ✅ (43) · `next build` ✅
+**Build/test:** `scarb build` ✅ · `snforge test` ✅ (101, +11 ignored benches) · `cargo test -p gol-sdk` ✅ (43) · `next build` ✅
 **Live site:** https://gol-starknet.vercel.app — Vercel git integration auto-deploys every push to `main` (verified current 2026-07-06)
 **Tx tooling:** all on-chain transactions via **strkd** — pair with `kind:"agent"`; never sncast/raw keys
 
@@ -40,6 +40,15 @@ Site renamed **petri** (loop/wanderer collections keep their names). See LOG 202
   /create → v3 mint click-through, /leaderboards eyeballing, tiled phase-segment mint on-chain.
 - **v2** (and v1) remain deployed but superseded — [v2-deployment.md](../v2-deployment.md); the v2
   symmetry challenge-burn stays live there for its collection.
+- **On-chain render (`gol_metadata_v2`, shared by v2 + v3):** `token_uri` now emits a static `image`
+  (run-length SVG snapshot of the current generation) alongside the interactive `animation_url`, so
+  key-holding wallets — which read only `image` and won't execute the HTML — render a real preview
+  instead of a placeholder. A run-count cap (RUN_CAP=16) falls back to a fixed glider emblem so
+  token_uri is revert-proof + uniform-cost (**~64–87M L2 for ANY state**, same bench basis as the
+  deployed 38.6M). Code-complete on `new_design`. **NOT yet deployed** — and the gating check is a
+  real `starknet_call` on the target Sepolia RPC: the budget is a window (38.6M works, ~162M reverts)
+  and the image sits at ~64–87M INSIDE it. See [v2-grid-redesign.md](../v2-grid-redesign.md) + LOG
+  2026-07-24 (6).
 - **Frontend** (`ui/game-of-life`): garden, `/create` editor, incubator, `/leaderboards` (4 boards,
   data live-verified; ⚠️ page not yet eyeballed in a browser) — [frontend.md](../frontend.md).
   **FR temporarily disabled (2026-07-09):** site is English-only, toggle removed; all `{ fr, en }`
@@ -62,3 +71,7 @@ confirmed by Henri (long wanderer minted). 99 Cairo + 43 SDK tests.
    loop, Seed Grant (check SNF conflict-of-interest).
 3. Exercise the tiled phase-segment loop mint on-chain; genesis reseed whenever Henri wants.
 4. Pre-mainnet checklist: external audit, governance hardening (immutability endgame).
+5. Ship the `gol_metadata_v2` `image` upgrade: FIRST confirm `token_uri` survives a real
+   `starknet_call` on the target Sepolia RPC (budget window 38.6M–162M; image is ~64–87M), tune
+   RUN_CAP up if there's headroom, then upgrade the live v2/v3 lifeforms + wanderers classes so
+   minted NFTs render in wallets.

@@ -28,6 +28,23 @@
 > **Deferred check (TODO):** open a minted lifeform's `animation_url` (decoded `data:text/html`) in
 > a real browser to confirm the canvas render + animation look right. The grid/Conway logic is
 > node-verified (bit convention, blinker period-2, toroidal wrap); the visual hasn't been eyeballed.
+>
+> **Update (2026-07-24) — static `image` re-added alongside `animation_url` (supersedes "No SVG / no
+> `image` field").** A wallet-integration test showed key-holding wallets read only `image` and can't
+> safely execute `animation_url` (untrusted on-chain HTML/JS), so they render a placeholder.
+> `gol_metadata_v2::token_uri` now emits BOTH: a static `data:image/svg+xml` snapshot of the current
+> generation (`image`, the universal preview/fallback) + the interactive `animation_url` (still the
+> canonical piece). The SVG uses **run-length `<rect>`s** (one per horizontal run of live cells, not
+> per cell) so clustered grids stay cheap, plus a **run-count cap (RUN_CAP=16)** that falls back to a
+> fixed glider emblem (in the token's colours) for busier states — so `token_uri` is revert-proof and
+> roughly uniform-cost for ANY state. Measured (snforge L2 gas, SAME basis as the deployed 38.6M, full
+> `token_uri`): sparse 64M, in-full ceiling 84M, over-cap fallback 87M (a naive per-cell SVG was
+> ~2.11B and would revert). **⚠️ Deploy gate:** the node view-call budget is a window — 38.6M works,
+> ~162M reverts — and the image sits at ~64–87M INSIDE it, so token_uri must be confirmed with a real
+> `starknet_call` on the target Sepolia RPC before upgrading; raise RUN_CAP if there's headroom, or
+> optimise the SVG further (raw-SVG / cheaper base64) if the node caps below ~90M. Code-complete on
+> `new_design`; NOT yet deployed — the live v2/v3 classes carry the old image-less metadata until
+> upgraded. See LOG 2026-07-24 (6).
 
 ---
 

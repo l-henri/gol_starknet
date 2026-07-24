@@ -18,6 +18,46 @@
 
 ---
 
+## 2026-07-24 (6) — v2 metadata: static SVG `image` re-added (run-length), gas-measured
+- **Goal:** a wallet couldn't show GoL NFTs — `gol_metadata_v2` emits only `animation_url` (untrusted
+  on-chain HTML/JS the wallet won't execute), so it fell back to a placeholder. Re-add a static
+  `image` (the standard dual-field NFT pattern) without reintroducing the density blow-up that made
+  v2 drop SVG in the first place.
+- **Branch:** `new_design` · **Commits:** metadata + this doc trail, committed this session. NOTE:
+  the metadata work was first accidentally swept into a parallel UI commit (`860ad90`) by a broad
+  `git add` in another session; history was split so the UI work (now `179d474`) and this metadata
+  work are separate commits. LOG (4)/(5)'s "uncommitted WIP" are now `46371c3` / `179d474`.
+- **Changed (`src/gol_metadata_v2.cairo`):** new `render_svg(state, bg, cell)` — unpacks the 41×41
+  `GridState` with the EXACT `render_html` bit convention (row r, bit c = cell at x=c,y=r), emits
+  **run-length `<rect>`s** (one per horizontal run of live cells) inside a single `<g fill>`, unit
+  cells in a `0 0 41 41` viewBox, colours as `#RRGGBB`. `token_uri` now emits `image`
+  (`data:image/svg+xml;base64`) + `animation_url`; `build_metadata_json` gained an `image` param
+  (internal only — the `token_uri`/`derive_params` signatures every contract uses are unchanged).
+- **Verified:** `scarb build` ✅; `snforge test` ✅ **101 passed, 11 ignored**. New tests: SVG places
+  live cells at the right coords (runs + isolated cells + gaps); over-cap states fall back to the
+  emblem while real creatures render in full. Gas benches (snforge L2 gas — SAME basis as the deployed
+  38.6M — full `token_uri`): **sparse 64.1M, in-full ceiling (15 runs) 83.6M, over-cap fallback
+  86.9M** → token_uri is now uniformly ~64–87M for ANY state. (A naive per-cell SVG was ~2.11B on a
+  solid grid and would revert; run-length + the cap fix it.) NOT deployed to Sepolia.
+- **⚠️ Calibration caveat:** the node view-call budget is a WINDOW — 38.6M (deployed, node-verified)
+  works, ~162M reverts (v2-deployment.md). The image lifts token_uri to ~64–87M, INSIDE that window,
+  so viability must be confirmed with a real `starknet_call` on the target Sepolia RPC before deploy.
+  If that node caps below ~90M, the image needs more base64 optimisation (or raw-SVG) or a lower cap.
+- **Decisions:** run-length over per-cell to keep clustered creatures cheap and bound `token_uri`.
+  **Run-count cap (RUN_CAP=16) with a generic glider-emblem fallback** (Henri's call): over the cap,
+  render_svg returns a fixed emblem in the token's colours so token_uri is revert-proof and roughly
+  uniform-cost; set LOW because the view budget is tight, so only simple creatures render in full
+  (busier ones show the emblem until the cap is raised post-calibration). SVG (and HTML) stay base64
+  inside the raw-JSON `data:` URI (the `#` in colours would truncate a raw data URI). `image` = static
+  current-generation snapshot / fallback; `animation_url` stays the canonical piece. Wallet-side, the
+  rich view is safe only in a cross-origin `sandbox="allow-scripts"` iframe (the app already does
+  this) — the `image` is what makes third-party wallets work without that.
+- **Next:** confirm token_uri survives a real `starknet_call` on the target Sepolia RPC (the gating
+  step — see the calibration caveat); tune RUN_CAP up if there's headroom. Then upgrade the deployed
+  v2/v3 lifeforms + wanderers classes (all call `gol_metadata_v2::token_uri`) so live NFTs gain the
+  `image`.
+- **Blockers:** none for the code; deployment gated on Henri's go + the cap decision.
+
 ## 2026-07-24 (5) — rhythmic tap on the Ward pet button too
 - **Goal:** Henri: use the rhythmic-tap breathe on `/pets` ward cards (replacing the single "Pet"/
   "Adopt again" button).
