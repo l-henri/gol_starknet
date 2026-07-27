@@ -114,6 +114,163 @@ impl RpcReader {
             .expect("non-revert path always returns Some"))
     }
 
+    /// Many `starknet_call`s in ONE JSON-RPC batch — a single HTTP round-trip for N reads. `out[i]`
+    /// is the result of `calls[i]` (`(to, selector, calldata)`), or `None` when that call reverted
+    /// (`CONTRACT_ERROR`). The node may return the array out of order, so results are placed by `id`.
+    pub async fn call_batch(
+        &self,
+        calls: &[(Felt, Felt, Vec<Felt>)],
+    ) -> Result<Vec<Option<Vec<Felt>>>, GolError> {
+        if calls.is_empty() {
+            return Ok(Vec::new());
+        }
+        let batch: Vec<Value> = calls
+            .iter()
+            .enumerate()
+            .map(|(i, (to, sel, cd))| {
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": i,
+                    "method": "starknet_call",
+                    "params": [{
+                        "contract_address": felt_hex(to),
+                        "entry_point_selector": felt_hex(sel),
+                        "calldata": cd.iter().map(felt_hex).collect::<Vec<_>>(),
+                    }, "latest"],
+                })
+            })
+            .collect();
+
+        let resp: Value = self
+            .http
+            .post(&self.rpc_url)
+            .json(&batch)
+            .send()
+            .await
+            .map_err(|e| GolError::Read(e.to_string()))?
+            .json()
+            .await
+            .map_err(|e| GolError::Read(e.to_string()))?;
+
+        let arr = resp
+            .as_array()
+            .ok_or_else(|| GolError::Read("batch response is not an array".into()))?;
+        let mut out: Vec<Option<Vec<Felt>>> = vec![None; calls.len()];
+        for item in arr {
+            let id = item
+                .get("id")
+                .and_then(Value::as_u64)
+                .ok_or_else(|| GolError::Read("batch item missing id".into()))? as usize;
+            if id >= out.len() {
+                continue;
+            }
+            if let Some(err) = item.get("error") {
+                let code = err.get("code").and_then(Value::as_i64).unwrap_or_default();
+                if code == CONTRACT_ERROR {
+                    continue; // reverted -> leave None
+                }
+                return Err(GolError::Read(format!("rpc error: {err}")));
+            }
+            let felts = item
+                .get("result")
+                .and_then(Value::as_array)
+                .ok_or_else(|| GolError::Read("batch item missing result".into()))?
+                .iter()
+                .map(|v| {
+                    let s = v
+                        .as_str()
+                        .ok_or_else(|| GolError::Encoding("non-string felt in batch result".into()))?;
+                    Felt::from_hex(s).map_err(|e| GolError::Encoding(e.to_string()))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            out[id] = Some(felts);
+        }
+        Ok(out)
+    }
+
+    /// Hydrate many lifeforms in ~2 HTTP round-trips (batched `owner_of`, then batched
+    /// `get_lifeform_data` for the minted ones), preserving input order. Replaces N sequential
+    /// `lifeform()` calls — the fix for the gallery's serialized loop wall.
+    pub async fn lifeforms_batch(&self, ids: &[U256]) -> Result<Vec<OwnedLifeform>, GolError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let addr = self.addr(ContractKey::Lifeforms)?;
+        let owners = self
+            .call_batch(
+                &ids.iter()
+                    .map(|id| (addr, selector("owner_of"), id.to_calldata().to_vec()))
+                    .collect::<Vec<_>>(),
+            )
+            .await?;
+        // Only minted ids (owner_of returned Some) get a data call.
+        let minted: Vec<usize> = owners
+            .iter()
+            .enumerate()
+            .filter_map(|(i, o)| o.as_ref().map(|_| i))
+            .collect();
+        let datas = self
+            .call_batch(
+                &minted
+                    .iter()
+                    .map(|&i| (addr, selector("get_lifeform_data"), ids[i].to_calldata().to_vec()))
+                    .collect::<Vec<_>>(),
+            )
+            .await?;
+        let mut out = Vec::with_capacity(minted.len());
+        for (k, &i) in minted.iter().enumerate() {
+            let owner = match owners[i].as_ref().and_then(|v| v.first()) {
+                Some(o) => *o,
+                None => continue,
+            };
+            if let Some(Some(felts)) = datas.get(k) {
+                out.push(OwnedLifeform { token_id: ids[i], owner, data: decode_lifeform(felts)? });
+            }
+        }
+        Ok(out)
+    }
+
+    /// Hydrate many PATH creatures in ~2 HTTP round-trips (batched `owner_of` on the path NFT, then
+    /// batched `get_path_data`). Burned/unminted ids (whose `owner_of` reverts) are dropped. Order
+    /// preserved.
+    pub async fn paths_batch(&self, ids: &[U256]) -> Result<Vec<OwnedPath>, GolError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let addr = self.addr(ContractKey::PathLifeforms)?;
+        let owners = self
+            .call_batch(
+                &ids.iter()
+                    .map(|id| (addr, selector("owner_of"), id.to_calldata().to_vec()))
+                    .collect::<Vec<_>>(),
+            )
+            .await?;
+        let minted: Vec<usize> = owners
+            .iter()
+            .enumerate()
+            .filter_map(|(i, o)| o.as_ref().map(|_| i))
+            .collect();
+        let datas = self
+            .call_batch(
+                &minted
+                    .iter()
+                    .map(|&i| (addr, selector("get_path_data"), ids[i].to_calldata().to_vec()))
+                    .collect::<Vec<_>>(),
+            )
+            .await?;
+        let mut out = Vec::with_capacity(minted.len());
+        for (k, &i) in minted.iter().enumerate() {
+            let owner = match owners[i].as_ref().and_then(|v| v.first()) {
+                Some(o) => *o,
+                None => continue,
+            };
+            if let Some(Some(felts)) = datas.get(k) {
+                out.push(OwnedPath { token_id: ids[i], owner, data: decode_path_form(felts)? });
+            }
+        }
+        Ok(out)
+    }
+
     /// Raw `starknet_getEvents` page. Returns parsed events + the continuation token (`None` when
     /// the scan is exhausted). `keys` is the positional key filter, e.g. `[[selector], [], [to]]`
     /// (an empty inner vec is a wildcard for that key position).

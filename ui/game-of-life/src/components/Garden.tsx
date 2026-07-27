@@ -46,22 +46,15 @@ export default function Garden() {
     return () => { cancelled = true; };
   }, [sdk]);
 
-  // The wanderers (Digital Wanderers) — ids are fast; hydrate each, dropping burned ones, keeping order.
+  // The wanderers (Digital Wanderers) — one batched scan + hydrate (owner + state in ~2 round-trips),
+  // burned paths already dropped, newest first.
   useEffect(() => {
     if (!sdk) return;
     let cancelled = false;
-    (async () => {
-      try {
-        const ids = ((await sdk.recentPathTokenIds(SCAN)) as string[]) ?? [];
-        const slots = new Array<JsPath | null>(ids.length).fill(null);
-        await runPool(ids, 8, async (id, i) => {
-          slots[i] = (await sdk.pathLifeform(id).catch(() => null)) as JsPath | null;
-        });
-        if (!cancelled) setPaths(slots.filter((p): p is JsPath => p !== null));
-      } catch {
-        if (!cancelled) setPaths([]);
-      }
-    })();
+    sdk
+      .recentPaths(SCAN)
+      .then((r) => { if (!cancelled) setPaths((r as JsPath[]) ?? []); })
+      .catch(() => { if (!cancelled) setPaths([]); });
     return () => { cancelled = true; };
   }, [sdk]);
 

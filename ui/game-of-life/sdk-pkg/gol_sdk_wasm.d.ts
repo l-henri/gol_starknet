@@ -141,6 +141,12 @@ export class GolSdk {
      */
     recentPathTokenIds(limit: number): Promise<any>;
     /**
+     * Every minted PATH creature (newest first), capped at `limit` (0 = unlimited), hydrated in ~2
+     * batched round-trips (owner + state). The batched counterpart to `recentPathTokenIds` + per-id
+     * `pathLifeform`; burned paths are already dropped.
+     */
+    recentPaths(limit: number): Promise<any>;
+    /**
      * Token ids ("0x…") of recent mints, newest first — the FAST event scan only (no per-token
      * reads). For progressive UIs: get the ids, then hydrate each via `lifeform()` as it renders.
      */
@@ -221,6 +227,7 @@ export interface InitOutput {
     readonly golsdk_recentMints: (a: number) => any;
     readonly golsdk_recentPathMints: (a: number) => any;
     readonly golsdk_recentPathTokenIds: (a: number, b: number) => any;
+    readonly golsdk_recentPaths: (a: number, b: number) => any;
     readonly golsdk_recentTokenIds: (a: number, b: number) => any;
     readonly golsdk_renderParams: (a: number, b: number, c: number) => any;
     readonly golsdk_setPathRenderParamsCall: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];

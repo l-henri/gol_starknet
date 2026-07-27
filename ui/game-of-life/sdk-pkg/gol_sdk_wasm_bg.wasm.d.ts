@@ -30,6 +30,7 @@ export const golsdk_recentLifeforms: (a: number, b: number) => any;
 export const golsdk_recentMints: (a: number) => any;
 export const golsdk_recentPathMints: (a: number) => any;
 export const golsdk_recentPathTokenIds: (a: number, b: number) => any;
+export const golsdk_recentPaths: (a: number, b: number) => any;
 export const golsdk_recentTokenIds: (a: number, b: number) => any;
 export const golsdk_renderParams: (a: number, b: number, c: number) => any;
 export const golsdk_setPathRenderParamsCall: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];

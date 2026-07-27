@@ -12,7 +12,7 @@ use crate::datasource::{confirm_owned, dedupe, DataSource, MoveEvent};
 use crate::encoding::selector;
 use crate::error::GolError;
 use crate::rpc::{RawEvent, RpcReader};
-use crate::types::{felt_to_u128, Felt, OwnedLifeform, U256};
+use crate::types::{felt_to_u128, Felt, OwnedLifeform, OwnedPath, U256};
 
 pub struct EventScanDataSource {
     reader: RpcReader,
@@ -155,18 +155,19 @@ impl EventScanDataSource {
         Ok(out)
     }
 
-    /// Every minted lifeform, most-recent first, each confirmed live via the RPC reader (owner/state
-    /// current even after later transfers). Convenience over [`Self::recent_token_ids`] + hydration.
+    /// Every minted lifeform, most-recent first, each confirmed live (current owner + state).
+    /// Hydrates via ONE batched `owner_of` + one batched `get_lifeform_data` (~2 HTTP round-trips
+    /// total) instead of N sequential per-token reads — the fix for the serialized gallery loop wall.
     pub async fn recent_lifeforms(&self, limit: u32) -> Result<Vec<OwnedLifeform>, GolError> {
-        use crate::reader::Reader;
         let ids = self.recent_token_ids(limit).await?;
-        let mut out = Vec::with_capacity(ids.len());
-        for tid in ids {
-            if let Some(lf) = self.reader.lifeform(tid).await? {
-                out.push(lf);
-            }
-        }
-        Ok(out)
+        self.reader.lifeforms_batch(&ids).await
+    }
+
+    /// Every minted PATH creature, most-recent first, hydrated in ~2 batched round-trips. Burned
+    /// paths are dropped (their `owner_of` reverts). The batched counterpart to per-id `pathLifeform`.
+    pub async fn recent_paths(&self, limit: u32) -> Result<Vec<OwnedPath>, GolError> {
+        let ids = self.recent_path_token_ids(limit).await?;
+        self.reader.paths_batch(&ids).await
     }
 
     /// Page through every matching event, following the continuation token.

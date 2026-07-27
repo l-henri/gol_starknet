@@ -442,6 +442,17 @@ export class GolSdk {
         return ret;
     }
     /**
+     * Every minted PATH creature (newest first), capped at `limit` (0 = unlimited), hydrated in ~2
+     * batched round-trips (owner + state). The batched counterpart to `recentPathTokenIds` + per-id
+     * `pathLifeform`; burned paths are already dropped.
+     * @param {number} limit
+     * @returns {Promise<any>}
+     */
+    recentPaths(limit) {
+        const ret = wasm.golsdk_recentPaths(this.__wbg_ptr, limit);
+        return ret;
+    }
+    /**
      * Token ids ("0x…") of recent mints, newest first — the FAST event scan only (no per-token
      * reads). For progressive UIs: get the ids, then hydrate each via `lifeform()` as it renders.
      * @param {number} limit
@@ -865,12 +876,12 @@ function __wbg_get_imports() {
             return ret;
         },
         __wbindgen_cast_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 284, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 288, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__h74bcc3753d680b42);
             return ret;
         },
         __wbindgen_cast_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [], shim_idx: 256, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [], shim_idx: 260, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__hc0e1ada004448962);
             return ret;
         },

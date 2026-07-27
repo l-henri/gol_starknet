@@ -177,6 +177,20 @@ impl GolSdk {
         to_js(&js)
     }
 
+    /// Every minted PATH creature (newest first), capped at `limit` (0 = unlimited), hydrated in ~2
+    /// batched round-trips (owner + state). The batched counterpart to `recentPathTokenIds` + per-id
+    /// `pathLifeform`; burned paths are already dropped.
+    #[wasm_bindgen(js_name = recentPaths)]
+    pub async fn recent_paths(&self, limit: u32) -> Result<JsValue, JsValue> {
+        let ds = EventScanDataSource::new(
+            self.client.config.rpc_url.clone(),
+            self.client.config.addresses.clone(),
+        );
+        let recent = ds.recent_paths(limit).await.map_err(err)?;
+        let js: Vec<JsPath> = recent.iter().map(JsPath::of).collect();
+        to_js(&js)
+    }
+
     /// Token ids ("0x…") of recent mints, newest first — the FAST event scan only (no per-token
     /// reads). For progressive UIs: get the ids, then hydrate each via `lifeform()` as it renders.
     #[wasm_bindgen(js_name = recentTokenIds)]
