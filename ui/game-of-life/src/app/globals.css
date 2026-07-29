@@ -168,6 +168,8 @@ canvas.creature { display: block; width: 100%; height: 100%; }
 }
 .tb-link:hover { color: var(--ink-dim); }
 .tb-link.active { color: #f2f2f5; }
+/* WHY — the manifesto: quieter than the rest when inactive; still lit when it's the active section */
+.tb-link.tb-why:not(.active) { color: #4a4a56; }
 
 /* right — living census, wallet, hungry-ward tell */
 .tb-right { display: flex; align-items: center; gap: 14px; flex: none; margin-left: auto; }
@@ -717,6 +719,9 @@ a.record-row.top1:hover { background: rgba(34, 197, 94, 0.08); }
   font-size: clamp(1.55rem, 3.8vw, 2.5rem); line-height: 1.22; letter-spacing: -0.015em;
   font-weight: 500; color: var(--ink); max-width: 22ch; margin: 0.55em 0 0;
 }
+/* a quiet doorway to the manifesto — never competes with the care loop */
+.thesis-why { display: inline-block; margin-top: 1em; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.06em; color: var(--ink-faint); text-decoration: none; transition: color var(--dur) var(--ease-quiet); }
+.thesis-why:hover { color: var(--ink-dim); }
 .petri-lead .invite {
   display: inline-flex; align-items: center; gap: 0.5em; margin-top: 1.5em;
   font-family: var(--mono); font-size: 0.86rem; color: var(--ink-dim);
@@ -838,3 +843,20 @@ a.board-row:hover { border-color: var(--accent); background: var(--bg-dish-raise
 .board-thumb canvas { width: 100%; height: 100%; display: block; }
 .board-what { font-size: 0.92rem; color: var(--ink-dim); }
 .board-what strong { color: var(--ink); font-weight: 600; }
+
+/* ---- /why — the manifesto: a reading surface, one narrow column ---- */
+.why-essay { max-width: 640px; margin: clamp(28px, 6vw, 72px) auto clamp(64px, 10vw, 120px); font-family: var(--font-reading), ui-sans-serif, system-ui, sans-serif; }
+.why-essay .eyebrow { display: block; margin-bottom: 1.5em; }
+.why-title { font-family: var(--font-reading), ui-sans-serif, system-ui, sans-serif; font-size: clamp(1.5rem, 3.2vw, 1.95rem); line-height: 1.3; font-weight: 500; letter-spacing: -0.01em; color: var(--ink); margin: 0 0 1.7em; }
+.why-essay p { font-size: 18px; line-height: 1.8; color: #d4d4dc; margin: 0 0 1.5em; }
+.why-essay em { font-style: italic; color: #e6e6ee; }
+.why-close { margin-top: 2.6em; }
+.why-invite { font-size: 18px; color: #4ade80; text-decoration: none; border-bottom: 1px solid rgba(74, 222, 128, 0.35); padding-bottom: 1px; }
+.why-invite:hover { border-bottom-color: #4ade80; }
+/* live sims — demonstrate the argument, don't decorate. Small, mono-captioned, space around them. */
+.why-sim { margin: 2.6em auto; text-align: center; }
+.why-sim-grid { width: 200px; max-width: 62%; margin: 0 auto; aspect-ratio: 1 / 1; border-radius: 8px; overflow: hidden; background: #070709; }
+.why-sim-grid canvas { display: block; width: 100%; height: 100%; }
+.why-sim-cap { margin-top: 0.9em; font-size: 0.72rem; letter-spacing: 0.04em; color: var(--ink-faint); }
+.why-sim-pair { display: flex; gap: clamp(20px, 5vw, 44px); justify-content: center; flex-wrap: wrap; margin: 2.6em 0; }
+.why-sim-pair .why-sim { margin: 0; flex: 0 1 200px; }

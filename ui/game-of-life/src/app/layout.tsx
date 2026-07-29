@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, JetBrains_Mono, Press_Start_2P } from "next/font/google";
+import { Space_Grotesk, JetBrains_Mono, Press_Start_2P, Inter } from "next/font/google";
 import "./globals.css";
 import { GolSdkProvider } from "@/lib/sdk";
 import { WalletProvider } from "@/lib/wallet";
@@ -24,6 +24,12 @@ const arcade = Press_Start_2P({
   variable: "--font-arcade",
   weight: "400",
 });
+// Inter — the reading face for the /why manifesto (a quiet, legible essay column)
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-reading",
+  weight: ["400", "500"],
+});
 
 export const metadata: Metadata = {
   title: "petri — a garden of digital bacteria",
@@ -38,7 +44,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     // attribute-mismatch warning. This suppresses that warning ONE level deep on these two
     // elements only — genuine hydration mismatches anywhere else in the tree still surface.
     <html lang="en" suppressHydrationWarning>
-      <body className={`${grotesk.variable} ${mono.variable} ${arcade.variable}`} suppressHydrationWarning>
+      <body className={`${grotesk.variable} ${mono.variable} ${arcade.variable} ${inter.variable}`} suppressHydrationWarning>
         <LangProvider>
           <GolSdkProvider>
             <WalletProvider>

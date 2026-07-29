@@ -13,13 +13,15 @@ import type { JsLifeform } from "@/lib/types";
 // The quiet rim of the petri dish: always present, never loud. Green is chrome only (the heartbeat)
 // — never applied to creatures, which carry their own on-chain colours.
 
-type NavItem = { href: string; label: string; match: (p: string) => boolean };
+type NavItem = { href: string; label: string; match: (p: string) => boolean; dim?: boolean };
 const NAV: NavItem[] = [
   { href: "/", label: "Garden", match: (p) => p === "/" || p.startsWith("/life") },
   { href: "/create", label: "Create", match: (p) => p.startsWith("/create") },
   { href: "/incubator", label: "Incubator", match: (p) => p.startsWith("/incubator") },
   { href: "/pets", label: "Wards", match: (p) => p.startsWith("/pets") },
   { href: "/leaderboards", label: "Records", match: (p) => p.startsWith("/leaderboards") },
+  // the manifesto — sits last and quieter (present for the curious, never competing with care)
+  { href: "/why", label: "Why", match: (p) => p.startsWith("/why"), dim: true },
 ];
 
 const HUNGRY_DAYS = 2;
@@ -78,7 +80,7 @@ export default function GardenHeader() {
 
   const navLinks = (onClick?: () => void) =>
     NAV.map((n) => (
-      <Link key={n.href} href={n.href} onClick={onClick} className={"tb-link" + (n.match(pathname) ? " active" : "")}>
+      <Link key={n.href} href={n.href} onClick={onClick} className={"tb-link" + (n.match(pathname) ? " active" : "") + (n.dim ? " tb-why" : "")}>
         {n.label}
       </Link>
     ));
