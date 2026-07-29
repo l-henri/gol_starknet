@@ -61,8 +61,11 @@ pub mod GolWanderersV3 {
         }
         fn token_uri(self: @ContractState, token_id: u256) -> ByteArray {
             assert(self.erc721.exists(token_id), 'ERC721: invalid token ID');
-            gol_metadata_v2::token_uri(
-                token_id, self.lifeform_view(token_id), self.resolve_params(token_id),
+            gol_metadata_v2::token_uri_with_discoverer(
+                token_id,
+                self.lifeform_view(token_id),
+                self.resolve_params(token_id),
+                self.discoverer.read(token_id),
             )
         }
     }
@@ -70,8 +73,11 @@ pub mod GolWanderersV3 {
     impl ERC721MetadataCamelImpl of IERC721MetadataCamelOnly<ContractState> {
         fn tokenURI(self: @ContractState, tokenId: u256) -> ByteArray {
             assert(self.erc721.exists(tokenId), 'ERC721: invalid token ID');
-            gol_metadata_v2::token_uri(
-                tokenId, self.lifeform_view(tokenId), self.resolve_params(tokenId),
+            gol_metadata_v2::token_uri_with_discoverer(
+                tokenId,
+                self.lifeform_view(tokenId),
+                self.resolve_params(tokenId),
+                self.discoverer.read(tokenId),
             )
         }
     }
@@ -94,6 +100,9 @@ pub mod GolWanderersV3 {
         pub render_params: Map<u256, RenderParams>,
         pub next_nonce: u64,
         pub mint_nonce: Map<u256, u64>,
+        /// The human who discovered this wanderer (= mint's `minter`: the escrow payer, i.e. the
+        /// caller of the minter contract — not `recipient`). Zero = grandfathered.
+        pub discoverer: Map<u256, ContractAddress>,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -101,6 +110,8 @@ pub mod GolWanderersV3 {
         owner: ContractAddress,
         token_id: u256,
         path_data: PathFormData,
+        // Appended (indexers parse leading fields positionally): the discoverer/escrow payer.
+        discoverer: ContractAddress,
     }
     #[derive(Drop, starknet::Event)]
     struct WandererBurnedEvent {
@@ -189,11 +200,14 @@ pub mod GolWanderersV3 {
             let stored = PathFormData { minted_at: get_block_timestamp(), escrow, ..path_data };
             self.path_data.write(token_id, stored);
             self.canonical_state.write(token_id, canonical);
+            self.discoverer.write(token_id, minter);
             self.render_params.write(token_id, gol_metadata_v2::derive_params(token_id));
             self
                 .emit(
                     Event::NewWanderer(
-                        NewWandererEvent { owner: recipient, token_id, path_data: stored },
+                        NewWandererEvent {
+                            owner: recipient, token_id, path_data: stored, discoverer: minter,
+                        },
                     ),
                 );
             self.total_supply.write(self.total_supply.read() + 1);
@@ -213,6 +227,10 @@ pub mod GolWanderersV3 {
 
         fn get_mint_nonce(self: @ContractState, token_id: u256) -> u64 {
             self.mint_nonce.read(token_id)
+        }
+
+        fn get_discoverer(self: @ContractState, token_id: u256) -> ContractAddress {
+            self.discoverer.read(token_id)
         }
 
         fn get_grid_size(self: @ContractState) -> u32 {

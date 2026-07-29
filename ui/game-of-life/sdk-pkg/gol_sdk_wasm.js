@@ -125,6 +125,18 @@ export class GolSdk {
         return takeFromExternrefTable0(ret[0]);
     }
     /**
+     * The loop creature's discoverer (the mint's escrow payer) as a hex address, or `null`
+     * (unminted, grandfathered pre-field mint, or the deployed class predates the entrypoint).
+     * @param {string} token_id
+     * @returns {Promise<any>}
+     */
+    discoverer(token_id) {
+        const ptr0 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.golsdk_discoverer(this.__wbg_ptr, ptr0, len0);
+        return ret;
+    }
+    /**
      * The v3 FAMILY token id for a drawn pattern — the id it would mint under (loops: pass the
      * period; paths/wanderers: pass 0). Use to detect "this creature already lives" before the
      * wallet ever opens: `lifeform(familyTokenId(...))` non-null ⇒ duplicate.
@@ -253,6 +265,17 @@ export class GolSdk {
         const ptr0 = passStringToWasm0(address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
         const ret = wasm.golsdk_ownedLifeforms(this.__wbg_ptr, ptr0, len0);
+        return ret;
+    }
+    /**
+     * The wanderer's discoverer as a hex address, or `null` — same semantics as `discoverer`.
+     * @param {string} token_id
+     * @returns {Promise<any>}
+     */
+    pathDiscoverer(token_id) {
+        const ptr0 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.golsdk_pathDiscoverer(this.__wbg_ptr, ptr0, len0);
         return ret;
     }
     /**
@@ -876,12 +899,12 @@ function __wbg_get_imports() {
             return ret;
         },
         __wbindgen_cast_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 288, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 296, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__h74bcc3753d680b42);
             return ret;
         },
         __wbindgen_cast_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [], shim_idx: 260, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [], shim_idx: 268, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__hc0e1ada004448962);
             return ret;
         },

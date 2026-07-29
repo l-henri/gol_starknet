@@ -455,6 +455,32 @@ impl Reader for RpcReader {
         Ok(r.and_then(|v| v.into_iter().next()))
     }
 
+    async fn discoverer(&self, token_id: U256) -> Result<Option<Felt>, GolError> {
+        let r = self
+            .call_inner(
+                self.addr(ContractKey::Lifeforms)?,
+                selector("get_discoverer"),
+                &token_id.to_calldata(),
+                true,
+            )
+            .await?;
+        // Zero = grandfathered (pre-field mint) — reported as "no discoverer", like a revert on
+        // a class that predates the entrypoint.
+        Ok(r.and_then(|v| v.into_iter().next()).filter(|f| *f != Felt::ZERO))
+    }
+
+    async fn path_discoverer(&self, token_id: U256) -> Result<Option<Felt>, GolError> {
+        let r = self
+            .call_inner(
+                self.addr(ContractKey::PathLifeforms)?,
+                selector("get_discoverer"),
+                &token_id.to_calldata(),
+                true,
+            )
+            .await?;
+        Ok(r.and_then(|v| v.into_iter().next()).filter(|f| *f != Felt::ZERO))
+    }
+
     async fn nut_balance(&self, account: Felt) -> Result<U256, GolError> {
         let r = self
             .call_raw(self.addr(ContractKey::Nutrient)?, selector("balance_of"), &[account])

@@ -18,7 +18,69 @@
 
 ---
 
-## 2026-07-24 (8) — on-chain token_uri gas probe: attempted, then shipped on evidence
+## 2026-07-29 (2) — empty-grid genesis at deploy + "Discovered by" surfaced end-to-end
+- **Goal:** (a) the empty grid ("token 0") isn't mintable from the website (you can't draw
+  nothing) — mint it in the `GolLifeformsV3` CONSTRUCTOR to the deployer; (b) surface the new
+  `discoverer` field in token metadata and on `/life/[id]`.
+- **Branch:** `perf/garden-batching` · **Commits:** `feat(v3,sdk,ui): mint-time provenance + empty-grid genesis` (one commit for both 07-29 entries).
+- **Changed:**
+  - **Genesis:** the constructor now mints the empty grid to `creator`: period-1 still/dead loop,
+    drawn == canonical == empty, nonce 1 (user mints start at 2), `minted_at`/`discoverer`
+    stamped, **escrow 0** (no NUT can exist at deploy; the empty grid is the global lex-minimum,
+    so `prove_malformed` can never fire — regression-tested). NOTE: constructors do NOT run on
+    upgrades, so live Sepolia won't gain this via class upgrade — it's a fresh-deploy (mainnet)
+    feature. On Sepolia the empty grid remains mintable by calling `mint_loop` directly
+    (`is_single_loop(empty, 1)` holds); on mainnet genesis-at-deploy guarantees the deployer gets
+    the vacuum rather than a sniper.
+  - **Metadata:** `gol_metadata_v2` gains `token_uri_with_discoverer` (+ an `address_to_hex`
+    helper); a non-zero discoverer appends a `"Discovered by"` attribute (hex address). The 3-arg
+    `token_uri` stays as a zero-discoverer wrapper so v2 contracts are untouched. Both v3 NFTs
+    call the new fn with their stored discoverer.
+  - **SDK:** `Reader::discoverer` / `path_discoverer` (`get_discoverer`, revert-tolerant —
+    returns `None` for unminted/grandfathered-zero/pre-upgrade classes) + WASM `discoverer` /
+    `pathDiscoverer` (hex or null).
+  - **UI:** `/life/[id]` shows a copyable "discovered by" row (loop + wanderer views), hidden
+    when the SDK returns null.
+- **Verified:** `scarb build` ✅ · `snforge test` ✅ (103 passed — +2 genesis tests; nonce/balance
+  assertions updated for genesis) · `cargo test -p gol-sdk` ✅ (43) · wasm-pack build ✅ ·
+  `next build` ✅. NOT verified: live Sepolia behavior (classes not upgraded; discoverer row
+  correctly stays hidden there by design until the upgrade ships).
+- **Next:** upgrade the Sepolia v3 classes (lifeforms + wanderers) so discoverer starts
+  accruing, or fold that into the pending `gol_metadata_v2` image upgrade (same classes).
+
+## 2026-07-29 — pre-mainnet irreversibility review + loops get `minted_at` + `discoverer`
+- **Goal:** review what must be in the contracts before mainnet because it can't be added later;
+  fix the first findings: loops don't record their mint timestamp (wanderers do, via
+  `PathFormData.minted_at`), and neither NFT records WHO discovered a creature.
+- **Branch:** `perf/garden-batching` · **Commits:** same commit as the (2) entry above.
+- **Changed:**
+  - `GolLifeformsV3` now stamps `minted_at` (block timestamp) at mint, in its own
+    `Map<u256, u64>` + `get_minted_at` getter (`interfaces_v3.cairo`). Own map, NOT a new
+    `LifeFormData` field: the struct is shared with deployed v2 contracts, and appending to it
+    would churn every minter/metadata ABI; a side map is storage-append-safe for an in-place
+    Sepolia upgrade. Convention: `0` = grandfathered (minted before the field existed), same as
+    `mint_nonce` 0. Data is mint-time-only — it cannot be backfilled, hence "before mainnet".
+  - BOTH v3 NFTs (lifeforms + wanderers) now stamp `discoverer` — permanent artist attribution =
+    the mint's `minter` param (the escrow payer: the human caller of the minter contract, not the
+    recipient, which may be a gift target). No minter ABI change needed (they already pass
+    `get_caller_address()`). `Map<u256, ContractAddress>` + `get_discoverer` (zero address =
+    grandfathered), and `discoverer` APPENDED to `NewLifeFormEvent`/`NewWandererEvent` — safe:
+    the SDK reads mints from ERC-721 `Transfer` events and parses others by leading positional
+    fields with `>=`-length guards.
+- **Verified:** `scarb build` ✅ · `snforge test` ✅ (101 passed, 11 ignored; mint tests assert
+  both stamps, timestamp via cheatcode) · `cargo test -p gol-sdk` ✅ (43 — no event-shape coupling).
+- **Decisions (review findings, not yet implemented):** the mainnet one-way doors are (1) the
+  identity scheme (Poseidon/orbit-canonical/N=41/packing/`lt` ordering) frozen at first mint;
+  (2) event schemas + mint-time fields (can't backfill); (3) the un-upgradeable minters holding
+  the partial-path registry (replacing a minter strands in-flight mints); (4) the immutability
+  endgame's role topology — `upgrade()` and MINTER_ROLE-granting are BOTH behind
+  `DEFAULT_ADMIN_ROLE`, so renouncing it to freeze code also kills the ability to wire future
+  periphery (pets v2, new minters) into NUT/NFT mint roles → needs a separate UPGRADER_ROLE
+  before any renounce; (5) pluggable metadata renderer seam if art should evolve past the freeze.
+- **Next:** the rest of the pre-mainnet checklist (audit, tiled mint exercise, metadata image
+  upgrade). UPGRADER_ROLE separation: Henri points out it's addable later by upgrade — correct;
+  reclassified as a step on the immutability-endgame runbook (MUST land before any renounce),
+  not a mainnet-deploy blocker.
 - **Goal:** confirm on-chain that the new `token_uri` (image + RUN_CAP=16, ~64–87M L2) survives the
   canonical Sepolia node's `starknet_call` budget before upgrading the live classes.
 - **Branch:** `new_design`.

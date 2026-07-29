@@ -34,6 +34,12 @@ pub trait IGolLifeFormsV3<TContractState> {
     fn get_escrow(self: @TContractState, token_id: u256) -> u256;
     /// Mint order (strictly increasing from 1).
     fn get_mint_nonce(self: @TContractState, token_id: u256) -> u64;
+    /// Block timestamp at mint. 0 = minted before the minted_at upgrade (grandfathered, like
+    /// nonce 0). Kept in its own map (not LifeFormData) so the shared v2 struct stays untouched.
+    fn get_minted_at(self: @TContractState, token_id: u256) -> u64;
+    /// The human who discovered this creature (mint's escrow payer — the caller of the minter
+    /// contract, not the recipient). Zero address = grandfathered. Permanent artist attribution.
+    fn get_discoverer(self: @TContractState, token_id: u256) -> ContractAddress;
     /// Advance one generation; mints 1 NUT to the caller. Public.
     fn move_lifeform_forward(ref self: TContractState, token_id: u256);
     /// Advance `n` generations in one call; mints `n` NUT to the caller. Public.
@@ -70,6 +76,8 @@ pub trait IGolWanderersV3<TContractState> {
     fn get_path_data(self: @TContractState, token_id: u256) -> PathFormData;
     fn get_canonical_state(self: @TContractState, token_id: u256) -> GridState;
     fn get_mint_nonce(self: @TContractState, token_id: u256) -> u64;
+    /// The discoverer (mint's escrow payer). Zero address = grandfathered.
+    fn get_discoverer(self: @TContractState, token_id: u256) -> ContractAddress;
     fn get_grid_size(self: @TContractState) -> u32;
     fn get_render_params(self: @TContractState, token_id: u256) -> RenderParams;
     fn set_render_params(ref self: TContractState, token_id: u256, bg: u32, cell: u32, speed: u16);

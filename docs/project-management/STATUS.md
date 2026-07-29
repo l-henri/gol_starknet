@@ -3,7 +3,7 @@
 > Snapshot of where the project stands. Keep this short and current — rewrite it each session.
 > History lives in [LOG.md](LOG.md); the plan lives in [ROADMAP.md](ROADMAP.md).
 
-**Last updated:** 2026-07-24
+**Last updated:** 2026-07-29
 **Framing:** WIP **art piece**, not a commercial product — the outcome is burning gas and creating art.
 **Active branch:** `main` — the **petri redesign merged to `main` and deployed to production on
 2026-07-24** (Vercel auto-deploy). What shipped: the Garden
@@ -26,6 +26,14 @@ mint, hatch, rhythmic breathe/pet) are code-verified + fee-estimated but never c
 a real wallet; verify on the live site. Confirm the Vercel `NEXT_PUBLIC_GOL_RPC_URL` env (proxy vs
 direct) is sane for prod.
 **Build/test:** `scarb build` ✅ · `snforge test` ✅ (101, +11 ignored benches) · `cargo test -p gol-sdk` ✅ (43) · `next build` ✅
+**2026-07-29:** pre-mainnet irreversibility review done (see LOG); `GolLifeformsV3` now stamps
+`minted_at` (`get_minted_at`) and BOTH v3 NFTs stamp `discoverer` (`get_discoverer`, also appended
+to the mint events) — 0/zero-address = grandfathered. "Discovered by" is surfaced end-to-end:
+token_uri attribute (`token_uri_with_discoverer`), SDK/WASM (`discoverer`/`pathDiscoverer`,
+null-tolerant on old classes), `/life/[id]` row. The `GolLifeformsV3` constructor now GENESIS-MINTS
+the empty grid to the deployer (nonce 1, escrow 0) — fresh-deploy only (constructors don't run on
+upgrades). All uncommitted on `perf/garden-batching`; Sepolia classes NOT yet upgraded (tests:
+scarb ✅ · snforge 103 ✅ · sdk 43 ✅ · next build ✅).
 **Live site:** https://gol-starknet.vercel.app — Vercel git integration auto-deploys every push to `main` (verified current 2026-07-06)
 **Tx tooling:** all on-chain transactions via **strkd** — pair with `kind:"agent"`; never sncast/raw keys
 

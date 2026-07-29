@@ -16,7 +16,9 @@ pub mod GolLifeformsV3 {
     use openzeppelin::upgrades::UpgradeableComponent;
     use openzeppelin::interfaces::upgrades::IUpgradeable;
     use starknet::ClassHash;
-    use starknet::{ContractAddress, get_caller_address, get_contract_address};
+    use starknet::{
+        ContractAddress, get_caller_address, get_contract_address, get_block_timestamp,
+    };
     use starknet::storage::{Map, StorageMapReadAccess, StorageMapWriteAccess};
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
     use core::num::traits::Zero;
@@ -60,8 +62,11 @@ pub mod GolLifeformsV3 {
         }
         fn token_uri(self: @ContractState, token_id: u256) -> ByteArray {
             assert(self.erc721.exists(token_id), 'ERC721: invalid token ID');
-            gol_metadata_v2::token_uri(
-                token_id, self.lifeform_data.read(token_id), self.resolve_params(token_id),
+            gol_metadata_v2::token_uri_with_discoverer(
+                token_id,
+                self.lifeform_data.read(token_id),
+                self.resolve_params(token_id),
+                self.discoverer.read(token_id),
             )
         }
     }
@@ -69,8 +74,11 @@ pub mod GolLifeformsV3 {
     impl ERC721MetadataCamelImpl of IERC721MetadataCamelOnly<ContractState> {
         fn tokenURI(self: @ContractState, tokenId: u256) -> ByteArray {
             assert(self.erc721.exists(tokenId), 'ERC721: invalid token ID');
-            gol_metadata_v2::token_uri(
-                tokenId, self.lifeform_data.read(tokenId), self.resolve_params(tokenId),
+            gol_metadata_v2::token_uri_with_discoverer(
+                tokenId,
+                self.lifeform_data.read(tokenId),
+                self.resolve_params(tokenId),
+                self.discoverer.read(tokenId),
             )
         }
     }
@@ -95,6 +103,13 @@ pub mod GolLifeformsV3 {
         pub render_params: Map<u256, RenderParams>,
         pub next_nonce: u64,
         pub mint_nonce: Map<u256, u64>,
+        /// Block timestamp at mint. 0 = grandfathered (minted before this field existed), same
+        /// convention as mint_nonce 0. Own map so the shared LifeFormData layout stays untouched.
+        pub minted_at: Map<u256, u64>,
+        /// The human who discovered this creature (= mint's `minter`: the escrow payer, i.e. the
+        /// caller of the minter contract — not `recipient`, which may be a gift target).
+        /// Zero = grandfathered. Permanent artist attribution.
+        pub discoverer: Map<u256, ContractAddress>,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -102,6 +117,8 @@ pub mod GolLifeformsV3 {
         owner: ContractAddress,
         token_id: u256,
         lifeform_data: LifeFormData,
+        // Appended (indexers parse leading fields positionally): the discoverer/escrow payer.
+        discoverer: ContractAddress,
     }
     #[derive(Drop, starknet::Event)]
     struct NewMoveEvent {
@@ -159,6 +176,41 @@ pub mod GolLifeformsV3 {
         self.accesscontrol.initializer();
         self.accesscontrol._grant_role(DEFAULT_ADMIN_ROLE, creator);
         self.nutrient_token_contract.write(nutrient_token);
+        // Genesis: the EMPTY GRID, minted to the deployer at deploy. It's the one loop the
+        // website can never mint (you can't draw nothing), yet it's the fixed point every dead
+        // creature settles into — the vacuum belongs in the collection. Escrow is 0: no NUT can
+        // exist at deploy, and the empty grid is the global lex-minimum, so `prove_malformed`
+        // can never fire on it (the bounty would be unclaimable anyway).
+        let empty_rowvals: Array<(usize, u64)> = array![];
+        let empty_rows = gol_grid_v2::grid_with(@empty_rowvals);
+        let empty = gol_grid_v2::pack(@empty_rows);
+        let token_id = gol_grid_v2::token_id(@empty_rows);
+        self.erc721.mint(creator, token_id);
+        self.mint_nonce.write(token_id, 1);
+        self.next_nonce.write(2);
+        self.minted_at.write(token_id, get_block_timestamp());
+        self.discoverer.write(token_id, creator);
+        let lifeform_data = LifeFormData {
+            is_loop: true,
+            is_still: true,
+            is_alive: false,
+            is_dead: true,
+            sequence_length: 1,
+            current_state: empty, // drawn == canonical: the empty grid is its own orbit minimum
+            age: 0,
+        };
+        self.lifeform_data.write(token_id, lifeform_data);
+        self.canonical_state.write(token_id, empty);
+        self.render_params.write(token_id, gol_metadata_v2::derive_params(token_id));
+        self.total_supply.write(1);
+        self
+            .emit(
+                Event::NewLifeForm(
+                    NewLifeFormEvent {
+                        owner: creator, token_id, lifeform_data, discoverer: creator,
+                    },
+                ),
+            );
     }
 
     #[abi(embed_v0)]
@@ -187,11 +239,20 @@ pub mod GolLifeformsV3 {
             }
             self.mint_nonce.write(token_id, nonce);
             self.next_nonce.write(nonce + 1);
+            self.minted_at.write(token_id, get_block_timestamp());
+            self.discoverer.write(token_id, minter);
             let sequence_length = lifeform_data.sequence_length;
             self.lifeform_data.write(token_id, lifeform_data);
             self.canonical_state.write(token_id, canonical);
             self.render_params.write(token_id, gol_metadata_v2::derive_params(token_id));
-            self.emit(Event::NewLifeForm(NewLifeFormEvent { owner: recipient, token_id, lifeform_data }));
+            self
+                .emit(
+                    Event::NewLifeForm(
+                        NewLifeFormEvent {
+                            owner: recipient, token_id, lifeform_data, discoverer: minter,
+                        },
+                    ),
+                );
             self.total_supply.write(self.total_supply.read() + 1);
             // The mint charge is now a per-token ESCROW (the prove_malformed bounty). Unchallenged
             // escrow never leaves the contract — the intentional sink, per-token accounted.
@@ -217,6 +278,14 @@ pub mod GolLifeformsV3 {
 
         fn get_mint_nonce(self: @ContractState, token_id: u256) -> u64 {
             self.mint_nonce.read(token_id)
+        }
+
+        fn get_minted_at(self: @ContractState, token_id: u256) -> u64 {
+            self.minted_at.read(token_id)
+        }
+
+        fn get_discoverer(self: @ContractState, token_id: u256) -> ContractAddress {
+            self.discoverer.read(token_id)
         }
 
         fn move_lifeform_forward(ref self: ContractState, token_id: u256) {

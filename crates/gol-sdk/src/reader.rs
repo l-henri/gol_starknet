@@ -22,6 +22,14 @@ pub trait Reader {
     /// `owner_of`, or `None` if the token isn't minted.
     async fn owner_of(&self, token_id: U256) -> Result<Option<Felt>, GolError>;
 
+    /// `get_discoverer` on the loop NFT — the mint's escrow payer (permanent artist attribution,
+    /// v3). `None` when the token is unminted, the field is grandfathered (zero), or the call
+    /// reverts because the deployed class predates the entrypoint.
+    async fn discoverer(&self, token_id: U256) -> Result<Option<Felt>, GolError>;
+
+    /// `get_discoverer` on the path NFT (wanderers) — same semantics as [`Self::discoverer`].
+    async fn path_discoverer(&self, token_id: U256) -> Result<Option<Felt>, GolError>;
+
     /// NUT balance (`balance_of`).
     async fn nut_balance(&self, account: Felt) -> Result<U256, GolError>;
 

@@ -9,7 +9,7 @@ mod tests {
     use starknet::ContractAddress;
     use snforge_std::{
         declare, ContractClassTrait, DeclareResultTrait, start_cheat_caller_address,
-        stop_cheat_caller_address,
+        stop_cheat_caller_address, start_cheat_block_timestamp, stop_cheat_block_timestamp,
     };
     use openzeppelin::interfaces::accesscontrol::{
         IAccessControlDispatcher, IAccessControlDispatcherTrait,
@@ -107,6 +107,39 @@ mod tests {
     }
 
     // -------------------------------------------------------------------------------------------
+    // Genesis
+    // -------------------------------------------------------------------------------------------
+
+    #[test]
+    fn constructor_genesis_mints_empty_grid_to_deployer() {
+        let d = deploy_all();
+        let empty_rowvals: Array<(usize, u64)> = array![];
+        let empty_rows = grid_with(@empty_rowvals);
+        let id = token_id(@empty_rows);
+        let lf = IGolLifeFormsV3Dispatcher { contract_address: d.lifeforms };
+        let erc721 = IERC721Dispatcher { contract_address: d.lifeforms };
+        assert(erc721.owner_of(id) == d.creator, 'genesis to deployer');
+        let data = lf.get_lifeform_data(id);
+        assert(data.is_loop && data.is_still && data.is_dead && !data.is_alive, 'vacuum still life');
+        assert(data.sequence_length == 1, 'period 1');
+        assert(lf.get_canonical_state(id) == data.current_state, 'own canonical');
+        assert(lf.get_escrow(id) == 0, 'no escrow');
+        assert(lf.get_mint_nonce(id) == 1, 'genesis nonce 1');
+        assert(lf.get_discoverer(id) == d.creator, 'discoverer = deployer');
+    }
+
+    #[test]
+    #[should_panic(expected: 'id is minimal')]
+    fn genesis_empty_grid_is_fraud_proof() {
+        // The empty grid is the global lex-minimum: prove_malformed can never exhibit smaller.
+        let d = deploy_all();
+        let empty_rowvals: Array<(usize, u64)> = array![];
+        let id = token_id(@grid_with(@empty_rowvals));
+        let lf = IGolLifeFormsV3Dispatcher { contract_address: d.lifeforms };
+        lf.prove_malformed(id, 1, 7, 3, 0);
+    }
+
+    // -------------------------------------------------------------------------------------------
     // Loops
     // -------------------------------------------------------------------------------------------
 
@@ -120,8 +153,10 @@ mod tests {
         let id = token_id(@canonical_rows);
 
         start_cheat_caller_address(d.loop_minter, d.creator);
+        start_cheat_block_timestamp(d.lifeforms, 1700000000);
         let ok = IGolLoopMinterV3Dispatcher { contract_address: d.loop_minter }
             .mint_loop(pack(@drawn), 2, canonical, 0, 3, 5, 0, d.creator);
+        stop_cheat_block_timestamp(d.lifeforms);
         stop_cheat_caller_address(d.loop_minter);
         assert(ok, 'minted');
 
@@ -131,7 +166,10 @@ mod tests {
         assert(eq(@gol_starknet::gol_grid_v2::unpack(@data.current_state), @drawn), 'drawn kept');
         assert(lf.get_canonical_state(id) == canonical, 'canonical stored');
         assert(lf.get_escrow(id) == 2 * ONE_NUT, 'escrow = period NUT');
-        assert(lf.get_mint_nonce(id) == 1, 'nonce 1');
+        // nonce 1 is the constructor's empty-grid genesis; the first user mint is 2
+        assert(lf.get_mint_nonce(id) == 2, 'nonce 2');
+        assert(lf.get_minted_at(id) == 1700000000, 'minted_at stamped');
+        assert(lf.get_discoverer(id) == d.creator, 'discoverer stamped');
         let erc721 = IERC721Dispatcher { contract_address: d.lifeforms };
         assert(erc721.owner_of(id) == d.creator, 'owner');
     }
@@ -197,7 +235,8 @@ mod tests {
         assert(nut.balance_of(prover) - before == 2 * ONE_NUT, 'escrow paid to prover');
         assert(lf.get_escrow(id) == 0, 'escrow cleared');
         let erc721 = IERC721Dispatcher { contract_address: d.lifeforms };
-        assert(erc721.balance_of(d.creator) == 0, 'token burned');
+        // only the constructor's empty-grid genesis remains
+        assert(erc721.balance_of(d.creator) == 1, 'token burned');
     }
 
     #[test]
@@ -262,6 +301,7 @@ mod tests {
         assert(w.get_canonical_state(id) == pack(@canonical_rows), 'canonical stored');
         assert(data.escrow == ONE_NUT, 'escrowed');
         assert(w.get_mint_nonce(id) == 1, 'nonce 1');
+        assert(w.get_discoverer(id) == d.creator, 'discoverer stamped');
     }
 
     #[test]

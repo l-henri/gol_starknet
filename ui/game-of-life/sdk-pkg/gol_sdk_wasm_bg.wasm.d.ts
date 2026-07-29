@@ -8,6 +8,7 @@ export const golsdk_breatheLifeForCall: (a: number, b: number, c: number, d: num
 export const golsdk_challengeBurnCall: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number];
 export const golsdk_challengeBurnLoopCall: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => [number, number, number];
 export const golsdk_classifyFate: (a: number, b: number, c: number, d: number) => [number, number, number];
+export const golsdk_discoverer: (a: number, b: number, c: number) => any;
 export const golsdk_familyTokenId: (a: number, b: number, c: number, d: number) => [number, number, number];
 export const golsdk_findLoop: (a: number, b: number, c: number, d: number) => [number, number, number];
 export const golsdk_findWitness: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
@@ -17,6 +18,7 @@ export const golsdk_mintLoopCalls: (a: number, b: number, c: number, d: number, 
 export const golsdk_new: (a: number, b: number, c: number, d: number) => [number, number, number];
 export const golsdk_nutBalance: (a: number, b: number, c: number) => any;
 export const golsdk_ownedLifeforms: (a: number, b: number, c: number) => any;
+export const golsdk_pathDiscoverer: (a: number, b: number, c: number) => any;
 export const golsdk_pathLifeform: (a: number, b: number, c: number) => any;
 export const golsdk_pathRenderParams: (a: number, b: number, c: number) => any;
 export const golsdk_petCall: (a: number, b: number, c: number) => [number, number, number];

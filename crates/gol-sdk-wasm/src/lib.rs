@@ -136,6 +136,25 @@ impl GolSdk {
         }
     }
 
+    /// The loop creature's discoverer (the mint's escrow payer) as a hex address, or `null`
+    /// (unminted, grandfathered pre-field mint, or the deployed class predates the entrypoint).
+    #[wasm_bindgen(js_name = discoverer)]
+    pub async fn discoverer(&self, token_id: &str) -> Result<JsValue, JsValue> {
+        match self.client.reads().discoverer(parse_u256(token_id)?).await.map_err(err)? {
+            Some(f) => Ok(JsValue::from_str(&felt_to_hex(&f))),
+            None => Ok(JsValue::NULL),
+        }
+    }
+
+    /// The wanderer's discoverer as a hex address, or `null` — same semantics as `discoverer`.
+    #[wasm_bindgen(js_name = pathDiscoverer)]
+    pub async fn path_discoverer(&self, token_id: &str) -> Result<JsValue, JsValue> {
+        match self.client.reads().path_discoverer(parse_u256(token_id)?).await.map_err(err)? {
+            Some(f) => Ok(JsValue::from_str(&felt_to_hex(&f))),
+            None => Ok(JsValue::NULL),
+        }
+    }
+
     /// Decoded `token_uri` (name/description/animation_url/attributes), or `null`.
     #[wasm_bindgen(js_name = tokenUri)]
     pub async fn token_uri(&self, token_id: &str) -> Result<JsValue, JsValue> {

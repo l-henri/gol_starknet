@@ -82,6 +82,7 @@ function LoopDetail({ id }: { id: string }) {
   const [notFound, setNotFound] = useState(false);
 
   const [born, setBorn] = useState<number | null>(null);
+  const [foundBy, setFoundBy] = useState<string | null>(null); // v3 discoverer; null = grandfathered
   const [pack, setPack] = useState<{ holder: string; left: number | null }[] | null>(null);
   const [packEpoch, setPackEpoch] = useState(0);
 
@@ -109,6 +110,10 @@ function LoopDetail({ id }: { id: string }) {
 
   // lazy: the birth block (the on-chain name is just "Lifeform <id>"; we show a cleaner type name)
   useEffect(() => { if (!sdk) return; let c = false; sdk.recentMints().then((m) => { const hit = (m as { token_id: string; block: number }[]).find((x) => sameId(x.token_id, id)); if (!c) setBorn(hit?.block ?? null); }).catch(() => {}); return () => { c = true; }; }, [sdk, id]);
+
+  // lazy: the discoverer (v3 mint attribution; stays hidden for grandfathered mints or classes
+  // that predate the field — the SDK returns null for both)
+  useEffect(() => { if (!sdk) return; let c = false; sdk.discoverer(id).then((a) => { if (!c) setFoundBy((a as string | null) ?? null); }).catch(() => {}); return () => { c = true; }; }, [sdk, id]);
 
   // caretakers ("the pack") — every held bond on this creature, soonest-to-wilt first
   useEffect(() => {
@@ -215,6 +220,7 @@ function LoopDetail({ id }: { id: string }) {
             <div className="life-facts">
               <span>born · <span className="mono">{born !== null ? `block ${born.toLocaleString("en-US")}` : "…"}</span></span>
               <Copyable label="set free by" value={lf.owner} display={shortAddr(lf.owner)} />
+              {foundBy && <Copyable label="discovered by" value={foundBy} display={shortAddr(foundBy)} />}
             </div>
 
             <div className="trait-grid">
@@ -297,6 +303,7 @@ function PathDetail({ id }: { id: string }) {
   const [pf, setPf] = useState<JsPath | null>(null);
   const [rp, setRp] = useState<RP | null>(null);
   const [born, setBorn] = useState<number | null>(null);
+  const [foundBy, setFoundBy] = useState<string | null>(null); // v3 discoverer; null = grandfathered
   const [loading, setLoading] = useState(true);
   const [loopExists, setLoopExists] = useState<boolean | null>(null);
   const [loopRows, setLoopRows] = useState<number[] | null>(null); // canonical rows of the bound-for loop (if it isn't born yet)
@@ -309,6 +316,7 @@ function PathDetail({ id }: { id: string }) {
       setPf((p as JsPath) ?? null); setRp((params as RP | null) ?? null); setLoading(false);
     });
     sdk.recentPathMints().then((m) => { const hit = (m as { token_id: string; block: number }[]).find((x) => sameId(x.token_id, id)); if (!c) setBorn(hit?.block ?? null); }).catch(() => {});
+    sdk.pathDiscoverer(id).then((a) => { if (!c) setFoundBy((a as string | null) ?? null); }).catch(() => {});
     return () => { c = true; };
   }, [sdk, id]);
 
@@ -361,6 +369,7 @@ function PathDetail({ id }: { id: string }) {
             <div className="life-facts">
               <span>born · <span className="mono">{born !== null ? `block ${born.toLocaleString("en-US")}` : "…"}</span></span>
               <Copyable label="set free by" value={pf.owner} display={shortAddr(pf.owner)} />
+              {foundBy && <Copyable label="discovered by" value={foundBy} display={shortAddr(foundBy)} />}
             </div>
             <div className="trait-grid">
               <Trait t="Kind" v="Wanderer" />

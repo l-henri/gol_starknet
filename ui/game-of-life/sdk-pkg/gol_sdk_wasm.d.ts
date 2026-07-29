@@ -36,6 +36,11 @@ export class GolSdk {
      */
     classifyFate(rows: Float64Array, max_steps: number): any;
     /**
+     * The loop creature's discoverer (the mint's escrow payer) as a hex address, or `null`
+     * (unminted, grandfathered pre-field mint, or the deployed class predates the entrypoint).
+     */
+    discoverer(token_id: string): Promise<any>;
+    /**
      * The v3 FAMILY token id for a drawn pattern — the id it would mint under (loops: pass the
      * period; paths/wanderers: pass 0). Use to detect "this creature already lives" before the
      * wallet ever opens: `lifeform(familyTokenId(...))` non-null ⇒ duplicate.
@@ -75,6 +80,10 @@ export class GolSdk {
      * Lifeforms currently owned by `address`, via the RPC event scan.
      */
     ownedLifeforms(address: string): Promise<any>;
+    /**
+     * The wanderer's discoverer as a hex address, or `null` — same semantics as `discoverer`.
+     */
+    pathDiscoverer(token_id: string): Promise<any>;
     /**
      * Path creature by token id (decimal or `0x` hex), or `null` if not minted (or burned).
      */
@@ -205,6 +214,7 @@ export interface InitOutput {
     readonly golsdk_challengeBurnCall: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number];
     readonly golsdk_challengeBurnLoopCall: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => [number, number, number];
     readonly golsdk_classifyFate: (a: number, b: number, c: number, d: number) => [number, number, number];
+    readonly golsdk_discoverer: (a: number, b: number, c: number) => any;
     readonly golsdk_familyTokenId: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly golsdk_findLoop: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly golsdk_findWitness: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
@@ -214,6 +224,7 @@ export interface InitOutput {
     readonly golsdk_new: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly golsdk_nutBalance: (a: number, b: number, c: number) => any;
     readonly golsdk_ownedLifeforms: (a: number, b: number, c: number) => any;
+    readonly golsdk_pathDiscoverer: (a: number, b: number, c: number) => any;
     readonly golsdk_pathLifeform: (a: number, b: number, c: number) => any;
     readonly golsdk_pathRenderParams: (a: number, b: number, c: number) => any;
     readonly golsdk_petCall: (a: number, b: number, c: number) => [number, number, number];

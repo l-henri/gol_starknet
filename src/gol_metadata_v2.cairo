@@ -10,6 +10,8 @@
 //!     the HTML its size (and token_uri gas) scales with density (see the bench_svg_*/bench_uri_*
 //!     gas probes — the reason worst-case density was measured before shipping this).
 
+use starknet::ContractAddress;
+use core::num::traits::Zero;
 use gol_starknet::interfaces_v2::{LifeFormData, RenderParams, SPEED_MAX};
 use gol_starknet::gol_grid_v2::{GridState, unpack, N};
 use gol_starknet::base64;
@@ -248,11 +250,42 @@ pub fn render_svg(state: GridState, bg: u32, cell: u32) -> ByteArray {
     svg
 }
 
+/// `0x`-prefixed lowercase hex of an address, no leading-zero padding (matches how explorers and
+/// starknet.js display felts). Only called for non-zero addresses.
+fn address_to_hex(a: ContractAddress) -> ByteArray {
+    let felt: felt252 = a.into();
+    let mut v: u256 = felt.into();
+    let mut digits: Array<u8> = array![];
+    while v > 0 {
+        let d: u8 = (v % 16).try_into().unwrap();
+        digits.append(d);
+        v = v / 16;
+    };
+    let mut out: ByteArray = "0x";
+    let mut i = digits.len();
+    while i > 0 {
+        i -= 1;
+        let d = *digits.at(i);
+        // '0'..'9' then 'a'..'f'
+        out.append_byte(if d < 10 {
+            48 + d
+        } else {
+            87 + d
+        });
+    };
+    out
+}
+
 /// ERC-721 JSON with traits, a static `image` (SVG snapshot of the current generation) and an
 /// `animation_url` (the interactive HTML renderer). `image` is the fallback for wallets/marketplaces
-/// that don't execute `animation_url`; the animation is the canonical piece.
+/// that don't execute `animation_url`; the animation is the canonical piece. A zero `discoverer`
+/// (v2 tokens, grandfathered v3 mints) omits the "Discovered by" attribute.
 pub fn build_metadata_json(
-    token_id: u256, data: LifeFormData, image: ByteArray, animation_url: ByteArray,
+    token_id: u256,
+    data: LifeFormData,
+    image: ByteArray,
+    animation_url: ByteArray,
+    discoverer: ContractAddress,
 ) -> ByteArray {
     let status: ByteArray = if data.is_alive {
         "Alive"
@@ -283,7 +316,13 @@ pub fn build_metadata_json(
     json.append(@u32_to_decimal(data.sequence_length));
     json.append(@"},{\"trait_type\":\"Age\",\"value\":");
     json.append(@u32_to_decimal(data.age));
-    json.append(@"}]}");
+    if !discoverer.is_zero() {
+        json.append(@"},{\"trait_type\":\"Discovered by\",\"value\":\"");
+        json.append(@address_to_hex(discoverer));
+        json.append(@"\"}]}");
+    } else {
+        json.append(@"}]}");
+    }
     json
 }
 
@@ -296,11 +335,19 @@ pub fn build_metadata_json(
 /// a consumer reads everything after the first comma and `JSON.parse`s it directly. Both the SVG and
 /// the HTML stay base64 (they carry `#` colors and spaces a raw `data:` URI can't hold safely).
 pub fn token_uri(token_id: u256, data: LifeFormData, rp: RenderParams) -> ByteArray {
+    // v2 collections predate discoverer attribution — zero omits the attribute.
+    token_uri_with_discoverer(token_id, data, rp, Zero::zero())
+}
+
+/// `token_uri` + permanent artist attribution (v3: the mint's escrow payer). Zero = omitted.
+pub fn token_uri_with_discoverer(
+    token_id: u256, data: LifeFormData, rp: RenderParams, discoverer: ContractAddress,
+) -> ByteArray {
     let mut image: ByteArray = "data:image/svg+xml;base64,";
     image.append(@base64::encode(render_svg(data.current_state, rp.bg, rp.cell)));
     let mut animation_url: ByteArray = "data:text/html;base64,";
     animation_url.append(@base64::encode(render_html(data.current_state, rp.bg, rp.cell, rp.speed)));
-    let json = build_metadata_json(token_id, data, image, animation_url);
+    let json = build_metadata_json(token_id, data, image, animation_url, discoverer);
     let mut uri: ByteArray = "data:application/json,";
     uri.append(@json);
     uri
