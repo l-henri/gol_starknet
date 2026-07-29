@@ -18,6 +18,25 @@
 
 ---
 
+## 2026-07-29 (3) — SHIP: /why manifesto + perf/provenance merged to `main` → production
+- **Goal:** Henri: "go ahead and merge" — ship the `/why` manifesto and the pending
+  perf/provenance work to the live site.
+- **Branch:** `main` (fast-forwarded from `perf/garden-batching`).
+- **What shipped (3 commits over the old trunk):** the gallery-batching perf pass (batched
+  `recentPaths` + cached read RPC); the **`/why` manifesto** (a ~640px Inter reading surface with
+  the founding essay from `docs/purpose.md` in first person at 41×41, three LIVE Conway sims —
+  R-pentomino evolving / spark going out / blinker looping — reduced-motion-aware, nav gains a
+  dimmer WHY + a quiet "why this exists" Garden doorway); and the **mint-time provenance** work
+  (`minted_at` + `discoverer` + empty-grid genesis).
+- **Caveat:** the provenance CONTRACT changes are code only — **not yet upgraded on Sepolia** — so
+  `/life`'s "Discovered by" hides gracefully (`sdk.discoverer` → null) until the classes are
+  upgraded. Frontend deploys fine regardless.
+- **How:** `git merge --ff-only perf/garden-batching` on `main` + `git push origin main`; Vercel
+  auto-deploys → https://gol-starknet.vercel.app.
+- **Verified:** `next build` green at HEAD (all routes incl. `/why` 4.33 kB). ⚠️ Wallet-signed flows
+  still not clicked through with a real wallet (standing caveat).
+- **Next:** upgrade the v3 classes on Sepolia (discoverer/minted_at); live-site wallet pass.
+
 ## 2026-07-29 (2) — empty-grid genesis at deploy + "Discovered by" surfaced end-to-end
 - **Goal:** (a) the empty grid ("token 0") isn't mintable from the website (you can't draw
   nothing) — mint it in the `GolLifeformsV3` CONSTRUCTOR to the deployer; (b) surface the new
