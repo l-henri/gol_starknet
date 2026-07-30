@@ -18,6 +18,44 @@
 
 ---
 
+## 2026-07-29 (4) — Security audit (cairo-auditor deep) + pet() CEI fix + v1 dead-code removal
+- **Goal:** run a thorough Cairo security audit of the whole contract suite (the free NUT faucet is
+  an intentional valueless proof-of-participation sink, explicitly out of scope), then act on it.
+- **Branch:** `main` · **Commits:** uncommitted WIP (working tree).
+- **Audit:** deep run — 4 attack-vector specialists + 1 adversarial reasoner over all 25 in-scope
+  `.cairo` files (~6.1k lines). Result: **no finding at or above the 75-confidence threshold.** The
+  live v3 invariants held under attack — orbit-canonical id + mint-time copy-prevention, D4
+  symmetry fraud-proofs, per-token escrow zeroed-before-payout (CEI-correct), pet-bond clock
+  carry-on-transfer, and cross-contract mint gating. Six low-confidence hardening notes surfaced.
+- **Changed (acted on 2 of the 6 notes):**
+  - **#1 pet() CEI (`gol_pet_bonds.cairo`):** reordered `pet()` so the ERC-1155 bond mint + the
+    `last_pet` clock write happen BEFORE the external `move_lifeform_forward_n_for` feed call
+    (effects-before-interaction), closing the latent reentrant double-mint / clock-desync window.
+    Behaviour preserved: an unminted/burned creature still reverts the whole tx (rolling the bond
+    mint back atomically) — proven by `petting_a_burned_creature_reverts`.
+  - **#2 v1 dead-code removal:** deleted the superseded, bug-carrying v1 minter stack —
+    `gol_lifeforms.cairo`, `gol_loop_minter.cairo`, `gol_path_minter.cairo` (the recipient-keyed
+    partial-path registry bug, already fixed + annotated "Audit #4" in v2/v3) and
+    `tests/test_minters.cairo`; pruned the now-dead `IGolLoopMinter` / `IGolPathMinter` /
+    `IGolLifeForms` traits from `interfaces.cairo`; updated `lib.cairo`. Repointed
+    `tests/test_grid_utils.cairo` to host the shared `GolUtilitiesComponent` on `GolBench` (which
+    embeds the same ABI) instead of the removed v1 `GolLifeforms`.
+- **Kept (turned out NOT dead):** `gol_metadata.cairo` — `gol_metadata_v2` reuses its
+  `u32_to_decimal` / `u256_to_decimal` helpers (the build caught this; restored + noted in
+  `lib.cairo`); `gol_utilities.cairo` — still used by `gol_bench` + `test_grid_utils`;
+  `interfaces.cairo` / `gol_nutrient.cairo` / `base64.cairo` — shared by v2/v3/pets.
+- **Verified:** `scarb build` ✅ · `snforge test` ✅ (91 passed, 0 failed, 11 ignored benches). The
+  count fell 103 → 91 = exactly the removed v1 `test_minters` cases; all 8 pet-bond tests pass on
+  the reordered `pet()`.
+- **Decisions:** #4 (repointing `nutrient_token_contract` strands per-token escrow and reverts all
+  `prove_malformed`/`challenge_burn` bounty payouts) **deferred per Henri** — admin-gated +
+  recoverable; revisit before the escrow model is relied on for anything of value. #3 (pet clock
+  not bound to the NFT mint epoch → stale after burn+re-mint), #5 (unchecked ERC-20 transfer return
+  on escrow/bounty), #6 (`gol_bench.verify_move_forward` missing start-state anchor) left as noted
+  low-confidence items.
+- **Next:** commit/branch these working-tree changes if desired; optional follow-ups on #3/#5.
+- **Blockers:** none.
+
 ## 2026-07-29 (3) — SHIP: /why manifesto + perf/provenance merged to `main` → production
 - **Goal:** Henri: "go ahead and merge" — ship the `/why` manifesto and the pending
   perf/provenance work to the live site.

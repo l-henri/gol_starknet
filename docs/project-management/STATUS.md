@@ -25,7 +25,7 @@ Site renamed **petri** (loop/wanderer collections keep their names). See LOG 202
 mint, hatch, rhythmic breathe/pet) are code-verified + fee-estimated but never clicked through with
 a real wallet; verify on the live site. Confirm the Vercel `NEXT_PUBLIC_GOL_RPC_URL` env (proxy vs
 direct) is sane for prod.
-**Build/test:** `scarb build` ✅ · `snforge test` ✅ (101, +11 ignored benches) · `cargo test -p gol-sdk` ✅ (43) · `next build` ✅
+**Build/test:** `scarb build` ✅ · `snforge test` ✅ (91, +11 ignored benches — v1 `test_minters` removed 2026-07-29) · `cargo test -p gol-sdk` ✅ (43) · `next build` ✅
 **2026-07-29:** pre-mainnet irreversibility review done (see LOG); `GolLifeformsV3` now stamps
 `minted_at` (`get_minted_at`) and BOTH v3 NFTs stamp `discoverer` (`get_discoverer`, also appended
 to the mint events) — 0/zero-address = grandfathered. "Discovered by" is surfaced end-to-end:
@@ -34,6 +34,12 @@ null-tolerant on old classes), `/life/[id]` row. The `GolLifeformsV3` constructo
 the empty grid to the deployer (nonce 1, escrow 0) — fresh-deploy only (constructors don't run on
 upgrades). All uncommitted on `perf/garden-batching`; Sepolia classes NOT yet upgraded (tests:
 scarb ✅ · snforge 103 ✅ · sdk 43 ✅ · next build ✅).
+**2026-07-29 (audit):** deep Cairo security audit (`/cairo-auditor`) over all 25 contracts —
+**no finding ≥75 confidence**; the live v3 identity/escrow/pet invariants held. Acted on two
+low-confidence notes: fixed `pet()` CEI ordering and removed the superseded v1 minter *source*
+(`gol_lifeforms`/`gol_loop_minter`/`gol_path_minter` + their test + dead interfaces). Deferred the
+escrow-on-token-repoint note (#4) per Henri. `scarb build` ✅ · `snforge test` ✅ (91). Uncommitted
+on `main`. See LOG 2026-07-29 (4).
 **Live site:** https://gol-starknet.vercel.app — Vercel git integration auto-deploys every push to `main` (verified current 2026-07-06)
 **Tx tooling:** all on-chain transactions via **strkd** — pair with `kind:"agent"`; never sncast/raw keys
 
@@ -51,7 +57,9 @@ scarb ✅ · snforge 103 ✅ · sdk 43 ✅ · next build ✅).
   already-minted check, breathing history preserved across versions. ⚠️ Still to do: a manual
   /create → v3 mint click-through, /leaderboards eyeballing, tiled phase-segment mint on-chain.
 - **v2** (and v1) remain deployed but superseded — [v2-deployment.md](../v2-deployment.md); the v2
-  symmetry challenge-burn stays live there for its collection.
+  symmetry challenge-burn stays live there for its collection. **The v1 contract _source_ was
+  removed from the repo 2026-07-29** (the superseded minter stack; deployed instances untouched) —
+  see LOG 2026-07-29 (4).
 - **On-chain render (`gol_metadata_v2`, shared by v2 + v3):** `token_uri` now emits a static `image`
   (run-length SVG snapshot of the current generation) alongside the interactive `animation_url`, so
   key-holding wallets — which read only `image` and won't execute the HTML — render a real preview
