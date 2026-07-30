@@ -153,12 +153,14 @@ pub mod GolPetBonds {
     impl GolPetBondsImpl of IGolPetBonds<ContractState> {
         fn pet(ref self: ContractState, creature_id: u256) {
             let holder = get_caller_address();
-            // Petting IS feeding: one ceremonial generation, NUT to the petter. Reverts for
-            // unminted/burned creatures — which is exactly how orphaned bonds age out.
             let lifeforms = IGolLifeFormsV3Dispatcher {
                 contract_address: self.gol_lifeforms.read(),
             };
-            lifeforms.move_lifeform_forward_n_for(creature_id, 1, holder);
+            // Effects before interaction (CEI): mint the bond and stamp the clock BEFORE the
+            // external feed call, so a reentrant callee can never observe a stale balance and
+            // double-mint the bond or write an inconsistent clock. If the creature is
+            // unminted/burned the feed below reverts, rolling these writes back atomically —
+            // which is exactly how orphaned bonds age out.
             if self.erc1155.balance_of(holder, creature_id) == 0 {
                 // internal update (no acceptance check): plain wallet accounts must be bondable
                 self
@@ -171,6 +173,8 @@ pub mod GolPetBonds {
                     );
             }
             self.last_pet.write((creature_id, holder), get_block_timestamp());
+            // Interaction: petting IS feeding — one ceremonial generation, NUT to the petter.
+            lifeforms.move_lifeform_forward_n_for(creature_id, 1, holder);
             let age = lifeforms.get_lifeform_data(creature_id).age;
             self.emit(Event::Petted(PettedEvent { creature_id, holder, age }));
         }
