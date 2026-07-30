@@ -1,10 +1,9 @@
-pub mod gol_lifeforms;
-pub mod gol_loop_minter;
 pub mod interfaces;
 pub mod gol_utilities;
 pub mod gol_nutrient;
-pub mod gol_path_minter;
 pub mod base64;
+// v1 renderer: superseded as a full metadata module, but gol_metadata_v2 still reuses its
+// u32_to_decimal / u256_to_decimal number-formatting helpers, so it stays as a shared util.
 pub mod gol_metadata;
 pub mod gol_bench;
 pub mod gol_grid_v2;

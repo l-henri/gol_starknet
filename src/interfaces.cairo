@@ -32,32 +32,6 @@ pub trait IGolUtilities<TContractState> {
 }
 
 #[starknet::interface]
-pub trait IGolLoopMinter<TContractState> {
-    // Mint a loop
-    fn mint_loop(ref self: TContractState, loop_id: u256, loop_length: usize, recipient: ContractAddress) -> bool;
-    fn mint_partial_path(ref self: TContractState, path_start: u256, path_length: usize, trigger_state: u256);
-    fn combine_partial_path(ref self: TContractState, partial_path_id_1: u256, partial_path_id_2: u256);
-    fn mint_loop_from_partial_paths(ref self: TContractState, loop_id: u256, recipient: ContractAddress);
-}
-
-#[starknet::interface]
-pub trait IGolPathMinter<TContractState> {
-    // Mint a path
-    fn mint_path(ref self: TContractState, path_id: u256, length_to_loop_entrypoint: usize, loop_entrypoint: u256, loop_length: usize, recipient: ContractAddress) -> bool;
-    fn mint_partial_path(ref self: TContractState, path_start: u256, path_length: usize, trigger_state: u256);
-    fn combine_partial_path(ref self: TContractState, partial_path_id_1: u256, partial_path_id_2: u256);
-    fn mint_path_from_partial_paths(ref self: TContractState, path_id: u256, recipient: ContractAddress);
-}
-
-#[starknet::interface]
-pub trait IGolLifeForms<TContractState> {
-    // Mint a token
-    fn mint(ref self: TContractState, recipient: ContractAddress, minter: ContractAddress, token_id: u256, lifeform_data: LifeFormData);
-    fn get_lifeform_data(self: @TContractState, token_id: u256) -> LifeFormData;
-    fn move_lifeform_forward(ref self: TContractState, token_id: u256);
-}
-
-#[starknet::interface]
 pub trait IGolNutrientToken<TContractState> {
     // Mint a token
     fn mint(ref self: TContractState, recipient: ContractAddress, amount: u256);

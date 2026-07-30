@@ -1,7 +1,6 @@
 #[cfg(test)]
 mod tests {
     use core::array::ArrayTrait;
-    use starknet::ContractAddress;
     use snforge_std::{declare, ContractClassTrait, DeclareResultTrait};
     use gol_starknet::interfaces::{IGolUtilitiesDispatcher, IGolUtilitiesDispatcherTrait};
 
@@ -34,13 +33,14 @@ mod tests {
         grid
     }
 
-    // GolUtilities is a component embedded in GolLifeforms and exposed via its ABI, so we exercise
-    // it through a deployed lifeforms contract rather than a bare component state.
+    // GolUtilities is a component embedded in GolBench (the benchmark host) and exposed via its
+    // ABI, so we exercise it through a deployed GolBench contract rather than a bare component
+    // state. (The v1 GolLifeforms host was removed; GolBench embeds the same GolUtilities engine.)
     fn deploy_utilities() -> IGolUtilitiesDispatcher {
-        let creator: ContractAddress = 0x1.try_into().unwrap();
-        let class = declare("GolLifeforms").unwrap().contract_class();
+        let class = declare("GolBench").unwrap().contract_class();
         let mut calldata: Array<felt252> = ArrayTrait::new();
-        creator.serialize(ref calldata);
+        let initial_state: u256 = 0;
+        initial_state.serialize(ref calldata);
         let (address, _) = class.deploy(@calldata).unwrap();
         IGolUtilitiesDispatcher { contract_address: address }
     }
