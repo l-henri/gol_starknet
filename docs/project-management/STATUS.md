@@ -36,8 +36,9 @@ unverified in a browser (as is the 2026-07-31 breath basket, on any network).
 - **2026-07-31 ownership UX (branch `ui/pets-edit-wanderers`, off `mainnet`):** /pets gains a
   "Yours" section (owned NFTs — owning never created a pet bond, so owners saw nothing);
   /life/[id] lets the OWNER edit colours (click a swatch → palette) and pace (click the number)
-  with live preview + one `set_render_params` tx; garden wanderer tiles now animate. Needs
-  Henri's browser click-through, then merge to `mainnet`. LOG 2026-07-31 (10).
+  with live preview + one `set_render_params` tx; garden wanderer tiles now animate. Merged to
+  `main` (production) same day; the owner-edit tx + owned scan still want a browser
+  click-through on the live site. LOG 2026-07-31 (10).
 - **2026-07-31 (Henri):** /create imports RLE (paste forum patterns onto the seed grid) +
   per-creature link previews for /life/[id] (commits d65be73, d238674).
 - **2026-07-31 void:** dead loops are feedable (`voidMode`: "Make an offering to the void")
