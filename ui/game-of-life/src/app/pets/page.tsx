@@ -54,7 +54,7 @@ function WardThumb({ lf }: { lf: JsLifeform | null | undefined }) {
 /* The per-ward breathe: the same rhythmic tap as the creature page — taps join the SHARED breath
    basket, so tapping several wards bundles them into one multicall tx (per creature: N gens +
    N NUT + bond renewed); a confirmed breath bumps txEpoch, which refreshes the ward list + clocks. */
-function WardBreathe({ creatureId }: { creatureId: string }) {
+function WardBreathe({ creatureId, voidMode }: { creatureId: string; voidMode?: boolean }) {
   const { address, onAppChain, connect, switchToAppChain } = useWallet();
   const [err, setErr] = useState<string | null>(null);
   return (
@@ -66,6 +66,7 @@ function WardBreathe({ creatureId }: { creatureId: string }) {
         onAppChain={onAppChain}
         onConnect={connect}
         onSwitch={switchToAppChain}
+        voidMode={voidMode}
         onExhaled={(_n, ok, _hash, error) => setErr(ok ? null : error)}
       />
       {err && <p className="breathe-err">{err}</p>}
@@ -156,7 +157,7 @@ export default function WardsPage() {
                         </div>
                         {w.lf && (
                           <div className="ward-actions">
-                            <WardBreathe creatureId={w.creatureId} />
+                            <WardBreathe creatureId={w.creatureId} voidMode={!!w.lf?.is_dead} />
                           </div>
                         )}
                       </div>
@@ -178,7 +179,7 @@ export default function WardsPage() {
                     <div className="ward-body">
                       <Link href={`/life/${w.creatureId}`} className="ward-name">{deriveName(w.lf)}</Link>
                       <p className="reaper-note">The reaper passed. You’re no longer its keeper, but it lives on if others tend it. A breath takes it back into your care.</p>
-                      {w.lf && <div className="ward-actions"><WardBreathe creatureId={w.creatureId} /></div>}
+                      {w.lf && <div className="ward-actions"><WardBreathe creatureId={w.creatureId} voidMode={!!w.lf?.is_dead} /></div>}
                     </div>
                   </div>
                 ))}

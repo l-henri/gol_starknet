@@ -25,11 +25,14 @@ export interface BreatheControlProps {
   /** this creature's slice of the bundle confirmed (ok) or the bundle failed */
   onExhaled?: ExhaledHandler;
   onTap?: () => void;                          // parent: one-cell shimmer on the grid
-  disabled?: boolean;                          // e.g. a creature that has gone out
+  disabled?: boolean;
   compact?: boolean;                           // Garden-tile variant
+  /** the creature has gone out (the empty grid): feeding still works on-chain, but the ritual
+   *  changes register — offerings to the void, not breaths into a living thing */
+  voidMode?: boolean;
 }
 
-export default function BreatheControl({ creatureId, connected, onAppChain, onConnect, onSwitch, onExhaled, onTap, disabled = false, compact = false }: BreatheControlProps) {
+export default function BreatheControl({ creatureId, connected, onAppChain, onConnect, onSwitch, onExhaled, onTap, disabled = false, compact = false, voidMode = false }: BreatheControlProps) {
   const { snapshot, tap } = useBreathBasket();
   const [remainMs, setRemainMs] = useState(0); // reduced-motion numeric countdown
   const [reduced, setReduced] = useState(false);
@@ -80,15 +83,17 @@ export default function BreatheControl({ creatureId, connected, onAppChain, onCo
     }
   }, [disabled, busy, connected, onAppChain, onConnect, onSwitch, reduced, onTap, tap, creatureId]);
 
-  const label = phase === "exhaling" ? "exhaling…"
-    : !connected ? "Connect to breathe"
+  const label = phase === "exhaling" ? (voidMode ? "the void receives…" : "exhaling…")
+    : !connected ? (voidMode ? "Connect to make an offering" : "Connect to breathe")
     : !onAppChain ? "Switch network"
+    : voidMode ? "Make an offering to the void"
     : "Breathe life";
-  const hint = phase === "exhaling" ? "sending your breath…"
-    : busy ? "a breath is on its way…"
-    : phase === "idle" ? "tap to give a breath"
-    : atCap ? "a full breath, release to send"
+  const hint = phase === "exhaling" ? (voidMode ? "carrying your offering…" : "sending your breath…")
+    : busy ? (voidMode ? "an offering is on its way…" : "a breath is on its way…")
+    : phase === "idle" ? (voidMode ? "tap to make an offering" : "tap to give a breath")
+    : atCap ? (voidMode ? "a full offering, release to send" : "a full breath, release to send")
     : others > 0 ? `×${snapshot.total} of ×${snapshot.cap} in this breath, across creatures`
+    : voidMode ? `tap again to deepen the offering (up to ×${snapshot.cap})`
     : `tap again to breathe deeper (up to ×${snapshot.cap})`;
 
   return (

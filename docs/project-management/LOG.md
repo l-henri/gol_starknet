@@ -18,6 +18,26 @@
 
 ---
 
+## 2026-07-31 (7) — Death accepts offerings: dead loops are feedable in the UI
+- **Goal:** Henri, testing the mainnet preview: the only token in existence is the genesis empty
+  grid ("death", is_dead) and the UI hid every breathe control on dead creatures — so NOTHING on
+  mainnet could be fed and no NUT could ever enter circulation. His call: death stays breathable,
+  with mystical copy.
+- **Branch:** `main`, merged into `mainnet` · **Commits:** this commit (+ merge).
+- **Changed:** `BreatheControl` grows a `voidMode` prop — same tap/basket mechanics, ritual copy
+  swapped ("Make an offering to the void", "tap to make an offering", "the void receives…").
+  BacteriaTile always shows the control (voidMode when is_dead); /life/[id] shows the acts block
+  for dead loops too, with a void act-note ("Nothing changes. That is the point.") and the
+  gone-out line reworded ("It cannot be revived, but it accepts offerings."); /pets wards pass
+  voidMode through. Garden's spotlight filter still excludes the dead (death is feedable, not
+  featured). The CONTRACT never blocked this — `_move_forward` has no is_dead guard; it was UI
+  fiction only.
+- **Why it matters:** on mainnet, feeding death is the only way to earn NUT until a living
+  creature is minted — the void is the economy's bootstrap.
+- **Verified:** `tsc` ✅ · `next build` ✅ (main and mainnet). Not yet clicked through with a
+  wallet.
+- **Next:** Henri feeds the void on the mainnet preview; first living mint.
+
 ## 2026-07-31 (6) — /why is now the VERBATIM copy of purpose.md (+ 6 fixes in both)
 - **Goal:** Henri: /why must carry the exact text of docs/purpose.md, then fix the
   inconsistencies he confirmed from my review.

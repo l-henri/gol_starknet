@@ -33,6 +33,9 @@ unverified in a browser (as is the 2026-07-31 breath basket, on any network).
 
 ## Recent (still fresh)
 
+- **2026-07-31 void:** dead loops are feedable (`voidMode`: "Make an offering to the void")
+  — on mainnet, offerings to the genesis empty grid are how NUT first enters circulation.
+  LOG 2026-07-31 (7).
 - **2026-07-31 breath basket:** breathe taps across MULTIPLE creatures bundle into ONE multicall
   (`lib/breathBasket.tsx`, BreatheControl rewritten, `useBreathe.ts` deleted); cap = bundle sum;
   route change discards un-sent taps. Needs a live click-through (2 creatures → one prompt).
