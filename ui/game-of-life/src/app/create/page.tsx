@@ -11,6 +11,7 @@ import { useNutBalance } from "@/lib/useNut";
 import { useGasCaps, plannedTxCount, plannedPathTxCount, MAX_TX } from "@/lib/gasCaps";
 import { N, type Cells, fromRows, rowsFromCells } from "@/lib/creatures";
 import { addBookmark, listBookmarks } from "@/lib/incubator";
+import { parseRle } from "@/lib/rle";
 
 /* ------------------------------------------------------------------ *
  * /create — the "slot machine of life". Two 41×41 grids, a matched
@@ -263,6 +264,31 @@ export default function CreatePage() {
     void mintPath(leftRows, pathSteps, loopPeriod, rollLook());
   };
 
+  // paste-a-pattern (RLE) — parse, refuse anything wider/taller than the dish, centre the rest
+  const [rleText, setRleText] = useState("");
+  const [rleErr, setRleErr] = useState<string | null>(null);
+  const importRle = () => {
+    const parsed = parseRle(rleText);
+    if (!parsed.ok) {
+      setRleErr(
+        parsed.why === "rule"
+          ? `This pattern plays by different rules (${parsed.rule}) — our dish only knows B3/S23.`
+          : parsed.why === "empty"
+          ? "That pattern has no live cells — nothing to drop in."
+          : "Couldn’t read that. Paste a pattern in RLE format — the kind that starts with “x = …, y = …”."
+      );
+      return;
+    }
+    if (parsed.width > N || parsed.height > N) {
+      setRleErr(`That one is ${parsed.width}×${parsed.height} — too big for our ${N}×${N} dish. Try a smaller pattern.`);
+      return;
+    }
+    setRleErr(null);
+    setLeft(place(parsed.coords)); // place() centres the bounding box on the grid
+    setPlaying(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const sendToIncubator = (id: string, rows: number[], period: number, kind: "loop" | "path", loopPeriod: number) => {
     bookmark(id, rows, period, kind, loopPeriod);
     router.push("/incubator");
@@ -419,6 +445,31 @@ export default function CreatePage() {
 
         </div>
       </div>
+
+      {/* ---- bring a pattern: paste RLE from the forums onto the seed grid ---- */}
+      <section className="rle-import">
+        <div className="board-cap">
+          <span className="board-name">bring a pattern</span>
+          <span className="board-hint dim">RLE, the forum format</span>
+        </div>
+        <p className="rle-sub dim">
+          Found something on the forums? Paste its RLE code here and drop it onto your seed grid.
+          Anything up to {N}×{N} fits — smaller patterns land in the middle.
+        </p>
+        <textarea
+          className="rle-input"
+          value={rleText}
+          onChange={(e) => { setRleText(e.target.value); setRleErr(null); }}
+          placeholder={"x = 3, y = 3, rule = B3/S23\nbo$2bo$3o!"}
+          rows={5}
+          spellCheck={false}
+          aria-label="RLE pattern code"
+        />
+        <div className="rle-actions">
+          <button className="btn primary" onClick={importRle} disabled={!rleText.trim()}>Drop it in</button>
+          {rleErr && <p className="rle-err">{rleErr}</p>}
+        </div>
+      </section>
 
       {/* ---- it lives: drop into the garden (colours were rolled at set-free) ---- */}
       {born && (

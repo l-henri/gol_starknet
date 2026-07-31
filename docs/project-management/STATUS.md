@@ -74,6 +74,11 @@ dashes removed (comma/colon/period rewrites), `/` thesis now "…and go on livin
 caption "One of the most popular creatures…", `/create` ownership line removed, `/leaderboards`
 labels now "Oldest loops"/"Oldest wanderers". Strings only; `tsc --noEmit` clean; uncommitted on
 `main`. See LOG 2026-07-31.
+**2026-07-31 (RLE import):** /create can now import forum patterns — new `lib/rle.ts` parser +
+a "bring a pattern" paste box at the bottom of the page (branch `feat/rle-import`). >41-wide/tall
+patterns and non-B3/S23 rules are refused with friendly copy; smaller patterns are centred on the
+seed grid and play immediately. `tsc` ✅ · lint ✅ · `next build` ✅ · 12-case parser test ✅; not
+browser-clicked. See LOG 2026-07-31 (9).
 **2026-07-29 (audit):** deep Cairo security audit (`/cairo-auditor`) over all 25 contracts —
 **no finding ≥75 confidence**; the live v3 identity/escrow/pet invariants held. Acted on two
 low-confidence notes: fixed `pet()` CEI ordering and removed the superseded v1 minter *source*

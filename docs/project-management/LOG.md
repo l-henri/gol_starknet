@@ -18,6 +18,30 @@
 
 ---
 
+## 2026-07-31 (9) — /create imports RLE (the forum pattern format)
+- **Goal:** Henri browses Game-of-Life forums where patterns are shared as RLE (`x = …, y = …,
+  rule = B3/S23` + `b`/`o` runs). Let those be pasted straight onto the /create seed grid
+  instead of redrawing them cell by cell.
+- **Branch:** `feat/rle-import` · **Commits:** this commit.
+- **Changed:** new `ui/game-of-life/src/lib/rle.ts` — a small RLE parser (comments, optional
+  header, run counts, `$` rows, `!` terminator; `.` accepted as dead and any letter as alive so
+  multistate exports import too; sizes by the live-cell bounding box, not the header's claim).
+  `/create` gets a "bring a pattern" section at the bottom: textarea + "Drop it in". Patterns
+  wider or taller than 41 are refused with a friendly message ("too big for our 41×41 dish");
+  anything smaller is centred on the grid via the existing `place()` helper, then the sim plays
+  immediately and the page scrolls back to the boards. Non-B3/S23 rules are refused too ("our
+  dish only knows B3/S23") since the on-chain stepper is Conway-only. Matching CSS block in
+  `globals.css`.
+- **Verified:** `tsc --noEmit` ✅ · `next lint` ✅ · `next build` ✅ · 12-case parser test in the
+  scratchpad (forum 21×21 sample, headerless glider, 42-wide refusal, exact-41 acceptance,
+  wrong rule, empty, garbage, comments, multistate letters) all pass. NOT browser-clicked yet.
+- **Decisions:** size check uses the live cells' bounding box, not the declared `x`/`y` — a
+  blinker exported from a 100×100 board should still import. Rule aliases `23/3` and `s23/b3`
+  accepted as Conway.
+- **Next:** browser pass (paste a forum pattern, watch it land centred); consider a "copy as
+  RLE" export next to it for sharing back to the forums.
+- **Blockers:** none.
+
 ## 2026-07-31 (7) — Death accepts offerings: dead loops are feedable in the UI
 - **Goal:** Henri, testing the mainnet preview: the only token in existence is the genesis empty
   grid ("death", is_dead) and the UI hid every breathe control on dead creatures — so NOTHING on
