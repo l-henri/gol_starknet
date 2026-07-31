@@ -62,13 +62,13 @@ function MintedDetail({ id }: { id: string }) {
   if (kind === "loading") return <Shell><p className="status-line"><span className="spinner" /> reading the chain…</p></Shell>;
   if (kind === "loop") return <LoopDetail id={id} />;
   if (kind === "path") return <PathDetail id={id} />;
-  return <Shell><p className="status-line">no creature #{id} is minted here.</p></Shell>;
+  return <Shell><p className="status-line">no creature #{id} is minted on Sepolia.</p></Shell>;
 }
 
 /* ---------- a living Bacterium: the ritual surface ---------- */
 function LoopDetail({ id }: { id: string }) {
   const { sdk, error } = useGolSdk();
-  const { address, connect, onAppChain, switchToAppChain } = useWallet();
+  const { address, connect, onSepolia, switchToSepolia } = useWallet();
   const bond = useBond(id);
   const connected = !!address;
 
@@ -156,7 +156,7 @@ function LoopDetail({ id }: { id: string }) {
 
   if (error) return <Shell><p className="status-line">the petri dish is offline: {error}</p></Shell>;
   if (loading) return <Shell><p className="status-line"><span className="spinner" /> reading the chain…</p></Shell>;
-  if (notFound) return <Shell><p className="status-line">no lifeform #{id} is minted here.</p></Shell>;
+  if (notFound) return <Shell><p className="status-line">no lifeform #{id} is minted on Sepolia.</p></Shell>;
   if (!lf) return null;
 
   const decId = tokenIdDecimal(lf.token_id);
@@ -237,15 +237,15 @@ function LoopDetail({ id }: { id: string }) {
                 <BreatheControl
                   creatureId={decId}
                   connected={connected}
-                  onAppChain={onAppChain}
+                  onSepolia={onSepolia}
                   onConnect={connect}
-                  onSwitch={switchToAppChain}
+                  onSwitch={switchToSepolia}
                   onExhaled={handleExhaled}
                   onTap={handleTap}
                 />
                 <p className="act-note">Tap to breathe; tap again within the moment to breathe deeper. When you stop, it goes forward that many generations in one breath (a NUT for each) and stays in your care (a 7-day bond, renewed each breath).</p>
 
-                {connected && onAppChain && bond?.held && (
+                {connected && onSepolia && bond?.held && (
                   <div className={"bond-clock" + (hungry ? " hungry" : "")}>
                     <span className="bond-dot" />
                     {left !== null && left <= 0
@@ -341,7 +341,7 @@ function PathDetail({ id }: { id: string }) {
   }, [sdk, pf]);
 
   if (loading) return <Shell><p className="status-line"><span className="spinner" /> reading the chain…</p></Shell>;
-  if (!pf) return <Shell><p className="status-line">no wanderer #{id} is minted here.</p></Shell>;
+  if (!pf) return <Shell><p className="status-line">no wanderer #{id} is minted on Sepolia.</p></Shell>;
 
   const dead = pf.life_state === "dead";
   const stateLabel = dead ? "Gone out · faded to nothing" : pf.life_state === "frozen" ? "Frozen · settles to a still life" : "Travelling · bound for a loop";
@@ -406,7 +406,7 @@ function BeastDetail() {
   const beast = findBeast(params.id)!;
   const router = useRouter();
   const { sdk } = useGolSdk();
-  const { address, connect, onAppChain, switchToAppChain } = useWallet();
+  const { address, connect, onSepolia, switchToSepolia } = useWallet();
   const { status, txHash, error, mint, reset } = useMint();
   const [info, setInfo] = useState<BeastInfo>({ kind: "loading" });
 
@@ -459,8 +459,8 @@ function BeastDetail() {
                 <Link className="btn set-free" href={`/life/${ready.tokenId}`}>Meet this creature →</Link>
               ) : !address ? (
                 <button className="btn set-free" onClick={connect}>Connect to set it free</button>
-              ) : !onAppChain ? (
-                <button className="btn set-free" onClick={switchToAppChain}>Switch network</button>
+              ) : !onSepolia ? (
+                <button className="btn set-free" onClick={switchToSepolia}>Switch to Sepolia</button>
               ) : (
                 <button className="btn set-free" onClick={() => (status === "error" ? reset() : ready && mint(ready.smallest, ready.period))} disabled={busy}>
                   {status === "signing" ? "Confirm in your wallet…" : status === "pending" ? "The chain is writing…" : status === "confirmed" ? "Born, taking you there…" : status === "error" ? "Try again" : `Set it free · ${period} $NUT`}

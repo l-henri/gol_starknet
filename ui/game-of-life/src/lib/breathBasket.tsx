@@ -61,7 +61,7 @@ function humanize(e: unknown, t: (d: Dict) => string): string {
   if (/reject|abort|denied|cancel/i.test(m))
     return t({ fr: "Tu as refusé la signature.", en: "You declined the signature." });
   if (/insufficient|balance|fee|funds/i.test(m))
-    return t({ fr: "Pas assez de gas pour nourrir.", en: "Not enough gas to feed." });
+    return t({ fr: "Pas assez de gas Sepolia pour nourrir.", en: "Not enough Sepolia gas to feed." });
   // Some wallets (seen with Xverse) throw a blank error when they fail to broadcast — never show an
   // empty message, or the failure reads as "nothing happened". Give an actionable fallback.
   const msg = m.trim();

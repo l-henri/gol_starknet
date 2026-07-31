@@ -71,7 +71,7 @@ const pickRandom = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.lengt
 
 export default function CreatePage() {
   const { sdk } = useGolSdk();
-  const { address, connect, onAppChain, switchToAppChain } = useWallet();
+  const { address, connect, onSepolia, switchToSepolia } = useWallet();
   const { status, error: mintError, mint, mintPath, reset, stalled, continueMint } = useMint();
   const nut = useNutBalance();
   const caps = useGasCaps();
@@ -375,8 +375,8 @@ export default function CreatePage() {
                       <Link className="btn primary" href={`/life/${tokenId}`}>This one already lives → meet it</Link>
                     ) : !address ? (
                       <button className="btn primary" onClick={connect}>Connect to set it free</button>
-                    ) : !onAppChain ? (
-                      <button className="btn primary" onClick={switchToAppChain}>Switch network</button>
+                    ) : !onSepolia ? (
+                      <button className="btn primary" onClick={switchToSepolia}>Switch to Sepolia</button>
                     ) : loopTx > MAX_TX ? (
                       <p className="dim">This one’s too big to set free right now (~{loopTx} signatures).</p>
                     ) : loopTx > 1 ? (
@@ -394,7 +394,7 @@ export default function CreatePage() {
                     )
                   )}
 
-                  {pathMintable && !pathMinted && address && onAppChain && pathTokenId && (
+                  {pathMintable && !pathMinted && address && onSepolia && pathTokenId && (
                     pathTx > MAX_TX ? null : pathTx > 1 ? (
                       <button className="btn ghost" onClick={() => sendToIncubator(pathTokenId, leftRows, pathSteps, "path", fate.kind === "loop" ? fate.period : 1)}>
                         keep the journey as a Wanderer (Incubator) →

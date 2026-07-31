@@ -19,7 +19,7 @@ export interface BreatheControlProps {
   /** the creature this control feeds (decimal or 0x hex token id) */
   creatureId: string;
   connected: boolean;
-  onAppChain: boolean;
+  onSepolia: boolean;
   onConnect: () => void;
   onSwitch: () => void;
   /** this creature's slice of the bundle confirmed (ok) or the bundle failed */
@@ -29,7 +29,7 @@ export interface BreatheControlProps {
   compact?: boolean;                           // Garden-tile variant
 }
 
-export default function BreatheControl({ creatureId, connected, onAppChain, onConnect, onSwitch, onExhaled, onTap, disabled = false, compact = false }: BreatheControlProps) {
+export default function BreatheControl({ creatureId, connected, onSepolia, onConnect, onSwitch, onExhaled, onTap, disabled = false, compact = false }: BreatheControlProps) {
   const { snapshot, tap } = useBreathBasket();
   const [remainMs, setRemainMs] = useState(0); // reduced-motion numeric countdown
   const [reduced, setReduced] = useState(false);
@@ -71,18 +71,18 @@ export default function BreatheControl({ creatureId, connected, onAppChain, onCo
   const handleTap = useCallback(() => {
     if (disabled || busy) return;
     if (!connected) return onConnect();
-    if (!onAppChain) return onSwitch();
+    if (!onSepolia) return onSwitch();
     if (!reduced) btnRef.current?.animate([{ transform: "scale(1)" }, { transform: "scale(1.06)" }, { transform: "scale(1)" }], { duration: 150, easing: "ease-out" });
     onTap?.();
     const r = tap(creatureId, (n, ok, hash, error) => onExhaledRef.current?.(n, ok, hash, error));
     if (r === "capped" && !reduced) { // at the shared cap: pulse the counter, nothing added
       countRef.current?.animate([{ transform: "translateX(0)" }, { transform: "translateX(-3px)" }, { transform: "translateX(3px)" }, { transform: "translateX(0)" }], { duration: 180 });
     }
-  }, [disabled, busy, connected, onAppChain, onConnect, onSwitch, reduced, onTap, tap, creatureId]);
+  }, [disabled, busy, connected, onSepolia, onConnect, onSwitch, reduced, onTap, tap, creatureId]);
 
   const label = phase === "exhaling" ? "exhaling…"
     : !connected ? "Connect to breathe"
-    : !onAppChain ? "Switch network"
+    : !onSepolia ? "Switch to Sepolia"
     : "Breathe life";
   const hint = phase === "exhaling" ? "sending your breath…"
     : busy ? "a breath is on its way…"

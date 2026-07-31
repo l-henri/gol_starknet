@@ -18,6 +18,22 @@
 
 ---
 
+## 2026-07-31 (5) — Walk-back: mainnet site flip moved off `main` to branch `mainnet`
+- **Goal:** Henri, after the (4) push: keep `main`/production on the SEPOLIA deployment for now;
+  the mainnet flip should live on a separate branch.
+- **Branch:** `main` · **Commits:** revert commit on `main`; branch `mainnet` = eada201 (pushed).
+- **Changed:** reverted the UI flip on `main` (NETWORK back to `sepolia`, `onSepolia` naming and
+  copy restored, old wasm artifact back). KEPT on `main`: `docs/mainnet-deployment.md` (the
+  contracts ARE live — deployments get recorded where they happen), the LOG (4) entry (append-only
+  history is never rewritten), the README index line, the v3-deployment cross-note, and the SDK's
+  `Network::Mainnet` address book (truthful + inert while the app says `sepolia`).
+- **Verified:** `tsc` ✅ · `next build` ✅ on the reverted tree; production redeploys Sepolia on push.
+- **Decisions:** the walk-back is about the SITE, not the chain — the mainnet contracts stay live
+  and owned by the strkd agent account. Flip = merge/FF branch `mainnet` (then rebuild wasm if the
+  SDK moved) whenever Henri wants.
+- **Next:** unchanged from (4), minus the production exposure: Henri can click through mainnet by
+  running the `mainnet` branch locally; first living creature still unminted (1 NUT escrow ready).
+
 ## 2026-07-31 (4) — MAINNET: the garden goes live on Starknet mainnet
 - **Goal:** Henri: "let's deploy to mainnet". Take the v3 stack (current `main`, incl. provenance,
   empty-grid genesis, metadata `image`, CEI pet fix) live on SN_MAIN and point the app at it.

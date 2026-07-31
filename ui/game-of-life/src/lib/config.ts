@@ -1,6 +1,6 @@
 // Shared client config.
 
-export const NETWORK = "mainnet";
+export const NETWORK = "sepolia";
 
 // Official Starknet nodes. They send NO CORS headers, so the browser can't fetch them directly;
 // everything goes through our same-origin proxy at /api/rpc (see app/api/rpc/route.ts).
