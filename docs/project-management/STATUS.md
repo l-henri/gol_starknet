@@ -74,6 +74,12 @@ dashes removed (comma/colon/period rewrites), `/` thesis now "…and go on livin
 caption "One of the most popular creatures…", `/create` ownership line removed, `/leaderboards`
 labels now "Oldest loops"/"Oldest wanderers". Strings only; `tsc --noEmit` clean; uncommitted on
 `main`. See LOG 2026-07-31.
+**2026-07-31 (link previews):** `/life/[id]` now unfurls per-creature — `generateMetadata` +
+`opengraph-image` (1200×630 PNG: current frame in the creature's on-chain palette, zoomed to its
+bounding box) on branch `feat/link-previews`, backed by a server-side JSON-RPC batch reader
+(`lib/linkPreview.ts`, `owner_of`-gated like the SDK, 120 s cache; sepolia+mainnet address book).
+Smoke-tested against live Sepolia tokens (loop/wanderer/beast/garbage); NOT yet merged or
+crawler-verified on a deployed URL. See LOG 2026-07-31 (8).
 **2026-07-29 (audit):** deep Cairo security audit (`/cairo-auditor`) over all 25 contracts —
 **no finding ≥75 confidence**; the live v3 identity/escrow/pet invariants held. Acted on two
 low-confidence notes: fixed `pet()` CEI ordering and removed the superseded v1 minter *source*

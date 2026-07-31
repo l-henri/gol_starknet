@@ -18,6 +18,40 @@
 
 ---
 
+## 2026-07-31 (8) — Link previews: /life/[id] unfurls as the creature's portrait
+- **Goal:** sharing a `/life/xx` link showed only the generic site title, no image — the page is
+  a client component, so crawlers saw nothing per-creature. Make every shared creature link
+  unfurl as its own portrait card.
+- **Branch:** `feat/link-previews` · **Commits:** this commit.
+- **Changed:** three new files in `ui/game-of-life`. `lib/linkPreview.ts` — server-side lookup
+  for preview routes: bestiary slugs resolve locally; minted ids go straight to the official
+  node over one JSON-RPC batch (no CORS server-side) against BOTH collections, existence gated
+  on `owner_of` exactly like the SDK's readers (the data getters return zeroed/default structs
+  instead of reverting — a wanderer id initially misclassified as a loop until the gate was
+  `owner_of`). Decodes the 7-felt GridState (41 rows × 41 bits, LE, mirrors
+  `crates/gol-sdk/src/grid.rs`) with hardcoded precomputed selectors (keeps starknet.js out of
+  the route bundle); carries its own v3 address book copy (sepolia + mainnet, keyed off
+  `NETWORK`) since the WASM SDK can't run in a route handler; `unstable_cache` 120 s so an
+  unfurl burst costs one node round-trip. `app/life/[id]/layout.tsx` — `generateMetadata`:
+  per-creature title/description/OG/Twitter (loop: name + generations lived, dead = "gone out…
+  accepts offerings"; wanderer: journey length; beast: "waiting to be discovered"; unknown ids
+  inherit the garden-wide card). `app/life/[id]/opengraph-image.tsx` — 1200×630 PNG via
+  `next/og`: the creature's current frame in its own on-chain palette on the left (one embedded
+  SVG `<img>`, not per-cell divs; viewBox zooms to the padded bounding box, min 15-cell window,
+  full dish on wrap), identity + fact + petri wordmark on the right; site palette.
+- **Verified:** `tsc` ✅ · `next lint` ✅ · `next build` ✅; dev-server smoke test against live
+  Sepolia tokens: loop (Period-2, palette + age correct), wanderer (40-gen journey), bestiary
+  glider, garbage id fallback — PNGs eyeballed, all meta tags checked in the served HTML. NOT
+  verified: real crawler unfurls (Slack/X/Discord) on a deployed URL; `metadataBase` relies on
+  Vercel's default (fine on prod, og:image URLs are relative-resolved).
+- **Decisions:** read the chain directly in the preview routes rather than through the WASM SDK
+  (can't instantiate in a route handler) or the `/api/rpc` proxy (same server — pointless hop).
+  Zoomed-bounding-box render over full-dish fidelity: a 3-cell blinker on the full 41×41 torus
+  reads as an empty card; the detail page keeps the full dish, the preview optimizes for
+  legibility.
+- **Next:** merge to `main`, then share a creature link in Slack/X and eyeball the real unfurl;
+  port comes free on `mainnet` (address book already keyed off `NETWORK`).
+
 ## 2026-07-31 (7) — Death accepts offerings: dead loops are feedable in the UI
 - **Goal:** Henri, testing the mainnet preview: the only token in existence is the genesis empty
   grid ("death", is_dead) and the UI hid every breathe control on dead creatures — so NOTHING on
