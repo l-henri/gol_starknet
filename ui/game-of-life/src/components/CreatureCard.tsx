@@ -75,18 +75,18 @@ export function BacteriaTile({ lf, hungry }: { lf: JsLifeform; hungry: boolean }
           <span className="petri-id mono">{id}</span>
         </div>
       </Link>
-      {!lf.is_dead && (
-        <div className="petri-hover-breathe">
-          <BreatheControl
-            compact
-            creatureId={lf.token_id}
-            connected={!!address}
-            onSepolia={onSepolia}
-            onConnect={connect}
-            onSwitch={switchToSepolia}
-          />
-        </div>
-      )}
+      {/* dead loops (the empty grid) stay feedable — the one dead thing that accepts offerings */}
+      <div className="petri-hover-breathe">
+        <BreatheControl
+          compact
+          creatureId={lf.token_id}
+          connected={!!address}
+          onSepolia={onSepolia}
+          onConnect={connect}
+          onSwitch={switchToSepolia}
+          voidMode={lf.is_dead}
+        />
+      </div>
     </div>
   );
 }

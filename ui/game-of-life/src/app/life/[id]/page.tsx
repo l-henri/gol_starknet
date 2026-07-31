@@ -232,7 +232,8 @@ function LoopDetail({ id }: { id: string }) {
               {rp && <Trait t="Pace" v={`${rp.speed} gen/s`} />}
             </div>
 
-            {!lf.is_dead && (
+            {lf.is_dead && <p className="dim" style={{ marginTop: 16 }}>This one has gone out. It rests on-chain, the stillness every creature settles into. It cannot be revived, but it accepts offerings.</p>}
+            {(
               <div className="acts">
                 <BreatheControl
                   creatureId={decId}
@@ -242,8 +243,11 @@ function LoopDetail({ id }: { id: string }) {
                   onSwitch={switchToSepolia}
                   onExhaled={handleExhaled}
                   onTap={handleTap}
+                  voidMode={lf.is_dead}
                 />
-                <p className="act-note">Tap to breathe; tap again within the moment to breathe deeper. When you stop, it goes forward that many generations in one breath (a NUT for each) and stays in your care (a 7-day bond, renewed each breath).</p>
+                <p className="act-note">{lf.is_dead
+                  ? "Each offering carries it one generation deeper into the same emptiness (a NUT for each), and keeps it in your care (a 7-day bond, renewed each offering). Nothing changes. That is the point."
+                  : "Tap to breathe; tap again within the moment to breathe deeper. When you stop, it goes forward that many generations in one breath (a NUT for each) and stays in your care (a 7-day bond, renewed each breath)."}</p>
 
                 {connected && onSepolia && bond?.held && (
                   <div className={"bond-clock" + (hungry ? " hungry" : "")}>
@@ -263,7 +267,6 @@ function LoopDetail({ id }: { id: string }) {
                 {bErr && <p className="breathe-err">{bErr}</p>}
               </div>
             )}
-            {lf.is_dead && <p className="dim" style={{ marginTop: 16 }}>This one has gone out. It rests on-chain, a record of a life.</p>}
           </div>
         </div>
 
