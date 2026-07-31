@@ -18,6 +18,36 @@
 
 ---
 
+## 2026-07-31 (4) — MAINNET: the garden goes live on Starknet mainnet
+- **Goal:** Henri: "let's deploy to mainnet". Take the v3 stack (current `main`, incl. provenance,
+  empty-grid genesis, metadata `image`, CEI pet fix) live on SN_MAIN and point the app at it.
+- **Branch:** `main` · **Commits:** this session's commit (contracts unchanged — deploy + SDK/UI
+  repoint + docs).
+- **Changed:** (1) declared 6 classes + deployed 6 contracts + full wiring in ONE multicall via
+  strkd (agent account `gol-mainnet` `0x0062e08b…2118` = creator/admin) — every address, class
+  hash, tx and fee in the new [mainnet-deployment.md](../mainnet-deployment.md); (2) SDK
+  `Network::Mainnet` address book filled (deploy_block 12_553_900, fresh-NUT note) + new
+  `mainnet_address_book_loads` test; (3) frontend flipped: `NETWORK="mainnet"`,
+  `onSepolia/switchToSepolia` renamed `onAppChain/switchToAppChain` with `TARGET_CHAIN_ID`
+  derived from NETWORK, `REF_TOKEN_ID` per-network (mainnet = the empty-grid genesis), all
+  user-visible "Sepolia" copy made network-neutral; wasm rebuilt.
+- **Decisions (Henri):** deploy NOW, external audit + governance hand-off consciously deferred
+  (2026-07-29 deep cairo-auditor pass is the launch basis); NUT initial supply **1** ("so death
+  can be spawned by the deployer; once a creature is alive the system can start"); fresh strkd
+  agent account (the Sepolia deployer no longer lists under this client); site flips to mainnet
+  after verification. Fee craft: tight custom resource_bounds (1.15×/1.2×) because auto-bounds
+  pad ~2.2× and the balance must cover the bound; biggest declares first. Total ≈ 306 STRK.
+- **Verified:** genesis token id == SDK `tokenIdForRows(empty)` (Rust↔Cairo proof on mainnet);
+  6/6 class hashes at addresses; all wiring events in the receipt; `token_uri` executes on the
+  mainnet public node WITH the `image` field (the metadata gate is closed on mainnet);
+  wasm SDK mainnet smoke (recentTokenIds → genesis, nutBalance = 1 NUT); `cargo test -p gol-sdk`
+  44 ✅ · `tsc` ✅ · `next build` ✅. NOT verified: a wallet click-through on the live mainnet
+  site (mint/breathe with real funds).
+- **Next:** Henri's live-site pass on mainnet (connect, breathe the genesis? it's dead — mint the
+  first living creature: deployer holds exactly 1 NUT = one period-1 escrow); consider admin
+  hand-off/immutability; Sepolia classes still lack the `image` metadata (upgrade or let the
+  testnet lag).
+
 ## 2026-07-31 (3) — Feature: the shared breath basket (feed many creatures in ONE tx)
 - **Goal:** Henri's feature request — tapping "breathe" on several creatures should bundle all
   intents into a single multicall transaction instead of one tx per creature.

@@ -29,7 +29,7 @@ const HUNGRY_DAYS = 2;
 export default function GardenHeader() {
   const pathname = usePathname() || "/";
   const { sdk } = useGolSdk();
-  const { address, connecting, connect, disconnect, onSepolia, switchToSepolia, txEpoch } = useWallet();
+  const { address, connecting, connect, disconnect, onAppChain, switchToAppChain, txEpoch } = useWallet();
   const nut = useNutBalance();
   const [census, setCensus] = useState<number | null>(null);
   const [wardsHungry, setWardsHungry] = useState(false);
@@ -94,8 +94,8 @@ export default function GardenHeader() {
         <button className="tb-connect primary" onClick={connect} disabled={connecting}>
           {connecting ? "Connecting…" : "Connect"}
         </button>
-      ) : !onSepolia ? (
-        <button className="tb-connect warn" onClick={switchToSepolia}>Wrong network</button>
+      ) : !onAppChain ? (
+        <button className="tb-connect warn" onClick={switchToAppChain}>Wrong network</button>
       ) : (
         <span className="tb-account">
           {wardsHungry && (

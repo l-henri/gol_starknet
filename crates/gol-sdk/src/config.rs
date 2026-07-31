@@ -62,7 +62,7 @@ impl GolAddresses {
     }
 }
 
-/// Known deployments shipped with the SDK. Mainnet filled in when live.
+/// Known deployments shipped with the SDK.
 /// Sepolia values are the live deployment (see project-management/STATUS.md); `bench` is the
 /// optimized `GolBench` instance used for the SNIP-36 benchmark.
 pub fn deployments(net: Network) -> Option<GolAddresses> {
@@ -86,7 +86,29 @@ pub fn deployments(net: Network) -> Option<GolAddresses> {
             // NUT is v2's token (first minted at block ~11_075_524) — feed history spans versions.
             nutrient_deploy_block: 11_075_000,
         }),
-        Network::Mainnet => None,
+        // Mainnet deployment — deployed 2026-07-31 via strkd, one multicall
+        // (docs/mainnet-deployment.md). Same v3 stack as Sepolia but with the post-Sepolia
+        // classes (mint provenance, empty-grid genesis, metadata `image`, CEI pet fix) and a
+        // FRESH NUT (1 NUT initial supply — the faucet mints the rest through feeding).
+        Network::Mainnet => Some(GolAddresses {
+            lifeforms: felt("0x05ebd2e7ca95af6a81863e89496ba2ca0b3765bd04227bde4b769afbc13e5784"),
+            path_lifeforms: felt(
+                "0x01259a8b553e5ae806620ff422eb85ccbce2b8ff034235e8d09e36060058f64e",
+            ),
+            nutrient: felt("0x075a2e584fea61cc3e8580fd6b96e065b2e038863c9d8bf4113b29d58eb0ced1"),
+            loop_minter: felt(
+                "0x00e92f01378b0b9c9b9a22c994a24bff5ed897be6c5d218aa0b8adf56f441b3d",
+            ),
+            path_minter: felt(
+                "0x05bf9b9d20523fa4a502cc16ae76f26a228dd73de7d1bcd4078b89cc5e0069ac",
+            ),
+            pets: felt("0x0492226c4ffc142e1c1c3c248bd8c9398e4379ddf28ce2d7d6eefbdfdae7e8ec"),
+            bench: None,
+            // Everything (deploys + wiring + genesis) landed in one tx at block 12_553_924.
+            deploy_block: 12_553_900,
+            // NUT is fresh on mainnet — same block as the collections.
+            nutrient_deploy_block: 12_553_900,
+        }),
     }
 }
 
@@ -141,6 +163,14 @@ mod tests {
         assert!(a.bench.is_none()); // v2 has no benchmark contract
         assert!(a.get(ContractKey::Bench).is_err());
         assert_eq!(a.get(ContractKey::Lifeforms).unwrap(), a.lifeforms);
-        assert!(deployments(Network::Mainnet).is_none());
+    }
+
+    #[test]
+    fn mainnet_address_book_loads() {
+        let a = deployments(Network::Mainnet).unwrap();
+        assert!(a.bench.is_none());
+        assert_eq!(a.get(ContractKey::Lifeforms).unwrap(), a.lifeforms);
+        // Fresh NUT on mainnet: the feed-history scan starts at the collection's own block.
+        assert_eq!(a.deploy_block, a.nutrient_deploy_block);
     }
 }

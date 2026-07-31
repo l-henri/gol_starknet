@@ -1,3 +1,5 @@
+import { NETWORK } from "./config";
+
 // The v2 token's on-chain HTML renderer, reconstructed CLIENT-SIDE.
 //
 // `htmlA`/`htmlB` are copied BYTE-FOR-BYTE from the contract's `render_html`
@@ -19,8 +21,12 @@ const htmlB = `;function hx(n){return '#'+n.toString(16).padStart(6,'0');}functi
 let tplA = htmlA;
 let tplB = htmlB;
 
-/** A permanently-minted token to read the live renderer from on boot (the seeded blinker). */
-export const REF_TOKEN_ID = "0x7d4eec5dea95c8a4cf6c781f7c8a7d75c3f05a384bb710a10bcc3ff7ddc4b9";
+/** A permanently-minted token to read the live renderer from on boot: the empty-grid genesis on
+ *  mainnet (minted by the v3 constructor), the seeded blinker on Sepolia. */
+export const REF_TOKEN_ID =
+  NETWORK === "mainnet"
+    ? "0x2d9fc289c9a2cf292a3000a46579a8a53a67b1f9cdd485d86ecacfdc45d0e4"
+    : "0x7d4eec5dea95c8a4cf6c781f7c8a7d75c3f05a384bb710a10bcc3ff7ddc4b9";
 
 /** Re-derive the template from a live token's decoded animation HTML so it tracks the DEPLOYED
  *  renderer. Splits on `ROWS=` … `SPEED=<n>`; keeps the bundled default if the markers aren't found

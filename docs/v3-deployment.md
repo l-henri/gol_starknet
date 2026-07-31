@@ -1,5 +1,9 @@
 # GoL v3 — Sepolia Deployment
 
+> **2026-07-31:** the production deployment is now **mainnet** — see
+> [mainnet-deployment.md](mainnet-deployment.md). This Sepolia stack stays live but the app no
+> longer points at it, and its classes predate the provenance/image/CEI changes shipped to mainnet.
+
 **Network:** SN_SEPOLIA · **Deployed:** 2026-07-06 · **Admin/deployer:** `0x026d87a881bc82eb038c4cc214fbccd16ea72b424b523a7b2b2551a2e495e70f` (strkd agent `gol-bench`)
 **Identity model:** orbit-canonical token ids ([v3-identity-spec.md](v3-identity-spec.md)).
 **NUT reused** from v2 (`0x60e0a0bd…4e2c9`); v2 collections stay live but are superseded.
