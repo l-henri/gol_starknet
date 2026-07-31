@@ -54,7 +54,7 @@ function Egg({ rows, pct, warm }: { rows: number[]; pct: number; warm?: boolean 
 
 export default function IncubatorPage() {
   const { sdk } = useGolSdk();
-  const { address, connect, onSepolia, switchToSepolia, txEpoch } = useWallet();
+  const { address, connect, onAppChain, switchToAppChain, txEpoch } = useWallet();
   const { status, error, progress, stalled, continueMint, mint, mintPath, reset } = useMint();
   const nut = useNutBalance();
   const router = useRouter();
@@ -147,9 +147,9 @@ export default function IncubatorPage() {
         </div>
       ) : (
         <>
-          {!onSepolia && (
+          {!onAppChain && (
             <div className="inc-connect">
-              <button className="btn set-free" onClick={switchToSepolia}>Switch to Sepolia to hatch</button>
+              <button className="btn set-free" onClick={switchToAppChain}>Switch network to hatch</button>
             </div>
           )}
 
@@ -177,7 +177,7 @@ export default function IncubatorPage() {
                         <p className="nut-note">Not enough NUT yet. Breathing life into creatures grows your supply. <Link href="/" className="tx-link">find one that needs a breath →</Link></p>
                       )}
                       <div className="egg-actions">
-                        <button className="btn set-free" disabled={busy || !onSepolia} onClick={() => hatch(p)}>
+                        <button className="btn set-free" disabled={busy || !onAppChain} onClick={() => hatch(p)}>
                           {active && progress ? `Hatching ${progress.current}/${progress.total}…` : "Continue hatching"}
                         </button>
                         <Link className="btn ghost" href={createHref(p.rows)}>Open in Create →</Link>
@@ -215,7 +215,7 @@ export default function IncubatorPage() {
                       </div>
                       <div className="egg-actions">
                         <Link className="btn set-free" href={`/create?load=${b.id}`}>Open in Create →</Link>
-                        <button className="btn ghost" disabled={busy || !onSepolia} onClick={() => hatch(b)} title="Set free without editing (big ones warm here)">
+                        <button className="btn ghost" disabled={busy || !onAppChain} onClick={() => hatch(b)} title="Set free without editing (big ones warm here)">
                           {active && progress ? `Hatching ${progress.current}/${progress.total}…` : "hatch it here"}
                         </button>
                         <button className="btn ghost" onClick={() => { removeBookmark(b.id); refresh(); }}>Forget</button>

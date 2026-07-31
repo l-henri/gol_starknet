@@ -30,7 +30,7 @@ function humanize(e: unknown, t: (d: Dict) => string): string {
       en: "This step is too heavy: the wallet under-estimated the gas.",
     });
   if (/insufficient|balance|funds|allowance/i.test(m))
-    return t({ fr: "Pas assez de gas Sepolia ou de $NUT pour libérer.", en: "Not enough Sepolia gas or $NUT to set it free." });
+    return t({ fr: "Pas assez de gas ou de $NUT pour libérer.", en: "Not enough gas or $NUT to set it free." });
   const msg = m.trim();
   if (!msg)
     return t({

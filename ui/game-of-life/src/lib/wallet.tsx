@@ -9,17 +9,18 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { RPC_URL_COMPAT } from "./config";
+import { NETWORK, RPC_URL_COMPAT } from "./config";
 import type { MeteringTier } from "./gasCaps";
 
-const SEPOLIA_CHAIN_ID = "0x534e5f5345504f4c4941"; // SN_SEPOLIA
+// The chain this build of the app lives on (felt-encoded short string).
+const TARGET_CHAIN_ID = NETWORK === "mainnet" ? "0x534e5f4d41494e" /* SN_MAIN */ : "0x534e5f5345504f4c4941"; /* SN_SEPOLIA */
 
 interface WalletCtx {
   address: string | null;
   chainId: string | null;
   connecting: boolean;
   error: string | null;
-  onSepolia: boolean;
+  onAppChain: boolean;
   /** on-chain gas-metering regime of the connected account (sets feed/mint caps); see gasCaps.ts */
   meteringTier: MeteringTier;
   /** bumps after a confirmed tx — UI reads (e.g. NUT) depend on it to refetch */
@@ -31,8 +32,8 @@ interface WalletCtx {
   /** wait for a tx to be accepted, then signal a refetch */
   waitForTx: (hash: string) => Promise<void>;
   waitForTxAccepted: (hash: string) => Promise<void>;
-  /** ask the connected wallet to switch to Sepolia (shows the wallet's own popup) */
-  switchToSepolia: () => Promise<void>;
+  /** ask the connected wallet to switch to the app's chain (shows the wallet's own popup) */
+  switchToAppChain: () => Promise<void>;
 }
 
 const Ctx = createContext<WalletCtx>({
@@ -40,7 +41,7 @@ const Ctx = createContext<WalletCtx>({
   chainId: null,
   connecting: false,
   error: null,
-  onSepolia: true,
+  onAppChain: true,
   meteringTier: "unknown",
   txEpoch: 0,
   connect: async () => {},
@@ -50,7 +51,7 @@ const Ctx = createContext<WalletCtx>({
   },
   waitForTx: async () => {},
   waitForTxAccepted: async () => {},
-  switchToSepolia: async () => {},
+  switchToAppChain: async () => {},
 });
 
 export const useWallet = () => useContext(Ctx);
@@ -82,7 +83,7 @@ async function readChainId(swo: any): Promise<string | null> {
 
 async function requestSwitch(swo: any): Promise<void> {
   if (swo?.request) {
-    await swo.request({ type: "wallet_switchStarknetChain", params: { chainId: SEPOLIA_CHAIN_ID } });
+    await swo.request({ type: "wallet_switchStarknetChain", params: { chainId: TARGET_CHAIN_ID } });
   }
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -147,8 +148,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         return;
       }
       swoRef.current = swo;
-      // react to in-wallet network/account changes so onSepolia + address stay current after a
-      // switch (this is why the button could get stuck on "Switch to Sepolia" after switching).
+      // react to in-wallet network/account changes so onAppChain + address stay current after a
+      // switch (this is why the button could get stuck on "Switch network" after switching).
       swo.on?.("networkChanged", () => {
         void readChainId(swo).then(setChainId);
       });
@@ -157,12 +158,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       const id = await readChainId(swo);
       setChainId(id);
       // wrong network on connect → invite to switch (the wallet shows its own popup)
-      if (id && id !== SEPOLIA_CHAIN_ID) {
+      if (id && id !== TARGET_CHAIN_ID) {
         try {
           await requestSwitch(swo);
           setChainId(await readChainId(swo));
         } catch {
-          /* user declined — the Switch-to-Sepolia affordances stay available */
+          /* user declined — the switch-network affordances stay available */
         }
       }
     } catch (e) {
@@ -254,7 +255,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const waitForTx = useCallback((hash: string) => pollTx(hash, false), [pollTx]);
   const waitForTxAccepted = useCallback((hash: string) => pollTx(hash, true), [pollTx]);
 
-  const switchToSepolia = useCallback(async () => {
+  const switchToAppChain = useCallback(async () => {
     const swo = swoRef.current;
     if (!swo) {
       setError("Connect a wallet first.");
@@ -270,7 +271,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Poll the wallet's chain while connected — not every wallet emits "networkChanged", so this
-  // guarantees a switch is reflected (and `onSepolia` updated) within a few seconds.
+  // guarantees a switch is reflected (and `onAppChain` updated) within a few seconds.
   useEffect(() => {
     if (!address) return;
     const poll = setInterval(() => {
@@ -300,11 +301,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     };
   }, [address]);
 
-  const onSepolia = !chainId || chainId === SEPOLIA_CHAIN_ID;
+  const onAppChain = !chainId || chainId === TARGET_CHAIN_ID;
 
   return (
     <Ctx.Provider
-      value={{ address, chainId, connecting, error, onSepolia, meteringTier, txEpoch, connect, disconnect, execute, waitForTx, waitForTxAccepted, switchToSepolia }}
+      value={{ address, chainId, connecting, error, onAppChain, meteringTier, txEpoch, connect, disconnect, execute, waitForTx, waitForTxAccepted, switchToAppChain }}
     >
       {children}
     </Ctx.Provider>
