@@ -60,6 +60,11 @@ to the connected wallet, reads all bond clocks via a new batched `bondStatuses` 
 round-trip; SDK `bond_statuses` on `call_batch`) + `lifeformsBatch`, and renders clocks before
 thumbnails hydrate. WASM rebuilt; cargo 43 ✅ · tsc ✅; not yet browser-verified with a bonded
 wallet. See LOG 2026-07-31 (2) + sdk-decisions 2026-07-31.
+**2026-07-31 (essay):** /why is now the **verbatim copy of docs/purpose.md** (they must not
+drift — edit purpose.md first, mirror to the page). Six fixes applied in both: 41x41 (makes the
+atoms-in-the-universe claim true), Strandbeest/Theo Jansen, leads/else's/bacteria, “Game of
+Life” quotes unified. Henri chose to keep the empty-grid-vs-loop framing and the hyphen dashes.
+See LOG 2026-07-31 (6).
 **2026-07-31 (copy):** Henri's copy pass applied across `ui/game-of-life` — all user-visible em
 dashes removed (comma/colon/period rewrites), `/` thesis now "…and go on living forever", feature
 caption "One of the most popular creatures…", `/create` ownership line removed, `/leaderboards`

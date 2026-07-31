@@ -18,6 +18,23 @@
 
 ---
 
+## 2026-07-31 (6) — /why is now the VERBATIM copy of purpose.md (+ 6 fixes in both)
+- **Goal:** Henri: /why must carry the exact text of docs/purpose.md, then fix the
+  inconsistencies he confirmed from my review.
+- **Branch:** `main` · **Commits:** this commit.
+- **Changed:** rewrote the /why essay as the word-for-word copy of purpose.md (title included;
+  the three live sims stay at the text's natural pauses). Then applied Henri's picks IN BOTH
+  files so they can't drift: 15x15 → **41x41** (this also makes the "more states than atoms in
+  the universe" claim true — 2^1681 vs ~10^80; it was FALSE at 15×15), **Strandbeest/Theo
+  Jansen** name fixes, "states lead" → "leads", "somebody else" → "somebody else's",
+  "bacterias" → "bacteria", and unified the Game of Life quotes to curly-caps (“Game of Life”).
+- **Explicitly ignored (Henri):** the "empty grid vs loop" dichotomy (poetically kept even
+  though the empty grid is technically a period-1 loop — and the mainnet genesis token);
+  "try and set them free"; the hyphens-as-dashes ("Moreover - …") stay despite the site-wide
+  em-dash ban.
+- **Verified:** `tsc` ✅ · `next build` ✅; corrected-marker counts match across both files.
+- **Next:** unchanged (mainnet browser pass via branch `mainnet`; first living creature).
+
 ## 2026-07-31 (5) — Walk-back: mainnet site flip moved off `main` to branch `mainnet`
 - **Goal:** Henri, after the (4) push: keep `main`/production on the SEPOLIA deployment for now;
   the mainnet flip should live on a separate branch.
