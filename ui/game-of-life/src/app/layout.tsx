@@ -3,6 +3,7 @@ import { Space_Grotesk, JetBrains_Mono, Press_Start_2P, Inter } from "next/font/
 import "./globals.css";
 import { GolSdkProvider } from "@/lib/sdk";
 import { WalletProvider } from "@/lib/wallet";
+import { BreathBasketProvider } from "@/lib/breathBasket";
 import { LangProvider } from "@/lib/i18n";
 import GardenHeader from "@/components/GardenHeader";
 import SiteFooter from "@/components/SiteFooter";
@@ -32,7 +33,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "petri — a garden of digital bacteria",
+  title: "petri, a garden of digital bacteria",
   description:
     "A tended garden of autonomous Conway's Game of Life creatures, living forever on Starknet. Watch them breathe, keep them alive, set your own free.",
 };
@@ -48,10 +49,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <LangProvider>
           <GolSdkProvider>
             <WalletProvider>
-              <FaviconBlinker />
-              <GardenHeader />
-              <main>{children}</main>
-              <SiteFooter />
+              <BreathBasketProvider>
+                <FaviconBlinker />
+                <GardenHeader />
+                <main>{children}</main>
+                <SiteFooter />
+              </BreathBasketProvider>
             </WalletProvider>
           </GolSdkProvider>
         </LangProvider>

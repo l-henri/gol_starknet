@@ -27,7 +27,7 @@ function humanize(e: unknown, t: (d: Dict) => string): string {
   if (/max l2gas|out of gas|gas.*too low|exceeded the max|resource bounds/i.test(m))
     return t({
       fr: "Trop lourd pour cette étape : le portefeuille a sous-estimé le gas.",
-      en: "This step is too heavy — the wallet under-estimated the gas.",
+      en: "This step is too heavy: the wallet under-estimated the gas.",
     });
   if (/insufficient|balance|funds|allowance/i.test(m))
     return t({ fr: "Pas assez de gas Sepolia ou de $NUT pour libérer.", en: "Not enough Sepolia gas or $NUT to set it free." });

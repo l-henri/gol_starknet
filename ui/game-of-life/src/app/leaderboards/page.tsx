@@ -17,8 +17,8 @@ const TOP = 25;
 type RP = { bg: number; cell: number; speed: number };
 type Board = "lived" | "methuselah" | "caretakers";
 const BOARDS: { key: Board; label: string; desc: string }[] = [
-  { key: "lived", label: "Longest-lived", desc: "Creatures by the generations they’ve lived." },
-  { key: "methuselah", label: "Methuselahs", desc: "The longest journeys before settling — the census the cellular-automata world has always loved." },
+  { key: "lived", label: "Oldest loops", desc: "Creatures by the generations they’ve lived." },
+  { key: "methuselah", label: "Oldest wanderers", desc: "The longest journeys before settling, the census the cellular-automata world has always loved." },
   { key: "caretakers", label: "Most devoted", desc: "Breaths given to keep the garden’s creatures alive." },
 ];
 
@@ -80,7 +80,7 @@ export default function RecordsPage() {
       <header className="records-lead">
         <span className="eyebrow">Records</span>
         <h1 className="records-title">The garden’s census.</h1>
-        <p className="records-sub">A quiet hall of fame — the longest lives, the farthest journeys, the most devoted hands. Every number is earned on-chain. Nothing here is bought.</p>
+        <p className="records-sub">A quiet hall of fame: the longest lives, the farthest journeys, the most devoted hands. Every number is earned on-chain. Nothing here is bought.</p>
       </header>
 
       <div className="records-toggle" role="group" aria-label="Choose a board">
@@ -94,8 +94,8 @@ export default function RecordsPage() {
 
       <div className="records-panel">
         {!ready && !sdkError && <p className="records-empty"><span className="spinner" /> scanning the chain…</p>}
-        {sdkError && <p className="records-empty">the petri dish is offline — {sdkError}</p>}
-        {ready && rows.length === 0 && <p className="records-empty">Nobody yet — be the first.</p>}
+        {sdkError && <p className="records-empty">the petri dish is offline: {sdkError}</p>}
+        {ready && rows.length === 0 && <p className="records-empty">Nobody yet. Be the first.</p>}
 
         {board === "lived" && lived.map((lf, i) => (
           <Link key={lf.token_id} href={`/life/${lf.token_id}`} className={"record-row" + (i === 0 ? " top1" : "")}>

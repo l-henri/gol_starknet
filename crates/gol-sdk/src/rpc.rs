@@ -107,6 +107,45 @@ impl RpcReader {
         Ok((held, felt_to_u128(at(&last, 0)?) as u64, felt_to_u128(at(&reap, 0)?) == 1))
     }
 
+    /// Pet-bond status for MANY creatures against one holder in a single batched HTTP round-trip
+    /// (3 `starknet_call`s per creature: `balance_of`, `last_pet_of`, `is_reapable`). `out[i]`
+    /// matches `creatures[i]`; a reverting call reads as `(false, 0, false)` — the same "skip this
+    /// creature" tolerance callers of `bond_status` apply. The batched counterpart to
+    /// `bond_status`, same shape as `lifeforms_batch` — the fix for the serialized /pets sweep.
+    pub async fn bond_statuses(
+        &self,
+        creatures: &[U256],
+        holder: Felt,
+    ) -> Result<Vec<(bool, u64, bool)>, GolError> {
+        if creatures.is_empty() {
+            return Ok(Vec::new());
+        }
+        let pets = self.addr(ContractKey::Pets)?;
+        let mut calls: Vec<(Felt, Felt, Vec<Felt>)> = Vec::with_capacity(creatures.len() * 3);
+        for c in creatures {
+            let mut bal_cd = vec![holder];
+            bal_cd.extend_from_slice(&c.to_calldata());
+            calls.push((pets, selector("balance_of"), bal_cd));
+            let mut cd = c.to_calldata().to_vec();
+            cd.push(holder);
+            calls.push((pets, selector("last_pet_of"), cd.clone()));
+            calls.push((pets, selector("is_reapable"), cd));
+        }
+        let results = self.call_batch(&calls).await?;
+        let first = |r: &Option<Vec<Felt>>| -> u128 {
+            r.as_ref().and_then(|v| v.first()).map(felt_to_u128).unwrap_or(0)
+        };
+        Ok((0..creatures.len())
+            .map(|i| {
+                (
+                    first(&results[i * 3]) == 1,
+                    first(&results[i * 3 + 1]) as u64,
+                    first(&results[i * 3 + 2]) == 1,
+                )
+            })
+            .collect())
+    }
+
     async fn call_raw(&self, to: Felt, sel: Felt, calldata: &[Felt]) -> Result<Vec<Felt>, GolError> {
         Ok(self
             .call_inner(to, sel, calldata, false)

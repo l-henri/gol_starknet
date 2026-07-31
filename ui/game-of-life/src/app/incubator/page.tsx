@@ -131,7 +131,7 @@ export default function IncubatorPage() {
       <header className="inc-lead">
         <span className="eyebrow">Incubator</span>
         <h1 className="inc-title">Eggs not yet hatched.</h1>
-        <p className="inc-sub">Births in progress and the creatures you’ve kept — warming quietly for your wallet until you’re ready.</p>
+        <p className="inc-sub">Births in progress and the creatures you’ve kept, warming quietly for your wallet until you’re ready.</p>
       </header>
 
       {!address ? (
@@ -158,7 +158,7 @@ export default function IncubatorPage() {
             <section className="inc-group">
               <div className="inc-group-head">
                 <h2>Hatches in progress</h2>
-                <span className="desc">warming — each needs a few signatures</span>
+                <span className="desc">warming, each needs a few signatures</span>
               </div>
               <div className="egg-grid">
                 {pending.map((p) => {
@@ -174,7 +174,7 @@ export default function IncubatorPage() {
                       </div>
                       <p className="nut-cost mono">costs {p.period} NUT · you have {nut ?? 0}</p>
                       {short && (
-                        <p className="nut-note">Not enough NUT yet — breathing life into creatures grows your supply. <Link href="/" className="tx-link">find one that needs a breath →</Link></p>
+                        <p className="nut-note">Not enough NUT yet. Breathing life into creatures grows your supply. <Link href="/" className="tx-link">find one that needs a breath →</Link></p>
                       )}
                       <div className="egg-actions">
                         <button className="btn set-free" disabled={busy || !onSepolia} onClick={() => hatch(p)}>
@@ -185,7 +185,7 @@ export default function IncubatorPage() {
                       </div>
                       {active && stalled && status === "signing" && (
                         <button className="btn set-free" onClick={continueMint}>
-                          Your wallet dozed off — knock again{progress ? ` ${progress.current}/${progress.total}` : ""}
+                          Your wallet dozed off, knock again{progress ? ` ${progress.current}/${progress.total}` : ""}
                         </button>
                       )}
                       {active && status === "error" && error && <p className="breathe-err">{error}</p>}
@@ -201,7 +201,7 @@ export default function IncubatorPage() {
             <section className="inc-group">
               <div className="inc-group-head">
                 <h2>Saved creatures</h2>
-                <span className="desc">kept from Create — open one to set it free</span>
+                <span className="desc">kept from Create, open one to set it free</span>
               </div>
               <div className="egg-grid">
                 {saved.map((b) => {
@@ -222,7 +222,7 @@ export default function IncubatorPage() {
                       </div>
                       {active && stalled && status === "signing" && (
                         <button className="btn set-free" onClick={continueMint}>
-                          Your wallet dozed off — knock again{progress ? ` ${progress.current}/${progress.total}` : ""}
+                          Your wallet dozed off, knock again{progress ? ` ${progress.current}/${progress.total}` : ""}
                         </button>
                       )}
                       {active && status === "error" && error && <p className="breathe-err">{error}</p>}

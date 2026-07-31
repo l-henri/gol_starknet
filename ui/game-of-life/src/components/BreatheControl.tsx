@@ -1,46 +1,51 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useBreathBasket, breathKey, type ExhaledHandler } from "@/lib/breathBasket";
 
-// RHYTHMIC BREATH — tapping "Breathe" opens a 1-second window; each further tap within it adds a
-// generation and refills the window; when the window empties, the accumulated breath is sent as ONE
-// transaction (N generations, N NUT, bond renewed — never auto-signed beyond the user's wallet
-// prompt). Tapping is care intensity, not batching: capped, no "max", no per-tx optimisation.
+// RHYTHMIC BREATH — tapping "Breathe" adds a generation for THIS creature to the shared breath
+// basket (lib/breathBasket) and refills its 1-second window; tapping other creatures' controls adds
+// their generations to the SAME bundle. When the window empties, the whole basket is sent as ONE
+// multicall transaction (per creature: N generations, N NUT, bond renewed — never auto-signed
+// beyond the user's wallet prompt). Tapping is care intensity, not batching: the ×cap is the
+// per-TRANSACTION budget shared across the bundle, no "max", no per-tx optimisation.
 //
 // Motion = computation: taps only pulse the button (and shimmer the grid via onTap) — the grid does
 // NOT step during accumulation; it fast-forwards only on the confirmed exhale (the parent drives
-// that). Respects prefers-reduced-motion (no pulses; the window becomes a numeric countdown).
-
-const WINDOW_MS = 1000;
+// that via onExhaled). Respects prefers-reduced-motion (no pulses; the window becomes a numeric
+// countdown).
 
 export interface BreatheControlProps {
-  cap: number;                                 // ×MAX — the wallet's deepest single breath
+  /** the creature this control feeds (decimal or 0x hex token id) */
+  creatureId: string;
   connected: boolean;
   onSepolia: boolean;
   onConnect: () => void;
   onSwitch: () => void;
-  /** send the accumulated breath; resolves true on confirm, false on reject/error */
-  onExhale: (depth: number) => Promise<boolean>;
+  /** this creature's slice of the bundle confirmed (ok) or the bundle failed */
+  onExhaled?: ExhaledHandler;
   onTap?: () => void;                          // parent: one-cell shimmer on the grid
   disabled?: boolean;                          // e.g. a creature that has gone out
   compact?: boolean;                           // Garden-tile variant
 }
 
-type Phase = "idle" | "accumulating" | "exhaling";
-
-export default function BreatheControl({ cap, connected, onSepolia, onConnect, onSwitch, onExhale, onTap, disabled = false, compact = false }: BreatheControlProps) {
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [depth, setDepth] = useState(0);
-  const [windowKey, setWindowKey] = useState(0); // remount the bar → restart its CSS drain
-  const [remainMs, setRemainMs] = useState(WINDOW_MS); // reduced-motion numeric countdown
+export default function BreatheControl({ creatureId, connected, onSepolia, onConnect, onSwitch, onExhaled, onTap, disabled = false, compact = false }: BreatheControlProps) {
+  const { snapshot, tap } = useBreathBasket();
+  const [remainMs, setRemainMs] = useState(0); // reduced-motion numeric countdown
   const [reduced, setReduced] = useState(false);
 
-  const depthRef = useRef(0);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const deadlineRef = useRef(0);
+  const key = breathKey(creatureId);
+  const depth = snapshot.depths[key] ?? 0;
+  const inBundle = depth > 0;
+  const busy = snapshot.phase === "exhaling"; // the basket is signing — every control waits
+  const phase = busy ? (inBundle ? "exhaling" : "idle") : inBundle ? "accumulating" : "idle";
+  const atCap = snapshot.total >= snapshot.cap;
+  const others = snapshot.total - depth; // generations queued for OTHER creatures in this breath
+
   const btnRef = useRef<HTMLButtonElement>(null);
   const countRef = useRef<HTMLSpanElement>(null);
+  const onExhaledRef = useRef<ExhaledHandler | undefined>(onExhaled);
+  useEffect(() => { onExhaledRef.current = onExhaled; }, [onExhaled]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -51,65 +56,40 @@ export default function BreatheControl({ cap, connected, onSepolia, onConnect, o
     return () => mq.removeEventListener?.("change", on);
   }, []);
 
-  const clearTimers = useCallback(() => {
-    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
-    if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
-  }, []);
-  useEffect(() => clearTimers, [clearTimers]);
+  // reduced-motion: tick down toward the shared deadline while this card is in the bundle
+  useEffect(() => {
+    if (!reduced || phase !== "accumulating" || !snapshot.deadline) return;
+    setRemainMs(Math.max(0, snapshot.deadline - performance.now()));
+    const tick = setInterval(() => {
+      const r = Math.max(0, snapshot.deadline - performance.now());
+      setRemainMs(r);
+      if (r <= 0) clearInterval(tick);
+    }, 100);
+    return () => clearInterval(tick);
+  }, [reduced, phase, snapshot.deadline]);
 
-  const send = useCallback(async () => {
-    clearTimers();
-    const n = depthRef.current;
-    if (n < 1) { setPhase("idle"); return; }
-    setPhase("exhaling");
-    await onExhale(n); // confirm OR reject → either way return to idle, depth discarded (no scolding)
-    depthRef.current = 0;
-    setDepth(0);
-    setPhase("idle");
-  }, [clearTimers, onExhale]);
-
-  const armWindow = useCallback(() => {
-    clearTimers();
-    setWindowKey((k) => k + 1);
-    deadlineRef.current = performance.now() + WINDOW_MS;
-    timerRef.current = setTimeout(() => { void send(); }, WINDOW_MS);
-    if (reduced) {
-      setRemainMs(WINDOW_MS);
-      tickRef.current = setInterval(() => {
-        const r = Math.max(0, deadlineRef.current - performance.now());
-        setRemainMs(r);
-        if (r <= 0) { if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; } }
-      }, 100);
-    }
-  }, [clearTimers, send, reduced]);
-
-  const tap = useCallback(() => {
-    if (disabled || phase === "exhaling") return;
+  const handleTap = useCallback(() => {
+    if (disabled || busy) return;
     if (!connected) return onConnect();
     if (!onSepolia) return onSwitch();
     if (!reduced) btnRef.current?.animate([{ transform: "scale(1)" }, { transform: "scale(1.06)" }, { transform: "scale(1)" }], { duration: 150, easing: "ease-out" });
     onTap?.();
-    if (phase === "idle") {
-      depthRef.current = 1; setDepth(1); setPhase("accumulating"); armWindow();
-      return;
+    const r = tap(creatureId, (n, ok, hash, error) => onExhaledRef.current?.(n, ok, hash, error));
+    if (r === "capped" && !reduced) { // at the shared cap: pulse the counter, nothing added
+      countRef.current?.animate([{ transform: "translateX(0)" }, { transform: "translateX(-3px)" }, { transform: "translateX(3px)" }, { transform: "translateX(0)" }], { duration: 180 });
     }
-    if (depthRef.current >= cap) { // at cap: pulse the counter, refill the window, but don't add
-      if (!reduced) countRef.current?.animate([{ transform: "translateX(0)" }, { transform: "translateX(-3px)" }, { transform: "translateX(3px)" }, { transform: "translateX(0)" }], { duration: 180 });
-      armWindow();
-      return;
-    }
-    depthRef.current += 1; setDepth(depthRef.current); armWindow();
-  }, [disabled, phase, connected, onSepolia, onConnect, onSwitch, reduced, onTap, cap, armWindow]);
+  }, [disabled, busy, connected, onSepolia, onConnect, onSwitch, reduced, onTap, tap, creatureId]);
 
-  const atCap = depth >= cap;
   const label = phase === "exhaling" ? "exhaling…"
     : !connected ? "Connect to breathe"
     : !onSepolia ? "Switch to Sepolia"
     : "Breathe life";
   const hint = phase === "exhaling" ? "sending your breath…"
+    : busy ? "a breath is on its way…"
     : phase === "idle" ? "tap to give a breath"
-    : atCap ? "a full breath — release to send"
-    : `tap again to breathe deeper (up to ×${cap})`;
+    : atCap ? "a full breath, release to send"
+    : others > 0 ? `×${snapshot.total} of ×${snapshot.cap} in this breath, across creatures`
+    : `tap again to breathe deeper (up to ×${snapshot.cap})`;
 
   return (
     <div className={"breathe" + (compact ? " compact" : "")}>
@@ -118,22 +98,22 @@ export default function BreatheControl({ cap, connected, onSepolia, onConnect, o
           ref={btnRef}
           type="button"
           className="btn set-free breathe-act"
-          onClick={tap}
-          onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); tap(); } }}
-          disabled={disabled || phase === "exhaling"}
+          onClick={handleTap}
+          onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); handleTap(); } }}
+          disabled={disabled || busy}
         >
           {label}
         </button>
-        {phase !== "idle" && (
+        {inBundle && (
           <span ref={countRef} key={depth} className={"breathe-count mono" + (atCap ? " full" : "")} aria-live="polite">×{depth}</span>
         )}
       </div>
 
       {phase === "accumulating" && (
         reduced ? (
-          <div className="breathe-countdown mono">sends in {(remainMs / 1000).toFixed(1)}s — tap to keep it open</div>
+          <div className="breathe-countdown mono">sends in {(remainMs / 1000).toFixed(1)}s, tap to keep it open</div>
         ) : (
-          <div className="breathe-bar" aria-hidden="true"><span key={windowKey} className="breathe-bar-fill" /></div>
+          <div className="breathe-bar" aria-hidden="true"><span key={snapshot.windowKey} className="breathe-bar-fill" /></div>
         )
       )}
 

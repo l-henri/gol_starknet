@@ -69,34 +69,34 @@ export default function WhyPage() {
     <div className="wrap why">
       <article className="why-essay">
         <span className="eyebrow">Why this exists</span>
-        <h1 className="why-title">Digital bacteria — simple lifeforms that can live forever, independent of the one who made them.</h1>
+        <h1 className="why-title">Digital bacteria: simple lifeforms that can live forever, independent of the one who made them.</h1>
 
-        <p>In the 1970s, a mathematician named John Conway posed a thought experiment: could a simple set of rules, run in a computer, give rise to complexity? He described the <em>Game of Life</em> — a program that defines the behaviour of a grid of pixels. Apply the rules once and the grid steps forward one generation, computing a new grid. Repeat, over and over, and you get the unpredictable, mesmerising patterns that have fascinated computer-science students for decades.</p>
+        <p>In the 1970s, a mathematician named John Conway posed a thought experiment: could a simple set of rules, run in a computer, give rise to complexity? He described the <em>Game of Life</em>, a program that defines the behaviour of a grid of pixels. Apply the rules once and the grid steps forward one generation, computing a new grid. Repeat, over and over, and you get the unpredictable, mesmerising patterns that have fascinated computer-science students for decades.</p>
 
-        <p>Consider a simple 41×41 grid. There is something fascinating in the fact that it has more possible states than there are atoms in the universe — and something profound in a set of rules that lets each of those states evolve in its own direction, toward its own destiny.</p>
+        <p>Consider a simple 41×41 grid. There is something fascinating in the fact that it has more possible states than there are atoms in the universe, and something profound in a set of rules that lets each of those states evolve in its own direction, toward its own destiny.</p>
 
-        <Sim seed={R_PENT} speed={3} cycleMs={16000} caption="one grid, evolving — no two moments quite alike" />
+        <Sim seed={R_PENT} speed={3} cycleMs={16000} caption="one grid, evolving; no two moments quite alike" />
 
-        <p>And they all lead somewhere. Evolve any state long enough and it converges on one of two fates: an empty grid that repeats forever, or a loop — a sequence of states that cycles without end. Every lifeform eventually settles into life, or death.</p>
+        <p>And they all lead somewhere. Evolve any state long enough and it converges on one of two fates: an empty grid that repeats forever, or a loop: a sequence of states that cycles without end. Every lifeform eventually settles into life, or death.</p>
 
         <div className="why-sim-pair">
-          <Sim seed={SPARK} speed={4} cycleMs={4200} caption="this one goes out — an empty grid, repeating" />
-          <Sim seed={BLINKER} speed={2} caption="this one finds a loop — it lives" />
+          <Sim seed={SPARK} speed={4} cycleMs={4200} caption="this one goes out: an empty grid, repeating" />
+          <Sim seed={BLINKER} speed={2} caption="this one finds a loop; it lives" />
         </div>
 
         <p>Where the experiment falls short, to my taste, is persistence. I can run all the states I want; the moment I turn off my computer, they all disappear. They look alive, but they aren’t autonomous. They depend on me.</p>
 
         <p>I want to try to set them free.</p>
 
-        <p>Blockchains are a substrate for digital life — always-on computers that let anyone, anywhere, interact with arbitrary programs. They are petri dishes for digital creatures, whether those are proto-financial systems, ownership registries, or digital bacteria. Running the Game of Life on one lets me make simple creatures that move forward forever, independent of me: define a grid, and give it a button anyone can push. If the creature is alive — if it leads to a loop — it will go on forever, as long as someone keeps pushing.</p>
+        <p>Blockchains are a substrate for digital life: always-on computers that let anyone, anywhere, interact with arbitrary programs. They are petri dishes for digital creatures, whether those are proto-financial systems, ownership registries, or digital bacteria. Running the Game of Life on one lets me make simple creatures that move forward forever, independent of me: define a grid, and give it a button anyone can push. If the creature is alive, if it leads to a loop, it will go on forever, as long as someone keeps pushing.</p>
 
-        <p>It’s the digital equivalent of Theo Jansen’s Strandbeest — the wind-powered creatures that live on real beaches, walking on their own long after he has walked away.</p>
+        <p>It’s the digital equivalent of Theo Jansen’s Strandbeest, the wind-powered creatures that live on real beaches, walking on their own long after he has walked away.</p>
 
-        <p>Why would it move forward, you ask? Why would anyone push it? Even when it’s cheap, it costs something to run a program on a blockchain. What’s in it for the person pushing? Here we reach what actually moves blockchains forward: social coordination. Tweak the program a little further and you can make your own bacteria, too. The rules of life are the same for everyone — find a pattern that’s alive and you can bring it on-chain, and it will live, independent of you.</p>
+        <p>Why would it move forward, you ask? Why would anyone push it? Even when it’s cheap, it costs something to run a program on a blockchain. What’s in it for the person pushing? Here we reach what actually moves blockchains forward: social coordination. Tweak the program a little further and you can make your own bacteria, too. The rules of life are the same for everyone: find a pattern that’s alive and you can bring it on-chain, and it will live, independent of you.</p>
 
-        <p>The only thing the program asks in return is that you breathe a little life into an existing creature. Mine, someone else’s — it doesn’t matter. Pick one you like. Move it forward a bit; give it some life, and it will give some back to you.</p>
+        <p>The only thing the program asks in return is that you breathe a little life into an existing creature. Mine, someone else’s, it doesn’t matter. Pick one you like. Move it forward a bit; give it some life, and it will give some back to you.</p>
 
-        <p>With an undefined, very large number of digital bacteria waiting to be discovered, there is a vast reservoir of life for our creatures to draw on. And once it’s done? We’ll see. If you’ve read this far, you’re probably as taken with this as I am. As long as people like you and me exist — as long as someone wants to push these lifeforms forward — they’ll keep living. That’s the beauty of blockchains: they keep programs available forever, to anyone who cares to use them.</p>
+        <p>With an undefined, very large number of digital bacteria waiting to be discovered, there is a vast reservoir of life for our creatures to draw on. And once it’s done? We’ll see. If you’ve read this far, you’re probably as taken with this as I am. As long as people like you and me exist, as long as someone wants to push these lifeforms forward, they’ll keep living. That’s the beauty of blockchains: they keep programs available forever, to anyone who cares to use them.</p>
 
         <p className="why-close">
           <Link href="/" className="why-invite">Pick one you like, and move it forward a bit →</Link>

@@ -26,6 +26,20 @@ export class GolSdk {
         return ret;
     }
     /**
+     * Bond status for MANY creatures against one holder in a single batched round-trip:
+     * `[{ creature_id, held, last_pet, reapable }]`, in input order (`creature_ids` echoes back
+     * verbatim). The batched counterpart to `bondStatus` — use for /pets-style sweeps.
+     * @param {any} creature_ids
+     * @param {string} holder
+     * @returns {Promise<any>}
+     */
+    bondStatuses(creature_ids, holder) {
+        const ptr0 = passStringToWasm0(holder, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.golsdk_bondStatuses(this.__wbg_ptr, creature_ids, ptr0, len0);
+        return ret;
+    }
+    /**
      * The `move_lifeform_forward_n(token_id, n)` call for the wallet to sign + send — advances `n`
      * generations and mints `n` NUT in one tx. `n` is clamped to >= 1 (the contract asserts n > 0).
      * @param {string} token_id
@@ -205,6 +219,17 @@ export class GolSdk {
         const ptr0 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
         const ret = wasm.golsdk_lifeform(this.__wbg_ptr, ptr0, len0);
+        return ret;
+    }
+    /**
+     * Hydrate many lifeforms in ~2 batched round-trips (batched `owner_of`, then batched
+     * `get_lifeform_data`). Unminted/burned ids are dropped; order follows the input. The
+     * per-id counterpart is `lifeform()`.
+     * @param {any} token_ids
+     * @returns {Promise<any>}
+     */
+    lifeformsBatch(token_ids) {
+        const ret = wasm.golsdk_lifeformsBatch(this.__wbg_ptr, token_ids);
         return ret;
     }
     /**
@@ -629,6 +654,11 @@ function __wbg_get_imports() {
             getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
             getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
         },
+        __wbg___wbindgen_boolean_get_edaed31a367ce1bd: function(arg0) {
+            const v = arg0;
+            const ret = typeof(v) === 'boolean' ? v : undefined;
+            return isLikeNone(ret) ? 0xFFFFFF : ret ? 1 : 0;
+        },
         __wbg___wbindgen_debug_string_8a447059637473e2: function(arg0, arg1) {
             const ret = debugString(arg1);
             const ptr1 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
@@ -648,6 +678,16 @@ function __wbg_get_imports() {
         __wbg___wbindgen_is_undefined_721f8decd50c87a3: function(arg0) {
             const ret = arg0 === undefined;
             return ret;
+        },
+        __wbg___wbindgen_jsval_loose_eq_4b9aba9e5b3c4582: function(arg0, arg1) {
+            const ret = arg0 == arg1;
+            return ret;
+        },
+        __wbg___wbindgen_number_get_1cc01dd708740256: function(arg0, arg1) {
+            const obj = arg1;
+            const ret = typeof(obj) === 'number' ? obj : undefined;
+            getDataViewMemory0().setFloat64(arg0 + 8 * 1, isLikeNone(ret) ? 0 : ret, true);
+            getDataViewMemory0().setInt32(arg0 + 4 * 0, !isLikeNone(ret), true);
         },
         __wbg___wbindgen_string_get_71bb4348194e31f0: function(arg0, arg1) {
             const obj = arg1;
@@ -715,12 +755,26 @@ function __wbg_get_imports() {
             const ret = Reflect.get(arg0, arg1);
             return ret;
         }, arguments); },
+        __wbg_get_unchecked_54a4374c38e08460: function(arg0, arg1) {
+            const ret = arg0[arg1 >>> 0];
+            return ret;
+        },
         __wbg_has_4f060fe202ad7e87: function() { return handleError(function (arg0, arg1) {
             const ret = Reflect.has(arg0, arg1);
             return ret;
         }, arguments); },
         __wbg_headers_d9123c649c85d441: function(arg0) {
             const ret = arg0.headers;
+            return ret;
+        },
+        __wbg_instanceof_ArrayBuffer_2a7bb09fee70c2da: function(arg0) {
+            let result;
+            try {
+                result = arg0 instanceof ArrayBuffer;
+            } catch (_) {
+                result = false;
+            }
+            const ret = result;
             return ret;
         },
         __wbg_instanceof_Response_79948c98d1d2ba75: function(arg0) {
@@ -733,11 +787,29 @@ function __wbg_get_imports() {
             const ret = result;
             return ret;
         },
+        __wbg_instanceof_Uint8Array_f080092dc70f5d58: function(arg0) {
+            let result;
+            try {
+                result = arg0 instanceof Uint8Array;
+            } catch (_) {
+                result = false;
+            }
+            const ret = result;
+            return ret;
+        },
+        __wbg_isArray_145a34fd0a38d37b: function(arg0) {
+            const ret = Array.isArray(arg0);
+            return ret;
+        },
         __wbg_iterator_cc47ba25a2be735a: function() {
             const ret = Symbol.iterator;
             return ret;
         },
         __wbg_length_589238bdcf171f0e: function(arg0) {
+            const ret = arg0.length;
+            return ret;
+        },
+        __wbg_length_c6054974c0a6cdb9: function(arg0) {
             const ret = arg0.length;
             return ret;
         },
@@ -899,12 +971,12 @@ function __wbg_get_imports() {
             return ret;
         },
         __wbindgen_cast_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 296, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 310, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__h74bcc3753d680b42);
             return ret;
         },
         __wbindgen_cast_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [], shim_idx: 268, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [], shim_idx: 282, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__hc0e1ada004448962);
             return ret;
         },

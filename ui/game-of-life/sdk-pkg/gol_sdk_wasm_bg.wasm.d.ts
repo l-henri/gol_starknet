@@ -3,6 +3,7 @@
 export const memory: WebAssembly.Memory;
 export const __wbg_golsdk_free: (a: number, b: number) => void;
 export const golsdk_bondStatus: (a: number, b: number, c: number, d: number, e: number) => any;
+export const golsdk_bondStatuses: (a: number, b: any, c: number, d: number) => any;
 export const golsdk_breatheLifeCall: (a: number, b: number, c: number, d: number) => [number, number, number];
 export const golsdk_breatheLifeForCall: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
 export const golsdk_challengeBurnCall: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number];
@@ -14,6 +15,7 @@ export const golsdk_findLoop: (a: number, b: number, c: number, d: number) => [n
 export const golsdk_findWitness: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
 export const golsdk_gridSize: (a: number) => any;
 export const golsdk_lifeform: (a: number, b: number, c: number) => any;
+export const golsdk_lifeformsBatch: (a: number, b: any) => any;
 export const golsdk_mintLoopCalls: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
 export const golsdk_new: (a: number, b: number, c: number, d: number) => [number, number, number];
 export const golsdk_nutBalance: (a: number, b: number, c: number) => any;

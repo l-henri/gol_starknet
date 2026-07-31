@@ -281,12 +281,12 @@ export default function CreatePage() {
       <div className="create-stage">
         {/* LEFT — the seed you draw (yours, not yet alive) */}
         <div className="board">
-          <div className="board-cap"><span className="board-name">your seed</span><span className="board-hint dim">yours — not yet alive</span></div>
+          <div className="board-cap"><span className="board-name">your seed</span><span className="board-hint dim">yours, not yet alive</span></div>
           <div className="create-grid-wrap">
             <GolCanvas cells={left} editable onPaint={paint} cellColor="#9ad1ff" bg="#070709" />
             {!hasDrawing && (
               <div className="create-hint">
-                <p>Tap and drag to draw — or</p>
+                <p>Tap and drag to draw, or</p>
                 <button className="btn primary lever" onClick={randomize}>Randomize</button>
               </div>
             )}
@@ -338,20 +338,20 @@ export default function CreatePage() {
             ) : fate.kind === "transient" ? (
               <>
                 <p className="verdict-head">Still wandering.</p>
-                <p className="verdict-line dim">It hasn’t settled after {WATCH_CAP.toLocaleString()} generations — a restless one. Try a smaller seed.</p>
+                <p className="verdict-line dim">It hasn’t settled after {WATCH_CAP.toLocaleString()} generations, a restless one. Try a smaller seed.</p>
               </>
             ) : fate.kind === "dead" ? (
               <>
                 <p className="verdict-head">It goes out.</p>
-                <p className="verdict-line dim">It fades to nothing after {fate.steps} generation{fate.steps === 1 ? "" : "s"} — beautiful while it lasted.</p>
+                <p className="verdict-line dim">It fades to nothing after {fate.steps} generation{fate.steps === 1 ? "" : "s"}, beautiful while it lasted.</p>
               </>
             ) : (
               <>
                 <p className="verdict-head">This one lives.</p>
                 <p className="verdict-line">
                   {fate.period === 1
-                    ? "It settles into a still life — calm forever."
-                    : `It loops forever — a rhythm every ${fate.period} beats.`}
+                    ? "It settles into a still life, calm forever."
+                    : `It loops forever, a rhythm every ${fate.period} beats.`}
                   {fate.steps > 0 ? ` It gets there after ${fate.steps} generation${fate.steps === 1 ? "" : "s"}.` : ""}
                 </p>
               </>
@@ -361,7 +361,7 @@ export default function CreatePage() {
               {busy ? (
                 <>
                   <p className="verdict-line"><span className="spinner" /> {status === "signing" ? "Confirm in your wallet…" : "Breathing it to life…"}</p>
-                  {stalled && <button className="btn primary" onClick={continueMint}>The wallet didn’t open — knock again</button>}
+                  {stalled && <button className="btn primary" onClick={continueMint}>The wallet didn’t open, knock again</button>}
                 </>
               ) : status === "error" ? (
                 <>
@@ -381,14 +381,14 @@ export default function CreatePage() {
                       <p className="dim">This one’s too big to set free right now (~{loopTx} signatures).</p>
                     ) : loopTx > 1 ? (
                       <button className="btn primary" onClick={() => sendToIncubator(tokenId!, fate.canonical, fate.period, "loop", fate.period)}>
-                        This one’s big — set it free in the Incubator →
+                        This one’s big, set it free in the Incubator →
                       </button>
                     ) : (
                       <>
                         <p className="nut-cost mono">This birth costs {loopCost} NUT · you have {nut ?? 0}</p>
                         <button className="btn primary set-free" onClick={openLoop} disabled={nutShort}>Set it free</button>
                         {nutShort && (
-                          <p className="nut-note">Not enough NUT yet — breathing life into creatures grows your supply. <Link href="/" className="tx-link">find one that needs a breath →</Link></p>
+                          <p className="nut-note">Not enough NUT yet. Breathing life into creatures grows your supply. <Link href="/" className="tx-link">find one that needs a breath →</Link></p>
                         )}
                       </>
                     )
@@ -404,7 +404,7 @@ export default function CreatePage() {
                         <p className="nut-cost mono">the journey costs {pathSteps} NUT · you have {nut ?? 0}</p>
                         <button className="btn ghost" onClick={openPath} disabled={nutShortPath}>keep the journey as a Wanderer</button>
                         {nutShortPath && (
-                          <p className="nut-note">Not enough NUT yet — breathing life into creatures grows your supply. <Link href="/" className="tx-link">find one that needs a breath →</Link></p>
+                          <p className="nut-note">Not enough NUT yet. Breathing life into creatures grows your supply. <Link href="/" className="tx-link">find one that needs a breath →</Link></p>
                         )}
                       </div>
                     )
@@ -417,7 +417,6 @@ export default function CreatePage() {
             </div>
           </div>
 
-          <p className="create-note">When you set it free, it belongs to whoever keeps it alive.</p>
         </div>
       </div>
 

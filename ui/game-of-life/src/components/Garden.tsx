@@ -129,12 +129,12 @@ export default function Garden() {
     <div className="wrap">
       {booting && <p className="status-line"><span className="spinner" /> warming up the petri dish…</p>}
       {scanning && <p className="status-line"><span className="spinner" /> scanning the chain for life…</p>}
-      {error && <p className="status-line">the petri dish is offline — {error}</p>}
+      {error && <p className="status-line">the petri dish is offline: {error}</p>}
 
       {anyReady && (
         <>
           {bothLoaded && total === 0 && (
-            <p className="status-line">the dish is empty — be the first to set a creature free.</p>
+            <p className="status-line">the dish is empty, be the first to set a creature free.</p>
           )}
 
           {featured && <FeatureTile data={featured} hungry={!!featuredHungry} />}
@@ -143,7 +143,7 @@ export default function Garden() {
             <section className="collection">
               <div className="collection-head">
                 <h2>Digital Bacteria</h2>
-                <span className="desc">living loops — kept alive by breath</span>
+                <span className="desc">living loops</span>
                 <span className="count">{loops?.length ?? 0}</span>
               </div>
               <div className="petri-grid">
@@ -163,7 +163,7 @@ export default function Garden() {
             <section className="collection">
               <div className="collection-head">
                 <h2>Digital Wanderers</h2>
-                <span className="desc">travelling portraits — a moment on the way to a loop</span>
+                <span className="desc">travelling portraits, a moment on the way to a loop</span>
                 <span className="count">{paths?.length ?? 0}</span>
               </div>
               <div className="petri-grid">

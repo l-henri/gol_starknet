@@ -8,9 +8,7 @@ import BreathCanvas from "@/components/BreathCanvas";
 import BreatheControl from "@/components/BreatheControl";
 import { useGolSdk } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
-import { useBreathe } from "@/lib/useBreathe";
 import { useBond, daysLeft } from "@/lib/usePet";
-import { useBreathCap } from "@/lib/gasCaps";
 import { useMint } from "@/lib/useMint";
 import { findBeast } from "@/lib/bestiary";
 import { rowsFromCoords } from "@/lib/creatures";
@@ -60,7 +58,7 @@ function MintedDetail({ id }: { id: string }) {
     return () => { cancelled = true; };
   }, [sdk, id]);
 
-  if (error) return <Shell><p className="status-line">the petri dish is offline — {error}</p></Shell>;
+  if (error) return <Shell><p className="status-line">the petri dish is offline: {error}</p></Shell>;
   if (kind === "loading") return <Shell><p className="status-line"><span className="spinner" /> reading the chain…</p></Shell>;
   if (kind === "loop") return <LoopDetail id={id} />;
   if (kind === "path") return <PathDetail id={id} />;
@@ -71,10 +69,8 @@ function MintedDetail({ id }: { id: string }) {
 function LoopDetail({ id }: { id: string }) {
   const { sdk, error } = useGolSdk();
   const { address, connect, onSepolia, switchToSepolia } = useWallet();
-  const { status: bStatus, txHash: bHash, error: bErr, breathe, reset: bReset } = useBreathe();
   const bond = useBond(id);
   const connected = !!address;
-  const breathCap = useBreathCap(); // the wallet's deepest single breath (×MAX), ×10 when unknown
 
   const [lf, setLf] = useState<JsLifeform | null>(null);
   const [rp, setRp] = useState<RP | null>(null);
@@ -91,6 +87,9 @@ function LoopDetail({ id }: { id: string }) {
   const [breathN, setBreathN] = useState(1);           // depth of the breath currently exhaling
   const [breathSignal, setBreathSignal] = useState(0); // increment → BreathCanvas plays the exhale
   const [breathing, setBreathing] = useState(false);   // during the fast-forward, show BreathCanvas over the iframe
+  const [bErr, setBErr] = useState<string | null>(null);
+  // this creature's slice of a confirmed basket exhale — seq distinguishes consecutive breaths
+  const [exhaled, setExhaled] = useState<{ n: number; hash: string | null; seq: number } | null>(null);
   const shimmerRef = useRef<HTMLSpanElement>(null);    // render-frame shimmer flashed on each tap
 
   const load = useCallback(async () => {
@@ -139,22 +138,23 @@ function LoopDetail({ id }: { id: string }) {
     return () => { cancelled = true; };
   }, [sdk, id, packEpoch]);
 
-  // a confirmed breath → play the fast-forward, roll the counter up by its depth, reward, then settle
+  // a confirmed breath (this creature's slice of the basket's multicall) → play the fast-forward,
+  // roll the counter up by its depth, reward, then settle
   useEffect(() => {
-    if (bStatus !== "confirmed") return;
-    const n = breathN;
+    if (!exhaled) return;
+    const { n, hash } = exhaled;
+    setBreathN(n);
     setBreathing(true);
     setBreathSignal((s) => s + 1);
-    setConfirmMsg({ text: `You gave it ${n} breath${n === 1 ? "" : "s"}. +${n} NUT.`, hash: bHash });
+    setConfirmMsg({ text: `You gave it ${n} breath${n === 1 ? "" : "s"}. +${n} NUT.`, hash });
     // roll the generation counter up by n, in step with the reel (~250ms/gen, capped for deep breaths)
     let done = 0;
     const per = n === 1 ? 900 : Math.max(60, Math.min(250, 6000 / n));
     const roll = setInterval(() => { done += 1; setShownAge((a) => a + 1); if (done >= n) clearInterval(roll); }, per);
-    const t = setTimeout(() => bReset(), Math.min(9000, 1400 + n * per));
-    return () => { clearInterval(roll); clearTimeout(t); };
-  }, [bStatus]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => clearInterval(roll);
+  }, [exhaled]);
 
-  if (error) return <Shell><p className="status-line">the petri dish is offline — {error}</p></Shell>;
+  if (error) return <Shell><p className="status-line">the petri dish is offline: {error}</p></Shell>;
   if (loading) return <Shell><p className="status-line"><span className="spinner" /> reading the chain…</p></Shell>;
   if (notFound) return <Shell><p className="status-line">no lifeform #{id} is minted on Sepolia.</p></Shell>;
   if (!lf) return null;
@@ -166,12 +166,12 @@ function LoopDetail({ id }: { id: string }) {
   const left = daysLeft(bond);
   const hungry = left !== null && left <= 2;
 
-  // the rhythmic-tap control accumulates a depth, then hands us the whole breath to send as one tx:
-  // N generations forward + N NUT + bond renewed. Resolves true on confirm so the control can settle.
-  const handleExhale = async (n: number): Promise<boolean> => {
-    if (bStatus === "error") bReset();
-    setBreathN(n);
-    return breathe(decId, n);
+  // the rhythmic-tap control feeds the shared breath basket; when the basket's multicall lands,
+  // this creature's slice comes back here (n generations + tx hash) to drive the ritual visuals.
+  const handleExhaled = (n: number, ok: boolean, hash: string | null, error: string | null) => {
+    if (!ok) { setBErr(error); return; }
+    setBErr(null);
+    setExhaled((p) => ({ n, hash, seq: (p?.seq ?? 0) + 1 }));
   };
   // each tap shimmers the render frame (motion = computation stays off — the grid only advances on
   // the confirmed exhale). Skipped under reduced motion.
@@ -235,21 +235,21 @@ function LoopDetail({ id }: { id: string }) {
             {!lf.is_dead && (
               <div className="acts">
                 <BreatheControl
-                  cap={breathCap}
+                  creatureId={decId}
                   connected={connected}
                   onSepolia={onSepolia}
                   onConnect={connect}
                   onSwitch={switchToSepolia}
-                  onExhale={handleExhale}
+                  onExhaled={handleExhaled}
                   onTap={handleTap}
                 />
-                <p className="act-note">Tap to breathe; tap again within the moment to breathe deeper. When you stop, it goes forward that many generations in one breath — a NUT for each — and stays in your care (a 7-day bond, renewed each breath).</p>
+                <p className="act-note">Tap to breathe; tap again within the moment to breathe deeper. When you stop, it goes forward that many generations in one breath (a NUT for each) and stays in your care (a 7-day bond, renewed each breath).</p>
 
                 {connected && onSepolia && bond?.held && (
                   <div className={"bond-clock" + (hungry ? " hungry" : "")}>
                     <span className="bond-dot" />
                     {left !== null && left <= 0
-                      ? "in your care · bond wilted — a breath revives it"
+                      ? "in your care · bond wilted, a breath revives it"
                       : `in your care · ${left! >= 1 ? `${Math.floor(left!)} day${Math.floor(left!) === 1 ? "" : "s"}` : `${Math.max(1, Math.round(left! * 24))} hours`} left`}
                   </div>
                 )}
@@ -260,7 +260,7 @@ function LoopDetail({ id }: { id: string }) {
                     {confirmMsg.hash && <a className="tx-link" href={explorerTxUrl(confirmMsg.hash)} target="_blank" rel="noreferrer">{shortAddr(confirmMsg.hash)} ↗</a>}
                   </div>
                 )}
-                {bStatus === "error" && bErr && <p className="breathe-err">{bErr}</p>}
+                {bErr && <p className="breathe-err">{bErr}</p>}
               </div>
             )}
             {lf.is_dead && <p className="dim" style={{ marginTop: 16 }}>This one has gone out. It rests on-chain, a record of a life.</p>}
@@ -274,7 +274,7 @@ function LoopDetail({ id }: { id: string }) {
             {pack === null ? (
               <p className="dim"><span className="spinner" /> reading the pack…</p>
             ) : pack.length === 0 ? (
-              <p className="dim">No caretakers yet — be the first to pet it.</p>
+              <p className="dim">No caretakers yet. Be the first to pet it.</p>
             ) : (
               <ul className="pack">
                 {pack.map((c) => (
@@ -381,14 +381,14 @@ function PathDetail({ id }: { id: string }) {
                     ? <span className="dim">a loop…</span>
                     : loopExists
                     ? <Link className="tx-link" href={`/life/${pf.target_loop_id}`}>a loop →</Link>
-                    : <Link className="tx-link" href={`/create?rows=${encodeURIComponent((loopRows ?? pf.start_state).join(","))}`}>a loop — not yet born, set it free →</Link>
+                    : <Link className="tx-link" href={`/create?rows=${encodeURIComponent((loopRows ?? pf.start_state).join(","))}`}>a loop not yet born, set it free →</Link>
                 } />
               )}
               {rp && <Trait t="Cell" v={<Swatch color={toHex(rp.cell)} />} />}
               {rp && <Trait t="Background" v={<Swatch color={toHex(rp.bg)} />} />}
             </div>
             <p className="dim" style={{ maxWidth: "44ch", marginTop: 14 }}>
-              A wanderer is a journey, not a pet — a pattern playing out from where it began, travelling toward its fate. It isn’t fed and holds no bond. Its rarity is the length of that journey: the farther it wandered from its loop, the rarer.
+              A wanderer is a journey, not a pet: a pattern playing out from where it began, travelling toward its fate. It isn’t fed and holds no bond. Its rarity is the length of that journey: the farther it wandered from its loop, the rarer.
             </p>
           </div>
         </div>
@@ -442,14 +442,14 @@ function BeastDetail() {
           <div className="life-right">
             <span className="eyebrow">waiting to be discovered · not yet on chain</span>
             <h1 className="life-name">{beast.name}</h1>
-            <p className="dim" style={{ maxWidth: "44ch" }}>A known {beast.family === "spaceship" ? "spaceship" : beast.family === "still" ? "still life" : "oscillator"} from Conway’s reservoir. Set it free — alive on Starknet, independent of you.</p>
+            <p className="dim" style={{ maxWidth: "44ch" }}>A known {beast.family === "spaceship" ? "spaceship" : beast.family === "still" ? "still life" : "oscillator"} from Conway’s reservoir. Set it free: alive on Starknet, independent of you.</p>
             <div className="trait-grid">
               <Trait t="Kind" v={beast.kind} />
               <Trait t="Fate" v={info.kind === "toolarge" ? "Travels forever" : "Alive · a loop"} />
               <Trait t="Loop period" v={period ? String(period) : info.kind === "toolarge" ? "large" : "…"} />
             </div>
-            {info.kind === "toolarge" && <div className="callout">This traveller never settles into a small loop on the 41×41 torus — too large to set free cheaply.</div>}
-            {ready?.minted && <div className="callout">Already discovered — it lives on Starknet. <Link className="tx-link" href={`/life/${ready.tokenId}`}>meet it ↗</Link></div>}
+            {info.kind === "toolarge" && <div className="callout">This traveller never settles into a small loop on the 41×41 torus, too large to set free cheaply.</div>}
+            {ready?.minted && <div className="callout">Already discovered. It lives on Starknet. <Link className="tx-link" href={`/life/${ready.tokenId}`}>meet it ↗</Link></div>}
             <div style={{ marginTop: 18 }}>
               {info.kind === "loading" ? (
                 <button className="btn" disabled><span className="spinner" /> reading the chain…</button>
@@ -463,7 +463,7 @@ function BeastDetail() {
                 <button className="btn set-free" onClick={switchToSepolia}>Switch to Sepolia</button>
               ) : (
                 <button className="btn set-free" onClick={() => (status === "error" ? reset() : ready && mint(ready.smallest, ready.period))} disabled={busy}>
-                  {status === "signing" ? "Confirm in your wallet…" : status === "pending" ? "The chain is writing…" : status === "confirmed" ? "Born — taking you there…" : status === "error" ? "Try again" : `Set it free · ${period} $NUT`}
+                  {status === "signing" ? "Confirm in your wallet…" : status === "pending" ? "The chain is writing…" : status === "confirmed" ? "Born, taking you there…" : status === "error" ? "Try again" : `Set it free · ${period} $NUT`}
                 </button>
               )}
               {txHash && (status === "pending" || status === "confirmed") && <a className="tx-link" href={explorerTxUrl(txHash)} target="_blank" rel="noreferrer" style={{ marginLeft: 12 }}>view tx ↗</a>}

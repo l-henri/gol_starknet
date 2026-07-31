@@ -9,6 +9,12 @@ export class GolSdk {
      */
     bondStatus(creature_id: string, holder: string): Promise<any>;
     /**
+     * Bond status for MANY creatures against one holder in a single batched round-trip:
+     * `[{ creature_id, held, last_pet, reapable }]`, in input order (`creature_ids` echoes back
+     * verbatim). The batched counterpart to `bondStatus` — use for /pets-style sweeps.
+     */
+    bondStatuses(creature_ids: any, holder: string): Promise<any>;
+    /**
      * The `move_lifeform_forward_n(token_id, n)` call for the wallet to sign + send — advances `n`
      * generations and mints `n` NUT in one tx. `n` is clamped to >= 1 (the contract asserts n > 0).
      */
@@ -62,6 +68,12 @@ export class GolSdk {
      * Lifeform by token id (decimal or `0x` hex), or `null` if unminted.
      */
     lifeform(token_id: string): Promise<any>;
+    /**
+     * Hydrate many lifeforms in ~2 batched round-trips (batched `owner_of`, then batched
+     * `get_lifeform_data`). Unminted/burned ids are dropped; order follows the input. The
+     * per-id counterpart is `lifeform()`.
+     */
+    lifeformsBatch(token_ids: any): Promise<any>;
     /**
      * `[approve, mint_loop]` calls for the wallet to sign + send. v3: `rows` may be ANY state of
      * the loop (the drawn orientation is preserved for display); the orbit canonical + witness
@@ -209,6 +221,7 @@ export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_golsdk_free: (a: number, b: number) => void;
     readonly golsdk_bondStatus: (a: number, b: number, c: number, d: number, e: number) => any;
+    readonly golsdk_bondStatuses: (a: number, b: any, c: number, d: number) => any;
     readonly golsdk_breatheLifeCall: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly golsdk_breatheLifeForCall: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
     readonly golsdk_challengeBurnCall: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number];
@@ -220,6 +233,7 @@ export interface InitOutput {
     readonly golsdk_findWitness: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
     readonly golsdk_gridSize: (a: number) => any;
     readonly golsdk_lifeform: (a: number, b: number, c: number) => any;
+    readonly golsdk_lifeformsBatch: (a: number, b: any) => any;
     readonly golsdk_mintLoopCalls: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
     readonly golsdk_new: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly golsdk_nutBalance: (a: number, b: number, c: number) => any;

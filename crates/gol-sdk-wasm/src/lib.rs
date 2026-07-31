@@ -361,6 +361,52 @@ impl GolSdk {
         to_js(&JsBond { held, last_pet: last_pet as f64, reapable })
     }
 
+    /// Bond status for MANY creatures against one holder in a single batched round-trip:
+    /// `[{ creature_id, held, last_pet, reapable }]`, in input order (`creature_ids` echoes back
+    /// verbatim). The batched counterpart to `bondStatus` — use for /pets-style sweeps.
+    #[wasm_bindgen(js_name = bondStatuses)]
+    pub async fn bond_statuses(&self, creature_ids: JsValue, holder: &str) -> Result<JsValue, JsValue> {
+        let ids: Vec<String> =
+            serde_wasm_bindgen::from_value(creature_ids).map_err(|e| js_err(e.to_string()))?;
+        let parsed = ids.iter().map(|s| parse_u256(s)).collect::<Result<Vec<_>, _>>()?;
+        let statuses = self
+            .client
+            .rpc()
+            .bond_statuses(&parsed, parse_felt(holder)?)
+            .await
+            .map_err(err)?;
+        #[derive(Serialize)]
+        struct JsBond {
+            creature_id: String,
+            held: bool,
+            last_pet: f64,
+            reapable: bool,
+        }
+        to_js(
+            &ids.iter()
+                .zip(statuses)
+                .map(|(id, (held, last_pet, reapable))| JsBond {
+                    creature_id: id.clone(),
+                    held,
+                    last_pet: last_pet as f64,
+                    reapable,
+                })
+                .collect::<Vec<_>>(),
+        )
+    }
+
+    /// Hydrate many lifeforms in ~2 batched round-trips (batched `owner_of`, then batched
+    /// `get_lifeform_data`). Unminted/burned ids are dropped; order follows the input. The
+    /// per-id counterpart is `lifeform()`.
+    #[wasm_bindgen(js_name = lifeformsBatch)]
+    pub async fn lifeforms_batch(&self, token_ids: JsValue) -> Result<JsValue, JsValue> {
+        let ids: Vec<String> =
+            serde_wasm_bindgen::from_value(token_ids).map_err(|e| js_err(e.to_string()))?;
+        let parsed = ids.iter().map(|s| parse_u256(s)).collect::<Result<Vec<_>, _>>()?;
+        let lfs = self.client.rpc().lifeforms_batch(&parsed).await.map_err(err)?;
+        to_js(&lfs.iter().map(JsLifeform::of).collect::<Vec<_>>())
+    }
+
     /// The v3 FAMILY token id for a drawn pattern — the id it would mint under (loops: pass the
     /// period; paths/wanderers: pass 0). Use to detect "this creature already lives" before the
     /// wallet ever opens: `lifeform(familyTokenId(...))` non-null ⇒ duplicate.

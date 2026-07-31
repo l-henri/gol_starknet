@@ -210,3 +210,26 @@ Proving`, via `thiserror`. SNIP-36 server reasons live in the `Proving` string.
 **Reason:** Mirrors the sibling's 5-variant `SdkError`: callers match a category, not dozens of
 codes. Consequence: reads that simply "miss" return `Ok(None)` (e.g. an unminted token), reserving
 errors for genuine faults.
+
+---
+
+## 2026-07-31 — List-shaped reads are batched JSON-RPC, one typed batch method per surface
+
+**Decision:** Any read the UI performs per-item over a list goes through `RpcReader::call_batch`
+(N `starknet_call`s in one JSON-RPC batch = one HTTP round-trip), wrapped in a typed batch method:
+`lifeforms_batch` / `paths_batch` (gallery, 2026-07) and now `bond_statuses` (/pets, this entry) —
+3 calls per (creature, holder) pair, decoded by index, reverts tolerated as `(false, 0, false)`.
+The WASM layer exposes each (`lifeformsBatch`, `bondStatuses`); pages must not loop per-id reads.
+
+**Alternatives considered:** (1) per-id calls behind a client-side concurrency pool (what /pets
+shipped with) — wall-clock grows linearly with list size ÷ pool width and each `bond_status` is
+itself 3 sequential round-trips; measured as multi-second spinners once the dish had dozens of
+petted creatures. (2) A single aggregate view entrypoint on-chain — cleanest wire format but needs
+a contract upgrade per read shape and can't serve old classes. (3) The indexer DataSource — right
+long-term home, but it doesn't exist yet and the event-scan path must stay usable.
+
+**Reason:** Batching keeps the read layer deployment-free and class-agnostic while collapsing
+latency from O(items) to O(1) round-trips; nodes and the CORS proxy accept JSON-RPC batch arrays
+already (proven by the gallery fix). Consequence: batch methods return input-ordered results and
+callers own the "which items matter" filter — pages should shrink the id list *before* batching
+(e.g. /pets filters the pet graph to the connected wallet's pairs first).

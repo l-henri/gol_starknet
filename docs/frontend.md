@@ -36,7 +36,7 @@ ui/game-of-life/src/
     ├── creatures.ts            # PURE Conway core (41×41): step, pack/unpack, population, colours
     ├── onchainRender.ts        # the contract's HTML renderer, rebuilt locally (no per-view token_uri)
     ├── useMint.ts              # discover-&-mint ritual (approve + mint_loop multicall)
-    ├── useBreathe.ts           # feed ritual (move_lifeform_forward_n batch)
+    ├── breathBasket.tsx        # BreathBasketProvider — the SHARED feed bundle (multi-creature multicall)
     ├── format.ts               # shortAddr, tokenIdDecimal, lifeformKind (bilingual), formatNut
     ├── config.ts               # RPC_URL (CORS gateway), NETWORK, explorerTxUrl
     ├── bestiary.ts             # known patterns (mostly dormant; see "bestiary" below)
@@ -55,8 +55,13 @@ holds a key.
 3. **Calldata builders** (synchronous, return JS call arrays): `sdk.mintLoopCalls(...)`,
    `sdk.breatheLifeCall(id, n)`, `sdk.setRenderParamsCall(...)`.
 4. **Signing**: `useWallet().execute(calls)` → `WalletAccount.execute` (wallet popup) → tx
-   hash → `waitForTx(hash)`. `useMint` / `useBreathe` wrap build → sign → wait, with a small
-   status state machine (`idle | signing | pending | confirmed | error`).
+   hash → `waitForTx(hash)`. `useMint` wraps build → sign → wait with a small status state
+   machine (`idle | signing | pending | confirmed | error`); feeds go through the **breath
+   basket** (2026-07-31): every `BreatheControl` tap adds a generation for ITS creature to one
+   shared bundle and refills one shared 1-second window; on expiry the basket sends the whole
+   bundle as a single multicall (per creature: `move_lifeform_forward_n(n-1)` + `pet`) — the
+   per-tx feed cap applies to the bundle's SUM. Route changes discard un-sent taps; each card
+   gets its slice back via `onExhaled(n, ok, txHash, error)`.
 
 `lib/sdk.tsx` loads the wasm-pack glue + module from `/public` at runtime (a
 `webpackIgnore` dynamic import, so Next never bundles the `.wasm`), calls its init, and
@@ -92,7 +97,7 @@ string in `t({ fr, en })`.
 Two non-component cases:
 - **Pure helpers** can't call the hook, so `lifeformKind()` returns a `Dict` (`{fr, en}`)
   and the caller does `t(lifeformKind(lf))`.
-- **Hooks** (`useMint`, `useBreathe`) call `useT()` and pass `t` into their `humanize(e, t)`
+- **Hooks** (`useMint`, the breath basket) call `useT()` and pass `t` into their `humanize(e, t)`
   error formatter (and list `t` in the callback deps; `t` is memoised on `lang`).
 
 Intentionally left English: the on-chain `LIFEFORM_DESCRIPTION` (canonical, contract-bound)
@@ -146,7 +151,8 @@ case the discover flow returns; safe to delete with `BeastDetail` if it doesn't.
 ## Extending the frontend
 
 - **New chain action:** add a calldata builder to the SDK (Rust → `npm run wasm`), then a
-  hook that builds → `execute` → `waitForTx` (mirror `useBreathe`/`useMint`).
+  hook that builds → `execute` → `waitForTx` (mirror `useMint`, or `breathBasket` for
+  bundled/multicall actions).
 - **New copy:** `useT()` + `t({ fr, en })`; pure helpers return a `Dict`.
 - **Render a state anywhere:** `<Creature rows={...} />` (or `coords` / `cells`).
 - **Don't** run `next build` while `next dev` is live — it clobbers `.next` and 500s the dev

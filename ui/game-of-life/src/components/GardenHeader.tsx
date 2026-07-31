@@ -99,10 +99,10 @@ export default function GardenHeader() {
       ) : (
         <span className="tb-account">
           {wardsHungry && (
-            <Link href="/pets" className="tb-hungry" title="A ward is hungry — pet it before its bond wilts" aria-label="A ward is hungry" />
+            <Link href="/pets" className="tb-hungry" title="A ward is hungry, pet it before its bond wilts" aria-label="A ward is hungry" />
           )}
           {nut !== null && (
-            <Link href="/pets" className="tb-nut" title="Your NUT — sustenance, grown by breathing life into creatures">NUT {nut.toLocaleString("en-US")}</Link>
+            <Link href="/pets" className="tb-nut" title="Your NUT: sustenance, grown by breathing life into creatures">NUT {nut.toLocaleString("en-US")}</Link>
           )}
           <button className="tb-connect" onClick={disconnect} title="Disconnect">{shortAddr(address)}</button>
         </span>
@@ -114,7 +114,7 @@ export default function GardenHeader() {
     <>
     <header className="topbar">
       <div className="topbar-inner">
-        <Link href="/" className="tb-brand" aria-label="petri — home">
+        <Link href="/" className="tb-brand" aria-label="petri, home">
           <span className="tb-heartbeat" aria-hidden="true" />
           <span className="tb-word">petri</span>
           <span className="tb-desc">a garden of digital bacteria</span>

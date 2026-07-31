@@ -18,6 +18,84 @@
 
 ---
 
+## 2026-07-31 (3) — Feature: the shared breath basket (feed many creatures in ONE tx)
+- **Goal:** Henri's feature request — tapping "breathe" on several creatures should bundle all
+  intents into a single multicall transaction instead of one tx per creature.
+- **Branch:** `main` · **Commits:** uncommitted WIP (working tree).
+- **Decisions (Henri, via 4-question interview):** hard cap at ONE tx (the per-tx feed cap —
+  ×82 legacy / ×340 modern — applies to the bundle's SUM, extra taps shake and add nothing);
+  the shared basket applies EVERYWHERE BreatheControl appears (garden tiles, /pets, /life/[id]);
+  navigating to another page CANCELS un-sent taps (no surprise wallet prompt on another page;
+  a bundle already signing is left to land); per-card feedback only, no global chip (each tapped
+  card keeps its ×n badge + the shared drain bar; the hint shows "×total of ×cap in this breath"
+  when several creatures are queued).
+- **Changed (ui only — no contract/SDK changes; Starknet accounts are natively multicall):**
+  - NEW `lib/breathBasket.tsx` — `BreathBasketProvider` (mounted in layout inside WalletProvider):
+    one Map of creature→depth, ONE shared 1s window re-armed by any tap; on drain it builds
+    `move_lifeform_forward_n(id, n-1) + pet(id)` per creature, concatenates, and sends ONE
+    `execute()`. `waitForTx` still bumps txEpoch → ward clocks/NUT chip refresh as before.
+    Per-creature `onExhaled(n, ok, txHash, error)` callbacks (last tap wins) return each card
+    its slice.
+  - `BreatheControl` rewritten to consume the basket (no local timer/depth); new props
+    `creatureId` + `onExhaled` replace `cap` + `onExhale`. All controls lock while a bundle signs.
+  - Consumers rewired: garden `BacteriaTile` (fire-and-forget), `/pets` `WardBreathe` (error
+    line from callback), `/life/[id]` (fast-forward + confirm message now driven by the
+    callback's `{n, hash}` instead of useBreathe's status machine).
+  - `lib/useBreathe.ts` DELETED (fully superseded; its `humanize` moved into the basket).
+  - `docs/frontend.md` module map + data-flow + extending sections updated.
+- **Verified:** `tsc --noEmit` ✅ · `next build` ✅ (all routes). NOT yet exercised with a real
+  wallet — the multi-creature multicall (2+ creatures, mixed depths) needs one live click-through.
+- **Next:** browser pass — tap A ×2 then B ×1, confirm one wallet prompt, both bonds renewed,
+  both cards settle; check the cancel-on-navigation path.
+
+## 2026-07-31 (2) — /pets load fix: wallet-sized batched sweep instead of dish-sized serial one
+- **Goal:** /pets was multi-second for wallets with several creatures — diagnose and fix.
+- **Branch:** `main` · **Commits:** uncommitted WIP (working tree).
+- **Why it was slow (all four compounding):** the page called `bondStatus` for EVERY creature
+  anyone had ever petted (the render then discarded the non-mine entries anyway); each
+  `bondStatus` was 3 sequential `starknet_call` round-trips; each kept ward paid 2 more serial
+  calls (`lifeform` = owner_of + get_lifeform_data); and nothing rendered until the whole
+  6-wide pool drained. ≈ (dish-wide petted count ÷ 6) × 3 RTT before first paint.
+- **Changed:**
+  - SDK (`rpc.rs`): new `bond_statuses(creatures, holder)` — 3 calls per creature in ONE
+    `call_batch` HTTP round-trip, input-ordered, reverts read as `(false, 0, false)`.
+  - WASM: `bondStatuses(ids, holder)` and `lifeformsBatch(ids)` (wraps the existing
+    `lifeforms_batch` the gallery fix added). Rebuilt via `bun run wasm`.
+  - `/pets` page: filters the pet graph to the connected wallet's pairs FIRST (the page only ever
+    shows petted-by-me entries — the old global sweep was pure waste), then two batched round-trips
+    (bonds, then lifeform states), rendering clocks as soon as bonds land and hydrating thumbnails
+    right after (`Ward.lf: undefined` = hydrating vs `null` = gone). `runPool` deleted.
+  - Decision logged in [sdk-decisions.md](../sdk-decisions.md) 2026-07-31 (list reads = batched
+    JSON-RPC, callers shrink the id list before batching).
+- **Verified:** `cargo test -p gol-sdk` ✅ (43) · `bun run wasm` ✅ (d.ts shows the new methods) ·
+  `tsc --noEmit` ✅. NOT yet clicked through in a browser with a bonded wallet.
+- **Next:** eyeball /pets with Henri's wallet; same batching would also suit the per-card
+  `renderParams` calls if thumbnails ever feel slow.
+
+## 2026-07-31 — Copy pass: kill the em dashes, plainer garden voice
+- **Goal:** apply Henri's copy corrections across the site.
+- **Branch:** `main` · **Commits:** uncommitted WIP (working tree).
+- **Changed (ui/game-of-life only, strings — no logic):**
+  - Removed the em dash (—) from every user-visible string (13 files: all pages + CreatureCard,
+    Garden, GardenHeader, BreatheControl, useMint error copy, the metadata `title`), rewriting each
+    with a comma/colon/period that keeps the sentence's cadence. Code comments keep theirs — they
+    aren't on the website. The `/pets` unknown-clock placeholder "—" became "…".
+  - `/` thesis: "…learned to stay alive, and go on living forever." (was "…— and go on breathing
+    without you.")
+  - Feature caption: "One of the most popular creatures, N generations and counting." (was "One of
+    the most-breathed lives in the dish — …")
+  - Garden loops wall: desc is now just "living loops" ("— kept alive by breath" removed).
+  - `/create`: removed the ownership line "When you set it free, it belongs to whoever keeps it
+    alive." (it's also not literally true — the NFT owner doesn't change with care).
+  - `/leaderboards`: board labels "Longest-lived" → "Oldest loops", "Methuselahs" → "Oldest
+    wanderers" (labels only; keys/data unchanged).
+- **Why:** Henri's copy review — the em-dash tic reads as AI voice; the breath metaphor was
+  overloaded in captions; Methuselah is CA-insider jargon the labels shouldn't require.
+- **Verified:** `tsc --noEmit` clean; grep confirms zero em dashes left outside comments. Not
+  eyeballed in a browser this session.
+- **Next:** unchanged — Henri's browser pass (/pets, /leaderboards, a pet from the UI) now also
+  covers this copy.
+
 ## 2026-07-29 (4) — Security audit (cairo-auditor deep) + pet() CEI fix + v1 dead-code removal
 - **Goal:** run a thorough Cairo security audit of the whole contract suite (the free NUT faucet is
   an intentional valueless proof-of-participation sink, explicitly out of scope), then act on it.

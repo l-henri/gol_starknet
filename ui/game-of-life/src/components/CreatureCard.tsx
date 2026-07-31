@@ -6,11 +6,9 @@ import Creature from "./Creature";
 import BreatheControl from "./BreatheControl";
 import { useGolSdk } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
-import { useBreathe } from "@/lib/useBreathe";
-import { useBreathCap } from "@/lib/gasCaps";
 import type { JsLifeform } from "@/lib/types";
 import { ageToScale } from "@/lib/creatures";
-import { shortAddr, tokenIdDecimal } from "@/lib/format";
+import { shortAddr } from "@/lib/format";
 
 // The site owns only the FRAME (backdrop / border / petri texture, in globals.css). The render
 // inside each tile is the creature's OWN on-chain look — bg/cell/speed come from the chain and are
@@ -41,8 +39,6 @@ const STATE_WORD: Record<TileState, string> = { alive: "alive", hungry: "hungry"
 export function BacteriaTile({ lf, hungry }: { lf: JsLifeform; hungry: boolean }) {
   const { sdk } = useGolSdk();
   const { address, onSepolia, connect, switchToSepolia } = useWallet();
-  const { breathe } = useBreathe();
-  const cap = useBreathCap();
   const [rp, setRp] = useState<RenderParams | null>(null);
   const id = shortAddr(lf.token_id);
   const state: TileState = lf.is_dead ? "gone" : hungry ? "hungry" : "alive";
@@ -57,7 +53,7 @@ export function BacteriaTile({ lf, hungry }: { lf: JsLifeform; hungry: boolean }
 
   return (
     <div className="petri-tile" data-state={state}>
-      <Link href={`/life/${lf.token_id}`} className="petri-tile-link" aria-label={`Bacteria ${id} — ${STATE_WORD[state]}`}>
+      <Link href={`/life/${lf.token_id}`} className="petri-tile-link" aria-label={`Bacteria ${id}, ${STATE_WORD[state]}`}>
         <div className="petri-dish">
           <div className="petri-render">
             <Creature
@@ -83,12 +79,11 @@ export function BacteriaTile({ lf, hungry }: { lf: JsLifeform; hungry: boolean }
         <div className="petri-hover-breathe">
           <BreatheControl
             compact
-            cap={cap}
+            creatureId={lf.token_id}
             connected={!!address}
             onSepolia={onSepolia}
             onConnect={connect}
             onSwitch={switchToSepolia}
-            onExhale={(n) => breathe(tokenIdDecimal(lf.token_id), n)}
           />
         </div>
       )}
@@ -118,9 +113,9 @@ export function FeatureTile({ data, hungry }: { data: FeatureData; hungry?: bool
   const name = isLoop ? (data.lf.is_still ? "Still Life" : `Period-${data.lf.sequence_length} Loop`) : "Wanderer";
   const line = isLoop
     ? (hungry
-        ? "One of the dish’s elders, now growing hungry — a breath keeps it going."
-        : `One of the most-breathed lives in the dish — ${data.lf.age.toLocaleString("en-US")} generations and counting.`)
-    : `One of the longest journeys — ${data.pf.sequence_length.toLocaleString("en-US")} generations before it settles into a loop.`;
+        ? "One of the dish’s elders, now growing hungry. A breath keeps it going."
+        : `One of the most popular creatures, ${data.lf.age.toLocaleString("en-US")} generations and counting.`)
+    : `One of the longest journeys, ${data.pf.sequence_length.toLocaleString("en-US")} generations before it settles into a loop.`;
   const rows = isLoop ? data.lf.current_state : data.pf.start_state;
 
   useEffect(() => {
@@ -167,7 +162,7 @@ export function WandererTile({ pf }: { pf: JsPath }) {
   }, [sdk, pf.token_id]);
 
   return (
-    <Link href={`/life/${pf.token_id}`} className="petri-tile" data-state={state} aria-label={`Wanderer ${id} — ${STATE_WORD[state]}`}>
+    <Link href={`/life/${pf.token_id}`} className="petri-tile" data-state={state} aria-label={`Wanderer ${id}, ${STATE_WORD[state]}`}>
       <div className="petri-dish">
         <div className="petri-render">
           <Creature

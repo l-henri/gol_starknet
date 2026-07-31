@@ -3,7 +3,7 @@
 > Snapshot of where the project stands. Keep this short and current — rewrite it each session.
 > History lives in [LOG.md](LOG.md); the plan lives in [ROADMAP.md](ROADMAP.md).
 
-**Last updated:** 2026-07-29
+**Last updated:** 2026-07-31
 **Framing:** WIP **art piece**, not a commercial product — the outcome is burning gas and creating art.
 **Active branch:** `main` — the **petri redesign merged to `main` and deployed to production on
 2026-07-24** (Vercel auto-deploy). What shipped: the Garden
@@ -34,6 +34,22 @@ null-tolerant on old classes), `/life/[id]` row. The `GolLifeformsV3` constructo
 the empty grid to the deployer (nonce 1, escrow 0) — fresh-deploy only (constructors don't run on
 upgrades). All uncommitted on `perf/garden-batching`; Sepolia classes NOT yet upgraded (tests:
 scarb ✅ · snforge 103 ✅ · sdk 43 ✅ · next build ✅).
+**2026-07-31 (feature):** the **shared breath basket** — breathe taps across MULTIPLE creatures
+(garden tiles, /pets, /life/[id]) now bundle into ONE multicall tx (per creature:
+`move_lifeform_forward_n(n-1)` + `pet`); the per-tx feed cap governs the bundle's sum; route
+change discards un-sent taps; per-card feedback only. New `lib/breathBasket.tsx` provider,
+BreatheControl rewritten, `useBreathe.ts` deleted. `tsc` ✅ · `next build` ✅; needs a live
+wallet click-through (2 creatures, one prompt). See LOG 2026-07-31 (3).
+**2026-07-31 (perf):** /pets no longer sweeps the whole dish — the page now filters the pet graph
+to the connected wallet, reads all bond clocks via a new batched `bondStatuses` (one JSON-RPC
+round-trip; SDK `bond_statuses` on `call_batch`) + `lifeformsBatch`, and renders clocks before
+thumbnails hydrate. WASM rebuilt; cargo 43 ✅ · tsc ✅; not yet browser-verified with a bonded
+wallet. See LOG 2026-07-31 (2) + sdk-decisions 2026-07-31.
+**2026-07-31 (copy):** Henri's copy pass applied across `ui/game-of-life` — all user-visible em
+dashes removed (comma/colon/period rewrites), `/` thesis now "…and go on living forever", feature
+caption "One of the most popular creatures…", `/create` ownership line removed, `/leaderboards`
+labels now "Oldest loops"/"Oldest wanderers". Strings only; `tsc --noEmit` clean; uncommitted on
+`main`. See LOG 2026-07-31.
 **2026-07-29 (audit):** deep Cairo security audit (`/cairo-auditor`) over all 25 contracts —
 **no finding ≥75 confidence**; the live v3 identity/escrow/pet invariants held. Acted on two
 low-confidence notes: fixed `pet()` CEI ordering and removed the superseded v1 minter *source*
@@ -88,7 +104,8 @@ confirmed by Henri (long wanderer minted). 99 Cairo + 43 SDK tests.
 
 ## Next up
 
-1. Henri's browser pass: /pets, /leaderboards, a pet from the UI.
+1. Henri's browser pass: /pets, /leaderboards, a pet from the UI — now including the shared
+   breath basket (tap 2+ creatures → ONE wallet prompt → both bonds renewed).
 2. Outreach package (audience-research plays): manifesto essay, genesis bestiary, no-wallet share
    loop, Seed Grant (check SNF conflict-of-interest).
 3. Exercise the tiled phase-segment loop mint on-chain; genesis reseed whenever Henri wants.
