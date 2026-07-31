@@ -18,6 +18,39 @@
 
 ---
 
+## 2026-07-31 (10) — /pets shows what you own · owner edits the look in place · wanderers move
+- **Goal:** three Henri reports from the live mainnet site: (1) the creature he minted and owns
+  never appears on /pets; (2) an owner can't change a creature's colours/speed; (3) garden
+  wanderers sit still.
+- **Branch:** `ui/pets-edit-wanderers` (off `mainnet`) · **Commits:** this commit.
+- **Changed:**
+  - **/pets — "Yours" section.** Root cause of (1): the page only walks the pet-bond graph
+    (`petPairs`), and minting/owning an NFT never creates a bond — so an owner who never petted
+    sees nothing. New "Yours" section lists owned loops (`sdk.ownedLifeforms`, with breathe) and
+    owned wanderers (`recentPaths(0)` filtered by owner — the path NFT has no per-owner index
+    yet). Wards/reaper sections unchanged; empty state now accounts for ownership too.
+  - **/life/[id] — in-place look editing for the owner.** New `components/LookEditor.tsx`:
+    the Cell/Background swatches open a colour palette on click, the Pace number becomes a
+    field on click (hover shows the affordance). Edits preview live (iframe + BreathCanvas
+    render the draft); a quiet bar offers "make it permanent" → one owner-only
+    `set_render_params` tx via the existing SDK builders (`setRenderParamsCall` /
+    `setPathRenderParamsCall` — wired into the UI for the first time). Client-side validation
+    mirrors the contract invariants (bg ≠ cell, 0 < speed < 200). Wanderer detail gains a Pace
+    trait. Editable only when connected + on the app chain + owner.
+  - **Garden wanderers animate.** `WandererTile` was `animate={false}`; now `animate={!dead}` —
+    the journey plays from its start state at its on-chain pace, consistent with FeatureTile
+    and the wanderer detail page.
+- **Verified:** `next build` ✅ (includes tsc + lint). NOT browser-clicked: the owner edit tx
+  and the /pets owned scan need a connected wallet on mainnet — fold into Henri's mainnet pass.
+- **Decisions:** animating wanderer tiles does NOT touch the on-chain "paths are static
+  snapshots" decision (path-creatures-spec §9) — that is about feeding/age, and stands; this is
+  display only, and the detail page already played the journey. Look edits apply as ONE tx per
+  save (draft + explicit "make it permanent"), not a tx per picker tick — a colour drag fires
+  dozens of change events. Owned wanderers are found by filtering the full path collection;
+  fine at today's size, wants a per-owner event scan in the SDK if the dish grows.
+- **Next:** Henri clicks through on mainnet (owned section, a colour + pace edit, a moving
+  wanderer wall); consider an SDK `ownedPaths(address)` to replace the client-side filter.
+
 ## 2026-07-31 (9) — /create imports RLE (the forum pattern format)
 - **Goal:** Henri browses Game-of-Life forums where patterns are shared as RLE (`x = …, y = …,
   rule = B3/S23` + `b`/`o` runs). Let those be pasted straight onto the /create seed grid

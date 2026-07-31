@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import Creature from "@/components/Creature";
 import BreatheControl from "@/components/BreatheControl";
+import { type JsPath } from "@/components/CreatureCard";
 import { useGolSdk } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
 import { daysLeft, type BondState } from "@/lib/usePet";
@@ -51,6 +52,24 @@ function WardThumb({ lf }: { lf: JsLifeform | null | undefined }) {
   );
 }
 
+/* a wanderer thumbnail — its journey playing out in its own on-chain colours */
+function PathThumb({ pf }: { pf: JsPath }) {
+  const { sdk } = useGolSdk();
+  const [rp, setRp] = useState<RP | null>(null);
+  useEffect(() => {
+    if (!sdk) return;
+    let c = false;
+    sdk.pathRenderParams(pf.token_id).then((p) => { if (!c && p) setRp(p as RP); });
+    return () => { c = true; };
+  }, [sdk, pf.token_id]);
+  const dead = pf.life_state === "dead";
+  return (
+    <div className="ward-thumb">
+      <Creature rows={pf.start_state} bg={rp?.bg} cell={rp?.cell} speed={rp?.speed} variant={dead ? "dead" : "living"} animate={!dead} res={200} ariaLabel="wanderer" />
+    </div>
+  );
+}
+
 /* The per-ward breathe: the same rhythmic tap as the creature page — taps join the SHARED breath
    basket, so tapping several wards bundles them into one multicall tx (per creature: N gens +
    N NUT + bond renewed); a confirmed breath bumps txEpoch, which refreshes the ward list + clocks. */
@@ -79,6 +98,9 @@ export default function WardsPage() {
   const { address, connect, txEpoch } = useWallet();
 
   const [entries, setEntries] = useState<Ward[] | null>(null);
+  // the NFTs this wallet OWNS — a different relation from a ward: owning (set free / traded in)
+  // never creates a pet bond, so owned creatures don't appear in the bond sweep below.
+  const [owned, setOwned] = useState<{ loops: JsLifeform[]; paths: JsPath[] } | null>(null);
 
   // Only creatures I'VE petted can appear on this page (wards = held bonds, the reaper's rounds =
   // lapsed ones), so the sweep is wallet-sized, never dish-sized. Two batched round-trips: all bond
@@ -116,6 +138,27 @@ export default function WardsPage() {
     return () => { cancelled = true; };
   }, [sdk, address, txEpoch]);
 
+  // Owned NFTs: loops via the ownership event scan; wanderers by filtering the (small) path
+  // collection on owner — the path NFT has no per-owner index yet.
+  useEffect(() => {
+    if (!sdk || !address) { setOwned(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const [loops, paths] = await Promise.all([
+          sdk.ownedLifeforms(address).catch(() => []),
+          sdk.recentPaths(0).catch(() => []),
+        ]);
+        if (cancelled) return;
+        setOwned({
+          loops: ((loops as JsLifeform[]) ?? []),
+          paths: (((paths as JsPath[]) ?? [])).filter((p) => sameId(p.owner, address)),
+        });
+      } catch { if (!cancelled) setOwned({ loops: [], paths: [] }); }
+    })();
+    return () => { cancelled = true; };
+  }, [sdk, address, txEpoch]);
+
   const wards = useMemo(() => (entries ?? []).filter((e) => e.bond.held).sort((a, b) => (a.left ?? 0) - (b.left ?? 0)), [entries]);
   const reaped = useMemo(() => (entries ?? []).filter((e) => !e.bond.held), [entries]);
 
@@ -133,13 +176,49 @@ export default function WardsPage() {
         </div>
       ) : entries === null ? (
         <p className="dim" style={{ marginTop: 24 }}><span className="spinner" /> reading the pack…</p>
-      ) : wards.length === 0 && reaped.length === 0 ? (
-        <div className="wards-empty">
-          <p className="wards-empty-line">No wards yet.</p>
-          <p className="wards-empty-sub">Pet a creature in the <Link href="/" className="tx-link">garden</Link> to take one into your care.</p>
-        </div>
       ) : (
         <>
+          {/* YOURS — the NFTs this wallet owns. Ownership is a different relation from care:
+              setting a creature free (or trading it in) never creates a pet bond, so without
+              this section an owner would never find their own creature here. */}
+          {owned === null ? (
+            <p className="dim" style={{ marginTop: 24 }}><span className="spinner" /> looking for creatures you own…</p>
+          ) : (owned.loops.length + owned.paths.length > 0 && (
+            <section className="wards-group">
+              <div className="wards-group-head"><h2>Yours</h2><span className="desc">the creatures you own — set free by you, or traded into your keeping</span></div>
+              <div className="ward-grid">
+                {owned.loops.map((lf) => (
+                  <div key={lf.token_id} className="ward-card">
+                    <Link href={`/life/${lf.token_id}`}><WardThumb lf={lf} /></Link>
+                    <div className="ward-body">
+                      <Link href={`/life/${lf.token_id}`} className="ward-name">{deriveName(lf)}</Link>
+                      <span className="ward-name-sm">{lf.is_dead ? "gone out" : `alive · ${lf.age.toLocaleString("en-US")} generations`}</span>
+                      <div className="ward-actions">
+                        <WardBreathe creatureId={lf.token_id} voidMode={!!lf.is_dead} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {owned.paths.map((pf) => (
+                  <div key={pf.token_id} className="ward-card">
+                    <Link href={`/life/${pf.token_id}`}><PathThumb pf={pf} /></Link>
+                    <div className="ward-body">
+                      <Link href={`/life/${pf.token_id}`} className="ward-name">Wanderer</Link>
+                      <span className="ward-name-sm">{pf.life_state === "dead" ? "gone out" : `a journey of ${pf.sequence_length.toLocaleString("en-US")} generations`}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+
+          {wards.length === 0 && reaped.length === 0 && owned !== null && owned.loops.length + owned.paths.length === 0 && (
+            <div className="wards-empty">
+              <p className="wards-empty-line">No creatures yet.</p>
+              <p className="wards-empty-sub">Pet a creature in the <Link href="/" className="tx-link">garden</Link> to take one into your care, or <Link href="/create" className="tx-link">set one free</Link> to own it.</p>
+            </div>
+          )}
+
           {/* YOUR WARDS */}
           {wards.length > 0 && (
             <section className="wards-group">

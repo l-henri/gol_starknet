@@ -144,8 +144,9 @@ export function FeatureTile({ data, hungry }: { data: FeatureData; hungry?: bool
 }
 
 /**
- * DIGITAL WANDERERS — a captured moment of a pattern still travelling toward its loop. A static
- * portrait: no stepping, no care affordance. It shows its on-chain palette, held still.
+ * DIGITAL WANDERERS — a pattern still travelling toward its loop, playing out its journey from
+ * where it began (in its on-chain palette, at its on-chain pace). No care affordance — a wanderer
+ * is watched, not fed.
  */
 export function WandererTile({ pf }: { pf: JsPath }) {
   const { sdk } = useGolSdk();
@@ -171,7 +172,7 @@ export function WandererTile({ pf }: { pf: JsPath }) {
             cell={rp?.cell}
             speed={rp?.speed}
             variant={dead ? "dead" : "living"}
-            animate={false}
+            animate={!dead}
             res={440}
             ariaLabel={`wanderer ${id}`}
           />

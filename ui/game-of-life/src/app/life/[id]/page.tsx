@@ -8,6 +8,7 @@ import BreathCanvas from "@/components/BreathCanvas";
 import BreatheControl from "@/components/BreatheControl";
 import { useGolSdk } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
+import { EditableSwatch, EditablePace, LookBar, useLookApply, type Look } from "@/components/LookEditor";
 import { useBond, daysLeft } from "@/lib/usePet";
 import { useMint } from "@/lib/useMint";
 import { findBeast } from "@/lib/bestiary";
@@ -74,6 +75,7 @@ function LoopDetail({ id }: { id: string }) {
 
   const [lf, setLf] = useState<JsLifeform | null>(null);
   const [rp, setRp] = useState<RP | null>(null);
+  const [draft, setDraft] = useState<Look | null>(null); // the owner's previewed look, not yet on-chain
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -154,6 +156,14 @@ function LoopDetail({ id }: { id: string }) {
     return () => clearInterval(roll);
   }, [exhaled]);
 
+  // the owner edits the look in place (swatches + pace become controls): the draft previews live,
+  // one owner-only `set_render_params` tx makes it permanent. On success adopt the applied look
+  // directly — no re-read, the tx is the source of truth.
+  const lookSave = useLookApply(
+    (d) => sdk!.setRenderParamsCall(lf!.token_id, d.bg, d.cell, d.speed),
+    (d) => { setRp(d); setDraft(null); }
+  );
+
   if (error) return <Shell><p className="status-line">the petri dish is offline: {error}</p></Shell>;
   if (loading) return <Shell><p className="status-line"><span className="spinner" /> reading the chain…</p></Shell>;
   if (notFound) return <Shell><p className="status-line">no lifeform #{id} is minted here.</p></Shell>;
@@ -165,6 +175,11 @@ function LoopDetail({ id }: { id: string }) {
   const stateWord = lf.is_dead ? "gone out" : "alive";
   const left = daysLeft(bond);
   const hungry = left !== null && left <= 2;
+
+  // its owner, connected on the app chain, may restyle it — the look traits become the controls
+  const isOwner = connected && onAppChain && !!address && sameId(lf.owner, address);
+  const look = draft ?? rp;
+  const lookDirty = !!draft && !!rp && (draft.bg !== rp.bg || draft.cell !== rp.cell || draft.speed !== rp.speed);
 
   // the rhythmic-tap control feeds the shared breath basket; when the basket's multicall lands,
   // this creature's slice comes back here (n generations + tx hash) to drive the ritual visuals.
@@ -191,13 +206,13 @@ function LoopDetail({ id }: { id: string }) {
               then settle back to the on-chain renderer with the advanced state. */}
           <div className="life-left">
             <Slide>
-              {rp ? (
+              {look ? (
                 <>
                   <div style={{ width: "100%", height: "100%", display: breathing ? "none" : "block" }}>
-                    <iframe srcDoc={onchainHtml(lf.current_state, rp.bg, rp.cell, rp.speed)} title={`On-chain renderer for ${decId}`} sandbox="allow-scripts" style={{ width: "100%", height: "100%", border: 0, background: toHex(rp.bg) }} />
+                    <iframe srcDoc={onchainHtml(lf.current_state, look.bg, look.cell, look.speed)} title={`On-chain renderer for ${decId}`} sandbox="allow-scripts" style={{ width: "100%", height: "100%", border: 0, background: toHex(look.bg) }} />
                   </div>
                   <div style={{ width: "100%", height: "100%", display: breathing ? "block" : "none" }}>
-                    <BreathCanvas rows={lf.current_state} bg={rp.bg} cell={rp.cell} speed={rp.speed} playing={false} scrubGen={null} breathSignal={breathSignal} breathDepth={breathN} onBreathDone={onBreathDone} />
+                    <BreathCanvas rows={lf.current_state} bg={look.bg} cell={look.cell} speed={look.speed} playing={false} scrubGen={null} breathSignal={breathSignal} breathDepth={breathN} onBreathDone={onBreathDone} />
                   </div>
                   <span ref={shimmerRef} className="slide-shimmer" aria-hidden="true" />
                 </>
@@ -227,10 +242,20 @@ function LoopDetail({ id }: { id: string }) {
               <Trait t="Kind" v={lf.is_still ? "Still life" : "Loop"} />
               <Trait t="Loop period" v={String(period)} />
               <Trait t="State" v={stateWord} />
-              {rp && <Trait t="Cell" v={<Swatch color={toHex(rp.cell)} />} />}
-              {rp && <Trait t="Background" v={<Swatch color={toHex(rp.bg)} />} />}
-              {rp && <Trait t="Pace" v={`${rp.speed} gen/s`} />}
+              {look && <Trait t="Cell" v={<EditableSwatch color={look.cell} editable={isOwner} onPick={(c) => setDraft({ ...look, cell: c })} />} />}
+              {look && <Trait t="Background" v={<EditableSwatch color={look.bg} editable={isOwner} onPick={(c) => setDraft({ ...look, bg: c })} />} />}
+              {look && <Trait t="Pace" v={<EditablePace speed={look.speed} editable={isOwner} onPick={(s) => setDraft({ ...look, speed: s })} />} />}
             </div>
+
+            {isOwner && (
+              <LookBar
+                dirty={lookDirty}
+                saving={lookSave.saving}
+                err={lookSave.err}
+                onApply={() => draft && lookSave.apply(draft)}
+                onDiscard={() => setDraft(null)}
+              />
+            )}
 
             {lf.is_dead && <p className="dim" style={{ marginTop: 16 }}>This one has gone out. It rests on-chain, the stillness every creature settles into. It cannot be revived, but it accepts offerings.</p>}
             {(
@@ -303,8 +328,10 @@ type JsPath = {
 };
 function PathDetail({ id }: { id: string }) {
   const { sdk } = useGolSdk();
+  const { address, onAppChain } = useWallet();
   const [pf, setPf] = useState<JsPath | null>(null);
   const [rp, setRp] = useState<RP | null>(null);
+  const [draft, setDraft] = useState<Look | null>(null); // the owner's previewed look, not yet on-chain
   const [born, setBorn] = useState<number | null>(null);
   const [foundBy, setFoundBy] = useState<string | null>(null); // v3 discoverer; null = grandfathered
   const [loading, setLoading] = useState(true);
@@ -343,11 +370,21 @@ function PathDetail({ id }: { id: string }) {
     return () => { cancelled = true; };
   }, [sdk, pf]);
 
+  // the wanderer's owner restyles it the same way a loop's owner does — one
+  // `set_render_params` tx on the path NFT; adopt the applied look on success.
+  const lookSave = useLookApply(
+    (d) => sdk!.setPathRenderParamsCall(pf!.token_id, d.bg, d.cell, d.speed),
+    (d) => { setRp(d); setDraft(null); }
+  );
+
   if (loading) return <Shell><p className="status-line"><span className="spinner" /> reading the chain…</p></Shell>;
   if (!pf) return <Shell><p className="status-line">no wanderer #{id} is minted here.</p></Shell>;
 
   const dead = pf.life_state === "dead";
   const stateLabel = dead ? "Gone out · faded to nothing" : pf.life_state === "frozen" ? "Frozen · settles to a still life" : "Travelling · bound for a loop";
+  const isOwner = onAppChain && !!address && sameId(pf.owner, address);
+  const look = draft ?? rp;
+  const lookDirty = !!draft && !!rp && (draft.bg !== rp.bg || draft.cell !== rp.cell || draft.speed !== rp.speed);
 
   return (
     <Shell>
@@ -355,8 +392,8 @@ function PathDetail({ id }: { id: string }) {
         <div className="life-main">
           <div className="life-left">
             <Slide>
-              {rp ? (
-                <BreathCanvas rows={pf.start_state} bg={rp.bg} cell={rp.cell} speed={rp.speed} playing={true} scrubGen={null} breathSignal={0} />
+              {look ? (
+                <BreathCanvas rows={pf.start_state} bg={look.bg} cell={look.cell} speed={look.speed} playing={true} scrubGen={null} breathSignal={0} />
               ) : (
                 <div className="status-line" style={{ padding: 24 }}>reading render params…</div>
               )}
@@ -387,9 +424,19 @@ function PathDetail({ id }: { id: string }) {
                     : <Link className="tx-link" href={`/create?rows=${encodeURIComponent((loopRows ?? pf.start_state).join(","))}`}>a loop not yet born, set it free →</Link>
                 } />
               )}
-              {rp && <Trait t="Cell" v={<Swatch color={toHex(rp.cell)} />} />}
-              {rp && <Trait t="Background" v={<Swatch color={toHex(rp.bg)} />} />}
+              {look && <Trait t="Cell" v={<EditableSwatch color={look.cell} editable={isOwner} onPick={(c) => setDraft({ ...look, cell: c })} />} />}
+              {look && <Trait t="Background" v={<EditableSwatch color={look.bg} editable={isOwner} onPick={(c) => setDraft({ ...look, bg: c })} />} />}
+              {look && <Trait t="Pace" v={<EditablePace speed={look.speed} editable={isOwner} onPick={(s) => setDraft({ ...look, speed: s })} />} />}
             </div>
+            {isOwner && (
+              <LookBar
+                dirty={lookDirty}
+                saving={lookSave.saving}
+                err={lookSave.err}
+                onApply={() => draft && lookSave.apply(draft)}
+                onDiscard={() => setDraft(null)}
+              />
+            )}
             <p className="dim" style={{ maxWidth: "44ch", marginTop: 14 }}>
               A wanderer is a journey, not a pet: a pattern playing out from where it began, travelling toward its fate. It isn’t fed and holds no bond. Its rarity is the length of that journey: the farther it wandered from its loop, the rarer.
             </p>
@@ -489,9 +536,6 @@ function Copyable({ label, value, display }: { label: string; value: string; dis
       {label} <span className="mono">{copied ? "copied!" : display}</span>
     </span>
   );
-}
-function Swatch({ color }: { color: string }) {
-  return <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ display: "inline-block", width: 14, height: 14, borderRadius: 4, background: color, border: "1px solid rgba(255,255,255,0.2)" }} /><span className="mono">{color}</span></span>;
 }
 function Shell({ children }: { children: React.ReactNode }) {
   return <div className="wrap life-wrap">{children}<Link href="/" className="back-link">← back to the garden</Link></div>;
