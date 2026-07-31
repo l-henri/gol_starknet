@@ -75,6 +75,22 @@
 - **Next:** merge to `main`, then share a creature link in Slack/X and eyeball the real unfurl;
   port comes free on `mainnet` (address book already keyed off `NETWORK`).
 
+## 2026-07-31 (8) — PRODUCTION FLIPS TO MAINNET (branch `mainnet` merged into `main`)
+- **Goal:** Henri, after testing the `mainnet` preview: merge it into `main` → production goes
+  mainnet.
+- **Branch:** `main` · **Commits:** merge ee60888 (+ a489976 Starkscan on the branch).
+- **Changed:** `main` now carries the full flip (NETWORK="mainnet", onAppChain naming,
+  per-network REF_TOKEN_ID, Starkscan explorer links) MERGED WITH Henri's same-day solo work
+  (d65be73 /create RLE import, d238674 /life link previews) — one STATUS conflict resolved in
+  favour of the mainnet-live snapshot. Earlier same-day on-chain acts recorded here: death's
+  background set to pure black (set_render_params, tx 0xba6f1486…925e — the deployer owns the
+  genesis) and 10 STRK sent from gol-mainnet to Henri's wallet 0x046e4602…eEBcDF for offerings
+  (tx 0x63740a7e…71a5).
+- **Verified:** `tsc` ✅ · `next build` ✅ on the merge; NETWORK/Starkscan grep-confirmed on
+  `main`. Production deploy = this push (Vercel).
+- **Next:** first living mint (1 NUT escrow ready); offerings to the void from Henri's wallet;
+  governance hand-off decision.
+
 ## 2026-07-31 (7) — Death accepts offerings: dead loops are feedable in the UI
 - **Goal:** Henri, testing the mainnet preview: the only token in existence is the genesis empty
   grid ("death", is_dead) and the UI hid every breathe control on dead creatures — so NOTHING on
