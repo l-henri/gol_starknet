@@ -55,7 +55,7 @@ function WardThumb({ lf }: { lf: JsLifeform | null | undefined }) {
    basket, so tapping several wards bundles them into one multicall tx (per creature: N gens +
    N NUT + bond renewed); a confirmed breath bumps txEpoch, which refreshes the ward list + clocks. */
 function WardBreathe({ creatureId, voidMode }: { creatureId: string; voidMode?: boolean }) {
-  const { address, onSepolia, connect, switchToSepolia } = useWallet();
+  const { address, onAppChain, connect, switchToAppChain } = useWallet();
   const [err, setErr] = useState<string | null>(null);
   return (
     <div className="ward-breathe">
@@ -63,9 +63,9 @@ function WardBreathe({ creatureId, voidMode }: { creatureId: string; voidMode?: 
         compact
         creatureId={creatureId}
         connected={!!address}
-        onSepolia={onSepolia}
+        onAppChain={onAppChain}
         onConnect={connect}
-        onSwitch={switchToSepolia}
+        onSwitch={switchToAppChain}
         voidMode={voidMode}
         onExhaled={(_n, ok, _hash, error) => setErr(ok ? null : error)}
       />

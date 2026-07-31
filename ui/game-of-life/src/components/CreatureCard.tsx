@@ -38,7 +38,7 @@ const STATE_WORD: Record<TileState, string> = { alive: "alive", hungry: "hungry"
  */
 export function BacteriaTile({ lf, hungry }: { lf: JsLifeform; hungry: boolean }) {
   const { sdk } = useGolSdk();
-  const { address, onSepolia, connect, switchToSepolia } = useWallet();
+  const { address, onAppChain, connect, switchToAppChain } = useWallet();
   const [rp, setRp] = useState<RenderParams | null>(null);
   const id = shortAddr(lf.token_id);
   const state: TileState = lf.is_dead ? "gone" : hungry ? "hungry" : "alive";
@@ -81,9 +81,9 @@ export function BacteriaTile({ lf, hungry }: { lf: JsLifeform; hungry: boolean }
           compact
           creatureId={lf.token_id}
           connected={!!address}
-          onSepolia={onSepolia}
+          onAppChain={onAppChain}
           onConnect={connect}
-          onSwitch={switchToSepolia}
+          onSwitch={switchToAppChain}
           voidMode={lf.is_dead}
         />
       </div>

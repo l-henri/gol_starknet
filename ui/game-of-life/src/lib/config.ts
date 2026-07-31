@@ -1,6 +1,6 @@
 // Shared client config.
 
-export const NETWORK = "sepolia";
+export const NETWORK = "mainnet";
 
 // Official Starknet nodes. They send NO CORS headers, so the browser can't fetch them directly;
 // everything goes through our same-origin proxy at /api/rpc (see app/api/rpc/route.ts).
@@ -24,6 +24,6 @@ export const RPC_URL = process.env.NEXT_PUBLIC_GOL_RPC_URL || proxyBase();
 // starknet.js calls (v0.8 — tx polling, tier detection).
 export const RPC_URL_COMPAT = process.env.NEXT_PUBLIC_GOL_RPC_URL_COMPAT || `${proxyBase()}?spec=compat`;
 
-// Voyager explorer (network-aware: sepolia.voyager.online on testnet, voyager.online on mainnet).
+// Starkscan explorer (network-aware: sepolia.starkscan.co on testnet, starkscan.co on mainnet).
 export const explorerTxUrl = (hash: string): string =>
-  `https://${(NETWORK as string) === "mainnet" ? "" : "sepolia."}voyager.online/tx/${hash}`;
+  `https://${(NETWORK as string) === "mainnet" ? "" : "sepolia."}starkscan.co/tx/${hash}`;
