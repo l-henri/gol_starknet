@@ -18,6 +18,37 @@
 
 ---
 
+## 2026-08-03 (4) — Gas optimizations implemented: 2.64M → 1.15M/gen, mint walk halved
+- **Goal:** implement the research plan from entry (3) — get costs down as much as possible;
+  migration/deployment deliberately deferred.
+- **Branch:** `perf/stepper-gas` (off `main`) · **Commits:** fe3c05b (research docs), 3e5a8dc,
+  afc47e5, e04813a, 4b5b029, f99e5fc — one optimization class per commit.
+- **Changed:**
+  1. `translate`: 2^dc computed once, not per row (−~1.6M per translated witness).
+  2. `eq`/`lt`/`is_empty`: early-exit row scans (−~245k per walked gen in mints).
+  3. `step()` rewritten: per-row horizontal sums computed once and shared across the three
+     output rows that need them; rotations via one divmod; 6-op survival logic. 53→29
+     bitwise ops/row. **1.64M/gen.**
+  4. Loop-mint witness anchored at the DRAWN state, `step^k(drawn)` captured during the
+     loop walk (`run`/`is_single_loop` grew `capture_at`) — walk is the only stepping,
+     worst-case mint walk halved. This ALIGNS code with v3-identity-spec §4.2 as written
+     (the 2026-07-06 implementation had deviated; note added in the spec). SDK
+     `loop_family_canonical` now returns k relative to its input. **ABI shape unchanged,
+     k's meaning changed: this SDK requires a redeployed loop minter.**
+  5. `step()` pass 2 lane-packed: 3 rows per u128 bitwise op (42-bit lanes, guard bits;
+     lane words composed in felt252 — u128 muls were a measured net regression). Pass-2
+     bitwise 820→266 ops/gen. **1.15M/gen, −56.5% from baseline.**
+- **Verified:** `snforge test` green after every commit (91→95, new: lane-seam oracle 12-gen
+  lockstep test, drawn-anchor witness tests, capture unit tests); `cargo test -p gol-sdk`
+  44 green; benches re-run after each change (numbers above are measured, not estimated).
+- **Decisions:** apply_d4 rewrite DROPPED (butterfly transpose only ~2.5× on a once-per-mint
+  cost — see research doc); pass-1 laning deferred (~−0.1M more, high stitching complexity).
+- **Next:** cairo-auditor pass on the branch before merge; then the migration discussion —
+  minters have NO upgrade hook (redeploy + MINTER_ROLE re-grant + SDK/wasm rebuild must ship
+  together with the loop-minter redeploy since drawn-relative k reverts on old classes);
+  lifeforms upgrades in place. FEED_CAP can go 82 → ~190 after deploy.
+- **Blockers:** none.
+
 ## 2026-08-03 (3) — Gas-optimization research: profiled the stepper and mint flow
 - **Goal:** research how to cut contract gas — profile first, no code changes.
 - **Branch:** `main` · **Commits:** uncommitted (docs only).

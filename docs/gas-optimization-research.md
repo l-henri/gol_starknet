@@ -1,9 +1,14 @@
 # Gas optimization research — where the gas goes and how to cut it
 
 > **Research session 2026-08-03.** Profiled with `cairo-profiler` v0.17.0 over `snforge`
-> traces (sierra-gas sample). Nothing here is implemented yet; every estimate must be
-> re-measured after each change (see "How to reproduce" at the bottom). Measured facts are
-> marked **[measured]**, projections **[estimate]**.
+> traces (sierra-gas sample). Measured facts are marked **[measured]**, projections
+> **[estimate]**.
+>
+> **IMPLEMENTED same day** on branch `perf/stepper-gas` (see the results section at the
+> bottom): Tier 1, Tier 3.1/3.3/3.4, and the practical core of Tier 2. **Measured:
+> 2.64M → 1.15M sierra gas/generation (−56.5%)**, plus the mint walk halved worst-case.
+> Tier 3.2 (apply_d4) was assessed and deliberately dropped. NOT deployed — the mainnet/
+> Sepolia classes still run the old code; migration is a separate decision.
 
 ## TL;DR
 
@@ -176,3 +181,43 @@ cairo-profiler view profile.pb.gz --sample "sierra gas" --limit 30
 Discipline for the implementation sessions (per the cairo-optimization skill): tests green
 before and after every change, one optimization class per commit, re-profile after each,
 and a cairo-auditor pass before merge.
+
+## Implementation results (2026-08-03, branch `perf/stepper-gas`) [measured]
+
+One commit per optimization class; full suite (95 tests) green after each; benched via
+`(bench_step_101 − bench_step_1)/100`.
+
+| change | per-gen sierra gas | Δ |
+|---|---|---|
+| baseline (mainnet code) | 2,641,036 | — |
+| Tier 1: shared horizontal sums + divmod rots + 6-op decision | 1,644,715 | −37.7% |
+| Tier 2 core: pass 2 lane-packed, 3 rows per u128 word | **1,148,843** | **−56.5% total** |
+
+Plus, per mint: the `pow2_128` hoist (−~1.6M per translated witness), early-exit `eq`/`lt`
+(−~245k per walked gen), and the witness anchored at the drawn state — the walk is now the
+only stepping (`period−1` steps, was `period−1+k`, worst ~2× the period). Worked example,
+glider (period 164, worst-case k): walk ~861M → ~187M on a modern account (−78%); on a
+legacy-metered account (×5.2) ~975M — **now under the 1.2B wallet cap single-shot**.
+
+Deviations from the plan above:
+
+- **Tier 3.2 (row-wise `apply_d4`) dropped.** Without native shifts a butterfly transpose
+  is ~4 bitwise + mul + div per pair-swap; measured against the ~2.8M once-per-mint cost
+  the realistic gain is ~2.5×, not the ~10× estimated above — not worth the consensus
+  surface. The `d4_source` branch-hoist micro remains available if small-period mint
+  fixed costs ever matter.
+- **Tier 2 lane words must be composed in felt252.** Composing with u128 muls costs
+  ~451k/gen in `u128_mul_guarantee_verify` and made the laned pass a net REGRESSION
+  (2.00M/gen) before switching `pack3` to felt mul/add + one range-checked downcast.
+  u128 `bitwise` itself costs exactly what u64 does (783/op) — the lane win is real.
+- **Anchor change turned out to be spec-alignment, not a spec change** — v3-identity-spec
+  §4.2 always said `step^k(drawn)` captured from the walk; the 2026-07-06 implementation
+  had deviated. Note added in the spec. **The SDK on this branch produces drawn-relative
+  k, so it requires a redeployed loop minter** (old classes revert on k>0 witnesses).
+
+Remaining headroom, in ROI order: lane-pack pass 1 too (~−0.1M/gen more, needs bit-level
+lane stitching for the up/down planes); `advance()` sub-field storage writes (Tier 4,
+~100–200k per feed tx); `unpack_felt` via u128 instead of u256 math. Then it's SNIP-36
+territory. Before any deploy: cairo-auditor pass on the branch + FEED_CAP re-sizing
+(legacy worst case drops ~13.9M → ~6.05M/gen → cap 82 → ~190) + SDK/wasm rebuild and the
+minter redeploy sequencing (LOG 2026-08-03 (4)).

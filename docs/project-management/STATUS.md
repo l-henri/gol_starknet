@@ -33,11 +33,14 @@ unverified in a browser (as is the 2026-07-31 breath basket, on any network).
 
 ## Recent (still fresh)
 
-- **2026-08-03 gas research:** profiled the stepper + mint flow with cairo-profiler —
-  65% of per-gen cost is bitwise-builtin calls and `step_row` does ~2× the necessary ops;
-  a tiered plan (est. −40%/gen contained rewrite, ~2.5× total with lane packing, plus cheap
-  mint-flow fixes) is in [gas-optimization-research.md](../gas-optimization-research.md).
-  Nothing implemented yet. LOG 2026-08-03 (3).
+- **2026-08-03 gas work — IMPLEMENTED on branch `perf/stepper-gas`, NOT deployed:**
+  stepper **2.64M → 1.15M sierra gas/gen (−56.5%, measured)** via shared horizontal sums +
+  a u128 lane-packed combine pass; loop-mint walk halved worst-case (witness now anchored
+  at the drawn state per spec — **SDK on that branch requires a redeployed loop minter**);
+  translate/eq/lt micro-fixes. 95 tests green, one commit per optimization class. Research
+  + measured results: [gas-optimization-research.md](../gas-optimization-research.md).
+  Next: cairo-auditor pass, then the migration discussion (minters redeploy + role
+  re-grant + SDK/wasm ship together; lifeforms upgrades in place). LOG 2026-08-03 (3)+(4).
 - **2026-08-03 email login — LIVE-VERIFIED, merged to `main`:** Privy email OTP → a real
   Starknet account (ArgentX v0.5.0, app-managed key in Privy), all acts sponsored via AVNU
   paymaster behind a nonce-based per-account cap; connect chooser promotes email, wallets
