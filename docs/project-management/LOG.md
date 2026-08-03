@@ -18,6 +18,29 @@
 
 ---
 
+## 2026-08-03 (3) — Gas-optimization research: profiled the stepper and mint flow
+- **Goal:** research how to cut contract gas — profile first, no code changes.
+- **Branch:** `main` · **Commits:** uncommitted (docs only).
+- **Changed:** new [docs/gas-optimization-research.md](../gas-optimization-research.md) + index
+  line. No contract/SDK/UI changes; Scarb.toml profiler flag was toggled for tracing and
+  reverted; traces deleted.
+- **Verified:** `snforge test` green (91) before profiling. Installed `cairo-profiler` v0.17.0
+  (`~/.local/bin`), profiled `bench_step_101` (libfunc-level) and the loop-mint integration test.
+- **Findings (measured):** stepper = 2.64M sierra gas/gen, re-confirmed; **65% of it is
+  `u64_bitwise`** (53 ops/row — ~2× the necessary count); mint fixed overhead ~11M even for a
+  period-2 loop, with `translate` recomputing `pow2_128` per row (~1.6M waste) and non-identity
+  `apply_d4` at ~2.8M/call; loop-mint walk is `period−1+k` steps (worst ~2× period). v1 15×15
+  legacy stepper measured 3.36M/gen — v2 already beats it.
+- **Decisions:** proposed 4 tiers (doc has details): T1 step_row rewrite (shared horizontal
+  sums + divmod rots + cheaper decision logic, est. −40%/gen, bit-identical output); T2 3-rows-
+  per-u128 lanes (est. further ~2×, spike first); T3 mint fixes incl. anchoring the loop-mint
+  witness at the drawn state (halves worst-case walk, ABI+SDK change → needs a v3-identity-spec
+  note when done); T4 storage sub-path writes in `advance()` (minor).
+- **Next:** implement Tier 3.1 (pow2 hoist) + 3.3 (early-exit eq/lt) and Tier 1, one class per
+  commit, re-profiling each; then decide on the T3.4 witness-anchor ABI change before any minter
+  redeploy (minters have no upgrade hook — redeploy + MINTER_ROLE re-grant).
+- **Blockers:** none.
+
 ## 2026-08-03 (2) — Email login LIVE-VERIFIED on mainnet; three integration bugs fixed
 - **Goal:** first live run of the email door with real Privy + AVNU credentials (local dev
   against mainnet), fixing what broke.

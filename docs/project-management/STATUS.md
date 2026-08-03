@@ -33,6 +33,11 @@ unverified in a browser (as is the 2026-07-31 breath basket, on any network).
 
 ## Recent (still fresh)
 
+- **2026-08-03 gas research:** profiled the stepper + mint flow with cairo-profiler —
+  65% of per-gen cost is bitwise-builtin calls and `step_row` does ~2× the necessary ops;
+  a tiered plan (est. −40%/gen contained rewrite, ~2.5× total with lane packing, plus cheap
+  mint-flow fixes) is in [gas-optimization-research.md](../gas-optimization-research.md).
+  Nothing implemented yet. LOG 2026-08-03 (3).
 - **2026-08-03 email login — LIVE-VERIFIED, merged to `main`:** Privy email OTP → a real
   Starknet account (ArgentX v0.5.0, app-managed key in Privy), all acts sponsored via AVNU
   paymaster behind a nonce-based per-account cap; connect chooser promotes email, wallets
