@@ -57,14 +57,60 @@ fn fa(a: u64, b: u64, c: u64) -> (u64, u64) {
     (s2, c1 | c2)
 }
 
+// --- 3-lane SIMD (42-bit lanes in a u128) -----------------------------------------------------
+// The VM's bitwise builtin costs the same for u128 as for u64, so packing three 41-bit rows at a
+// 42-bit stride (1 guard bit each, bits 41/83/125 always clear) processes 3 rows per invocation.
+// Bitwise ops are bit-local — lanes can never interact — and the packing sum has disjoint bit
+// ranges, so pack/unpack are exact.
+
+const POW42_F: felt252 = 0x40000000000; // 2^42 — lane stride
+const POW84_F: felt252 = 0x1000000000000000000000; // 2^84
+const POW42_NZ: NonZero<u128> = 0x40000000000;
+/// MASK replicated in each lane (guard bits clear).
+const MASK3: u128 = 0x1ffffffffff7fffffffffdffffffffff;
+
+/// Three rows into one lane-word: a in lane 0, b in lane 1, c in lane 2. Composed in
+/// felt252 — felt mul/add are near-free where u128 muls pay a guarantee-verify (~1.2k gas
+/// each); one range-checked downcast at the end. Sum < 2^126, so the felt never wraps.
+fn pack3(a: u64, b: u64, c: u64) -> u128 {
+    let f: felt252 = a.into() + b.into() * POW42_F + c.into() * POW84_F;
+    f.try_into().unwrap()
+}
+
+/// Half adder over lane-words.
+fn ha3(a: u128, b: u128) -> (u128, u128) {
+    (a ^ b, a & b)
+}
+
+/// Full adder over lane-words.
+fn fa3(a: u128, b: u128, c: u128) -> (u128, u128) {
+    let (s1, c1) = ha3(a, b);
+    let (s2, c2) = ha3(s1, c);
+    (s2, c1 | c2)
+}
+
+/// The combine step on lane-words: neighbour count = t_up + p + t_dn (sum planes) with the
+/// matching carry planes, then alive iff count == 3, or == 2 with `m` alive.
+fn combine3(
+    t_up: u128, tc_up: u128, p: u128, pc: u128, t_dn: u128, tc_dn: u128, m: u128,
+) -> u128 {
+    let (ones, ca) = fa3(t_up, p, t_dn);
+    let (t2, c2a) = fa3(tc_up, pc, tc_dn);
+    let (twos, c2b) = ha3(t2, ca);
+    let (fours, eights) = ha3(c2a, c2b);
+    (ones | m) & twos & ((fours | eights) ^ MASK3)
+}
+
 /// One generation over the whole NxN torus.
 ///
 /// Two passes sharing the horizontal work: pass 1 rotates and sums each row ONCE
 /// (t + 2·tc = l+m+r, the 3-cell sum any adjacent row needs; p + 2·pc = l+r, the 2-cell
-/// sum the row itself needs), pass 2 adds the three row-sums per output row. Same
-/// full-adder network as the original step_row, deduplicated: 29 bitwise ops + 2 divmods
-/// per row instead of 53 + 6 (each input row was previously rotated/summed three times,
-/// once per adjacent output row). Inputs must be masked 41-bit rows (pack/unpack form).
+/// sum the row itself needs); pass 2 adds the three row-sums per output row, processing
+/// THREE rows per bitwise op on 42-bit u128 lanes (see `pack3`) — 13 general lane-words
+/// (rows 3w..3w+2) plus a 2-lane word for rows 39..40. Row wrap is pure index arithmetic
+/// at the packing step, so lanes never need bit-level stitching. Same full-adder network
+/// as the original step_row, deduplicated and vectorised: ~15.5 bitwise ops + 2 divmods
+/// per row instead of 53 + 6. Inputs must be masked 41-bit rows (pack/unpack form).
 pub fn step(rows: @Array<u64>) -> Array<u64> {
     // Pass 1: per-row horizontal sum/carry planes.
     let mut h: Array<(u64, u64, u64, u64)> = ArrayTrait::new();
@@ -78,35 +124,57 @@ pub fn step(rows: @Array<u64>) -> Array<u64> {
         h.append((t, tc, p, pc));
         r += 1;
     };
-    // Pass 2: neighbour count of row i = (l+m+r)(i-1) + (l+r)(i) + (l+m+r)(i+1),
-    // accumulated into per-bit count planes (ones, twos, fours, eights).
+    // Pass 2: neighbour count of row i = (l+m+r)(i-1) + (l+r)(i) + (l+m+r)(i+1), three rows
+    // at a time. Word w holds rows base..base+2; its up-plane holds rows base-1..base+1 and
+    // its down-plane rows base+1..base+3 — packed straight from `h` by index, wrap included.
     let mut out: Array<u64> = ArrayTrait::new();
-    let mut i: usize = 0;
-    while i != N {
-        let up = if i == 0 {
+    let mut w: usize = 0;
+    while w != 13 {
+        let base = 3 * w;
+        let prev = if base == 0 {
             N - 1
         } else {
-            i - 1
+            base - 1
         };
-        let dn = if i == N - 1 {
-            0
-        } else {
-            i + 1
-        };
-        let (t_u, tc_u, _, _) = *h[up];
-        let (_, _, p, pc) = *h[i];
-        let (t_d, tc_d, _, _) = *h[dn];
-        let (ones, ca) = fa(t_u, p, t_d);
-        let (t2, c2a) = fa(tc_u, pc, tc_d);
-        let (twos, c2b) = ha(t2, ca);
-        let (fours, eights) = ha(c2a, c2b);
-        // Alive iff count == 3, or count == 2 and currently alive: both need twos set
-        // with fours/eights clear; ones distinguishes 3 (born) from 2 (needs m). This is
-        // the old eq3 | (m & eq2) with the shared factor pulled out.
-        let m = *rows[i];
-        out.append((ones | m) & twos & (fours ^ MASK) & (eights ^ MASK));
-        i += 1;
+        let (t_pm, tc_pm, _, _) = *h[prev];
+        let (t_b0, tc_b0, p_b0, pc_b0) = *h[base];
+        let (t_b1, tc_b1, p_b1, pc_b1) = *h[base + 1];
+        let (t_b2, tc_b2, p_b2, pc_b2) = *h[base + 2];
+        let (t_b3, tc_b3, _, _) = *h[base + 3];
+        let word = combine3(
+            pack3(t_pm, t_b0, t_b1),
+            pack3(tc_pm, tc_b0, tc_b1),
+            pack3(p_b0, p_b1, p_b2),
+            pack3(pc_b0, pc_b1, pc_b2),
+            pack3(t_b1, t_b2, t_b3),
+            pack3(tc_b1, tc_b2, tc_b3),
+            pack3(*rows[base], *rows[base + 1], *rows[base + 2]),
+        );
+        let (rest, r0) = DivRem::div_rem(word, POW42_NZ);
+        let (r2, r1) = DivRem::div_rem(rest, POW42_NZ);
+        out.append(r0.try_into().unwrap());
+        out.append(r1.try_into().unwrap());
+        out.append(r2.try_into().unwrap());
+        w += 1;
     };
+    // Last word: rows 39, 40 in lanes 0..1 (lane 2 all-zero in, all-zero out, discarded).
+    let (t_38, tc_38, _, _) = *h[38];
+    let (t_39, tc_39, p_39, pc_39) = *h[39];
+    let (t_40, tc_40, p_40, pc_40) = *h[40];
+    let (t_0, tc_0, _, _) = *h[0];
+    let word = combine3(
+        pack3(t_38, t_39, 0),
+        pack3(tc_38, tc_39, 0),
+        pack3(p_39, p_40, 0),
+        pack3(pc_39, pc_40, 0),
+        pack3(t_40, t_0, 0),
+        pack3(tc_40, tc_0, 0),
+        pack3(*rows[39], *rows[40], 0),
+    );
+    let (rest, r39) = DivRem::div_rem(word, POW42_NZ);
+    let (_, r40) = DivRem::div_rem(rest, POW42_NZ);
+    out.append(r39.try_into().unwrap());
+    out.append(r40.try_into().unwrap());
     out
 }
 
@@ -597,6 +665,34 @@ mod tests {
     }
 
     #[test]
+    fn bitboard_matches_oracle_on_lane_and_wrap_boundaries() {
+        // Activity ON the u128-lane boundaries (rows 2/3, 20/21, 38/39), the last-word rows
+        // (39, 40), the row wrap (40 -> 0) and both column edges (bits 0 and 40) — every seam
+        // of the lane-packed combine pass, stepped in lockstep with the naive oracle.
+        let g0 = grid_with(
+            @array![
+                (0_usize, 0x1ffffffffff_u64), // full top row (wrap + all columns)
+                (2_usize, 0b111_u64), // lane 2/3 boundary of word 0
+                (3_usize, 0x10000000001_u64), // both column edges
+                (20_usize, 0x15555555555_u64), // alternating, lane boundary word 6/7
+                (21_usize, 0xaaaaaaaaaa_u64),
+                (38_usize, 0b1110000_u64), // last general-word row
+                (39_usize, 0x1f000000000_u64), // word-13 lanes
+                (40_usize, 0x1ffffffffff_u64) // full bottom row (wraps onto row 0)
+            ],
+        );
+        let mut cur = g0;
+        let mut g: usize = 0;
+        while g < 12 {
+            let nb = step(@cur);
+            let nn = step_naive(@cur);
+            assert(eq(@nb, @nn), 'lane seam != oracle');
+            cur = nb;
+            g += 1;
+        };
+    }
+
+    #[test]
     fn lt_is_a_strict_order() {
         let a = grid_with(@array![(0_usize, 1_u64)]);
         let b = grid_with(@array![(0_usize, 2_u64)]);
@@ -715,8 +811,9 @@ mod tests {
 
     // #[ignore]d so the default suite stays fast/green; run with
     // `snforge test bench_step --ignored`. Per-gen = (bench_step_101 - bench_step_1)/100
-    // ~= 1.64M L2 gas/generation at 41x41 (measured 2026-08-03, shared-horizontal-sums
-    // stepper; was 2.64M with the per-row step_row on 2026-06-22).
+    // ~= 1.15M L2 gas/generation at 41x41 (measured 2026-08-03: shared horizontal sums
+    // 2.64M -> 1.64M, then the u128 lane-packed combine pass -> 1.15M; the 2.64M baseline
+    // was the per-row step_row measured 2026-06-22).
     #[test]
     #[ignore]
     fn bench_step_1() {
