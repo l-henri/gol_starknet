@@ -18,6 +18,43 @@
 
 ---
 
+## 2026-08-03 (2) — Email login LIVE-VERIFIED on mainnet; three integration bugs fixed
+- **Goal:** first live run of the email door with real Privy + AVNU credentials (local dev
+  against mainnet), fixing what broke.
+- **Branch:** `feat/privy-email-login` · **Commits:** dab4d8d, then the JWKS/auth/ownership
+  fixes, merged to `main` this session.
+- **Changed (each a live-flow fix):**
+  1. **JWKS token verification** — `PRIVY_VERIFICATION_KEY` now optional; tokens verify
+     against the app's public JWKS endpoint (Henri couldn't find the key in the dashboard,
+     and it turns out nobody needs to).
+  2. **starkzap optional peers: alias-to-stub, not IgnorePlugin** — IgnorePlugin'd modules
+     THROW at load; starkzap's root statically reaches tongo-sdk/ethers, so
+     `import("starkzap")` died in the browser right after wallet creation, silently (the
+     error had no UI surface). Now: `optional-peer-stub.cjs` proxy alias + the chooser
+     stays open through the flow showing progress/errors. Upstream fix PR opened by a
+     parallel agent (verified repro, regression tests):
+     https://github.com/keep-starknet-strange/starkzap/pull/136.
+  3. **Privy wallets are APP-MANAGED (`external_id` mapping), not user-OWNED** — owner
+     key-quorums demand per-action authorization built for third-party-JWT auth setups
+     (rejected both the app secret and the Privy access token: "No valid authorization
+     keys…", then "Invalid JWT token provided"). Privy's own Tier-2/Starknet recipe signs
+     with the app secret; user↔wallet enforcement lives in our sign route (verified token +
+     external_id mapping). Keeper addresses from the orphaned owner-model wallet were
+     abandoned (held nothing).
+  4. **Privy island lazy-mounts** (chooser open / session restore / connected) — it had
+     mounted on every page view, shipping Privy's ~10k-module graph to every visitor.
+- **Verified:** the FULL email flow on mainnet: OTP login → wallet find-or-create →
+  sponsored account deploy → breathe: raw-sign 200 + sponsored execute; header shows the
+  keeper address, NUT + generation counter landed. Cap refusal exercised at the proxy level
+  by hand (temp cap 5 vs nonce-10 account → correct -32099 refusal). NOT yet: a real client
+  hitting the cap, email-keeper mints, FEED_CAP re-measure under the paymaster path.
+- **Decisions:** app-managed custody for email keepers is an accepted trade-off (the
+  self-custody door remains injected wallets) — recorded in privy-email-login.md. Email
+  breathe latency (build + sign round-trip + execute, no popup) accepted for now.
+- **Next:** set the env vars in Vercel to open the email door in production; watch AVNU
+  credit burn; re-measure FEED_CAP under the paymaster; consider prefetching the Privy
+  island on idle.
+
 ## 2026-08-03 — Email login (Privy) + sponsored gas (AVNU paymaster), built behind env flags
 - **Goal:** a no-wallet door into the garden: email OTP → a real Starknet account, gas
   covered. Henri's choices: mainnet directly, sponsor EVERYTHING behind a per-account cap,

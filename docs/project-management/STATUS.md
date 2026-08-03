@@ -33,12 +33,14 @@ unverified in a browser (as is the 2026-07-31 breath basket, on any network).
 
 ## Recent (still fresh)
 
-- **2026-08-03 email login (branch `feat/privy-email-login`):** Privy email OTP → a real
-  Starknet account (ArgentX v0.5.0, key in Privy), all acts sponsored via AVNU paymaster
-  behind a nonce-based per-account cap; connect chooser promotes email, wallets stay
-  first-class. Built + `next build` ✅ but **dormant until env vars are set** (no Privy/AVNU
-  accounts yet) and **zero live flows verified**. Setup guide:
-  [privy-email-login.md](../privy-email-login.md). LOG 2026-08-03.
+- **2026-08-03 email login — LIVE-VERIFIED, merged to `main`:** Privy email OTP → a real
+  Starknet account (ArgentX v0.5.0, app-managed key in Privy), all acts sponsored via AVNU
+  paymaster behind a nonce-based per-account cap; connect chooser promotes email, wallets
+  stay first-class. Henri ran the full flow on mainnet from local dev (login → sponsored
+  deploy → breathe, NUT landed). **Production's email door stays dormant until the env vars
+  are set in Vercel.** Upstream starkzap packaging fix PR:
+  keep-starknet-strange/starkzap#136. Guide: [privy-email-login.md](../privy-email-login.md).
+  LOG 2026-08-03 (+2).
 - **2026-07-31 ownership UX (branch `ui/pets-edit-wanderers`, off `mainnet`):** /pets gains a
   "Yours" section (owned NFTs — owning never created a pet bond, so owners saw nothing);
   /life/[id] lets the OWNER edit colours (click a swatch → palette) and pace (click the number)

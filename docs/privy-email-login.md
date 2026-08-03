@@ -1,8 +1,11 @@
 # Email login (Privy) + sponsored gas (AVNU paymaster)
 
-**Status: BUILT 2026-08-03, ⚠️ not yet exercised against live Privy/AVNU accounts** — the
-deployment ships with the email door disabled until the env vars below are set. Branch
-`feat/privy-email-login`.
+**Status: LIVE-VERIFIED 2026-08-03 (local dev against mainnet)** — Henri completed the full
+flow with real Privy + AVNU credentials: email OTP → wallet creation → sponsored account
+deploy → breathe (Privy-signed, AVNU-sponsored, NUT landed). Still unverified: the
+sponsorship-cap refusal in a real client flow (proxy-level refusal tested by hand), mints,
+and FEED_CAP under the paymaster path. The email door stays dormant on any deployment
+until the env vars below are set — production needs them added in Vercel.
 
 ## What it is
 
@@ -73,10 +76,20 @@ Privy email OTP  ─────────────────────
 
 ## Verification state
 
-- `next build` ✅ (types + lint). **Not verified**: any live flow — email OTP, wallet
-  creation, raw-sign round-trip, sponsored deploy/execute, the cap refusal path. All need
-  real Privy + AVNU credentials. First live test should be: login → account deploys →
-  breathe a creature (1 sponsored tx) → check /pets.
+- `next build` ✅ (types + lint). **Live-verified 2026-08-03** (local dev, mainnet, real
+  credentials): email OTP → wallet find-or-create → sponsored account deploy → breathe
+  (raw-sign 200 + sponsored execute; NUT + generation counter landed in the UI). The cap
+  refusal was exercised at the proxy level by hand (temporary cap 5 vs a nonce-10 account)
+  but not through a real client hitting its limit. Two hard-won integration lessons live in
+  the LOG (2026-08-03 (2)): Privy wallets must be APP-MANAGED (`external_id` mapping), not
+  user-OWNED — owner key-quorums demand a third-party-JWT authorization flow; and starkzap's
+  optional peers must be ALIASED to a stub, not IgnorePlugin'd (ignored modules throw at
+  load, killing the root import). Upstream fix PR:
+  https://github.com/keep-starknet-strange/starkzap/pull/136 — drop `optional-peer-stub.cjs`
+  when a release containing it ships.
+- **Perceived latency**: an email breathe ≈ paymaster build + Privy raw-sign round-trip
+  (~1.5 s) + sponsored execute — noticeably slower than a wallet popup path; acceptable,
+  optimizable later (parallel build/sign, token caching).
 - **Gas-cap caveat**: feed/mint sizing (`gasCaps.ts`) was measured for direct account
   execution; the paymaster path goes through SNIP-9 outside-execution on an ArgentX v0.5.0
   account (Sierra ≥ 1.7 → modern tier expected). Re-measure a real sponsored feed before
