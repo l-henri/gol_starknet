@@ -106,14 +106,16 @@ pub fn step(rows: @Array<u64>) -> Array<u64> {
 
 /// Strict lexicographic order over the row words, row 0 most significant.
 /// The multi-word generalisation of v1's `u256 <`. Total order over distinct grids.
+/// Exits on the first differing row — called every generation of every mint walk.
 pub fn lt(a: @Array<u64>, b: @Array<u64>) -> bool {
     let mut i: usize = 0;
-    let mut decided = false;
     let mut result = false;
-    while i < N {
-        if !decided && *a[i] != *b[i] {
-            result = *a[i] < *b[i];
-            decided = true;
+    while i != N {
+        let av = *a[i];
+        let bv = *b[i];
+        if av != bv {
+            result = av < bv;
+            break;
         }
         i += 1;
     };
@@ -482,28 +484,33 @@ pub fn grid_with(rowvals: @Array<(usize, u64)>) -> Array<u64> {
     g
 }
 
+/// Exits on the first differing row — called every generation of every mint walk.
 pub fn eq(a: @Array<u64>, b: @Array<u64>) -> bool {
-    if a.len() != b.len() {
+    let len = a.len();
+    if len != b.len() {
         return false;
     }
     let mut i: usize = 0;
     let mut ok = true;
-    while i < a.len() {
+    while i != len {
         if *a[i] != *b[i] {
             ok = false;
+            break;
         }
         i += 1;
     };
     ok
 }
 
-/// True iff every cell is dead (the empty/"dead" grid).
+/// True iff every cell is dead (the empty/"dead" grid). Exits on the first live row.
 pub fn is_empty(rows: @Array<u64>) -> bool {
+    let len = rows.len();
     let mut i: usize = 0;
     let mut empty = true;
-    while i < rows.len() {
+    while i != len {
         if *rows[i] != 0 {
             empty = false;
+            break;
         }
         i += 1;
     };
