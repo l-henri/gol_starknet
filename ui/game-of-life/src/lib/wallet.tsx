@@ -9,8 +9,18 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { NETWORK, RPC_URL_COMPAT } from "./config";
+import dynamic from "next/dynamic";
+import { NETWORK, PRIVY_APP_ID, RPC_URL_COMPAT } from "./config";
 import type { MeteringTier } from "./gasCaps";
+import type { EmailWallet } from "./privyWallet";
+import type { PrivyApi } from "./privyAuth";
+
+// The Privy auth island (email OTP → access token). Loaded only when the deployment has an
+// app id configured, so Privy's SDK never ships to wallet-only deployments.
+const PrivyBridge = dynamic(() => import("./privyAuth"), { ssr: false });
+
+// remembers that this browser chose the email door, so a reload reconnects silently
+const EMAIL_MARKER = "gol:email-session";
 
 // The chain this build of the app lives on (felt-encoded short string).
 const TARGET_CHAIN_ID = NETWORK === "mainnet" ? "0x534e5f4d41494e" /* SN_MAIN */ : "0x534e5f5345504f4c4941"; /* SN_SEPOLIA */
@@ -21,6 +31,8 @@ interface WalletCtx {
   connecting: boolean;
   error: string | null;
   onAppChain: boolean;
+  /** how the session signs: an injected Starknet wallet, or the Privy email keeper */
+  authKind: "wallet" | "email" | null;
   /** on-chain gas-metering regime of the connected account (sets feed/mint caps); see gasCaps.ts */
   meteringTier: MeteringTier;
   /** bumps after a confirmed tx — UI reads (e.g. NUT) depend on it to refetch */
@@ -42,6 +54,7 @@ const Ctx = createContext<WalletCtx>({
   connecting: false,
   error: null,
   onAppChain: true,
+  authKind: null,
   meteringTier: "unknown",
   txEpoch: 0,
   connect: async () => {},
@@ -137,7 +150,58 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const swoRef = useRef<any>(null);
 
-  const connect = useCallback(async () => {
+  // ---- the email door (Privy + starkzap; only live when PRIVY_APP_ID is configured) ----
+  const [authKind, setAuthKind] = useState<"wallet" | "email" | null>(null);
+  const [chooserOpen, setChooserOpen] = useState(false);
+  const [privyEpoch, setPrivyEpoch] = useState(0); // bumps whenever the bridge reports state
+  const emailWalletRef = useRef<EmailWallet | null>(null);
+  const privyApiRef = useRef<PrivyApi | null>(null);
+
+  // Onboard (or restore) the email keeper's Starknet account: resolve the Privy wallet,
+  // wrap it in starkzap (paymaster fees), deploying the account on first ever login.
+  const finishEmailConnect = useCallback(async () => {
+    const api = privyApiRef.current;
+    if (!api) return;
+    setConnecting(true);
+    setError(null);
+    try {
+      const { onboardEmailWallet } = await import("./privyWallet");
+      const w = await onboardEmailWallet(api.getAccessToken);
+      emailWalletRef.current = w;
+      setAuthKind("email");
+      setAddress(w.address);
+      setChainId(TARGET_CHAIN_ID); // the keeper account lives on the app's chain by construction
+      try { localStorage.setItem(EMAIL_MARKER, "1"); } catch { /* private mode */ }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setConnecting(false);
+    }
+  }, []);
+
+  const connectEmail = useCallback(() => {
+    const api = privyApiRef.current;
+    setChooserOpen(false);
+    if (!api || !api.ready) {
+      setError("Email login is still warming up — try again in a moment.");
+      return;
+    }
+    if (api.authenticated) void finishEmailConnect();
+    else api.login(); // the OTP modal; the bridge's onLogin lands back in finishEmailConnect
+  }, [finishEmailConnect]);
+
+  // A reload keeps the Privy session; if this browser had chosen the email door, walk back
+  // through it silently (signing is server-side, so no user gesture is needed).
+  useEffect(() => {
+    if (address || connecting) return;
+    const api = privyApiRef.current;
+    let marker = false;
+    try { marker = localStorage.getItem(EMAIL_MARKER) === "1"; } catch { /* private mode */ }
+    if (marker && api?.ready && api.authenticated) void finishEmailConnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [privyEpoch]);
+
+  const connectInjected = useCallback(async () => {
     setConnecting(true);
     setError(null);
     try {
@@ -155,6 +219,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       });
       swo.on?.("accountsChanged", () => void readAddress(swo).then(setAddress));
       setAddress(await readAddress(swo));
+      setAuthKind("wallet");
       const id = await readChainId(swo);
       setChainId(id);
       // wrong network on connect → invite to switch (the wallet shows its own popup)
@@ -173,7 +238,26 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // The single public entry: with the email door configured, offer the choice; otherwise the
+  // injected-wallet flow, exactly as before. Every "Connect" CTA in the app lands here.
+  const connect = useCallback(async () => {
+    if (PRIVY_APP_ID) {
+      setChooserOpen(true);
+      return;
+    }
+    await connectInjected();
+  }, [connectInjected]);
+
   const disconnect = useCallback(async () => {
+    if (authKind === "email") {
+      try { localStorage.removeItem(EMAIL_MARKER); } catch { /* private mode */ }
+      emailWalletRef.current = null;
+      await privyApiRef.current?.logout().catch(() => {});
+      setAuthKind(null);
+      setAddress(null);
+      setChainId(null);
+      return;
+    }
     try {
       const mod = await import("@starknet-io/get-starknet");
       await mod.disconnect({ clearLastWallet: true });
@@ -181,11 +265,33 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       /* ignore */
     }
     swoRef.current = null;
+    setAuthKind(null);
     setAddress(null);
     setChainId(null);
-  }, []);
+  }, [authKind]);
 
   const execute = useCallback(async (calls: unknown): Promise<string> => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const arr = (Array.isArray(calls) ? calls : [calls]) as any[];
+    const toFelt = (x: unknown): string => {
+      if (typeof x === "string") return x;
+      try { return BigInt(x as never).toString(); } catch { return String(x); }
+    };
+
+    // The email keeper signs headlessly (Privy raw-sign via our server) and rides the AVNU
+    // paymaster — no popup, no gas. Same calls, different rails.
+    if (authKind === "email") {
+      const w = emailWalletRef.current;
+      if (!w) throw new Error("Connect first.");
+      const zapCalls = arr.map((it) => ({
+        contractAddress: it.contractAddress ?? it.contract_address,
+        entrypoint: it.entrypoint ?? it.entry_point,
+        calldata: (it.calldata ?? []).map(toFelt),
+      }));
+      const tx = await w.execute(zapCalls, { feeMode: { type: "paymaster" } });
+      return tx.hash;
+    }
+
     const swo = swoRef.current;
     if (!swo?.request) throw new Error("Connect a wallet first.");
     // Hand the calls straight to the wallet via `wallet_addInvokeTransaction` — the wallet does the
@@ -194,12 +300,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     // (see starknet.js), minus the extra `requestAccounts` round-trip on first use — and we force
     // calldata to felt STRINGS, since some wallets silently hang on numeric/BigInt calldata (which
     // WalletAccount.execute passes through untouched).
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const arr = (Array.isArray(calls) ? calls : [calls]) as any[];
-    const toFelt = (x: unknown): string => {
-      if (typeof x === "string") return x;
-      try { return BigInt(x as never).toString(); } catch { return String(x); }
-    };
     const txCalls = arr.map((it) => ({
       contract_address: it.contractAddress ?? it.contract_address,
       entry_point: it.entrypoint ?? it.entry_point,
@@ -216,7 +316,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       console.error("[gol] wallet execute failed:", e, { txCalls });
       throw e;
     }
-  }, []);
+  }, [authKind]);
 
   // Poll a tx to completion. `requireAccepted` waits for ACCEPTED_ON_L2 — needed when a *later* tx
   // will read this one's on-chain writes (e.g. partial-path combine/final read a prior segment): a
@@ -256,6 +356,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const waitForTxAccepted = useCallback((hash: string) => pollTx(hash, true), [pollTx]);
 
   const switchToAppChain = useCallback(async () => {
+    if (authKind === "email") return; // the keeper account only exists on the app's chain
     const swo = swoRef.current;
     if (!swo) {
       setError("Connect a wallet first.");
@@ -268,7 +369,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, []);
+  }, [authKind]);
 
   // Poll the wallet's chain while connected — not every wallet emits "networkChanged", so this
   // guarantees a switch is reflected (and `onAppChain` updated) within a few seconds.
@@ -305,9 +406,41 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   return (
     <Ctx.Provider
-      value={{ address, chainId, connecting, error, onAppChain, meteringTier, txEpoch, connect, disconnect, execute, waitForTx, waitForTxAccepted, switchToAppChain }}
+      value={{ address, chainId, connecting, error, onAppChain, authKind, meteringTier, txEpoch, connect, disconnect, execute, waitForTx, waitForTxAccepted, switchToAppChain }}
     >
+      {PRIVY_APP_ID && (
+        <PrivyBridge
+          appId={PRIVY_APP_ID}
+          onApi={(api) => { privyApiRef.current = api; setPrivyEpoch((e) => e + 1); }}
+          onLogin={() => void finishEmailConnect()}
+        />
+      )}
       {children}
+      {chooserOpen && (
+        <ConnectChooser
+          onEmail={connectEmail}
+          onWallet={() => { setChooserOpen(false); void connectInjected(); }}
+          onClose={() => setChooserOpen(false)}
+        />
+      )}
     </Ctx.Provider>
+  );
+}
+
+/** The two doors into the garden. Email is the promoted path (no wallet, gas covered);
+ *  a Starknet wallet remains first-class for the self-custody crowd. */
+function ConnectChooser({ onEmail, onWallet, onClose }: { onEmail: () => void; onWallet: () => void; onClose: () => void }) {
+  return (
+    <div className="connect-sheet" role="dialog" aria-modal="true" aria-label="Connect">
+      <div className="connect-overlay" onClick={onClose} />
+      <div className="connect-panel">
+        <h3 className="connect-title">Step into the garden</h3>
+        <button className="btn set-free connect-opt" onClick={onEmail}>Continue with email</button>
+        <p className="connect-hint">No wallet needed — a keeper account is made for you, and the garden covers the gas.</p>
+        <button className="btn connect-opt" onClick={onWallet}>Connect a Starknet wallet</button>
+        <p className="connect-hint">ArgentX, Braavos… your keys, your gas.</p>
+        <button className="lens-btn connect-cancel" onClick={onClose}>not now</button>
+      </div>
+    </div>
   );
 }

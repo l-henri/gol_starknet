@@ -13,12 +13,15 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@privy-io/node": "^0.28.0",
+    "@privy-io/react-auth": "^3.36.1",
     "@starknet-io/get-starknet": "^4.0.8",
+    "gol-sdk-wasm": "file:./sdk-pkg",
     "next": "15.5.19",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "gol-sdk-wasm": "file:./sdk-pkg",
-    "starknet": "^7.6.4"
+    "starknet": "^7.6.4",
+    "starkzap": "^3.0.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

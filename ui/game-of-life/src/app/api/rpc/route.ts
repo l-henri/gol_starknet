@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { createHash } from "node:crypto";
-import { NETWORK, UPSTREAM_RPC, UPSTREAM_RPC_COMPAT } from "@/lib/config";
+import { NETWORK, UPSTREAM_RPC, UPSTREAM_RPC_COMPAT, UPSTREAM_RPC_V9 } from "@/lib/config";
 
 // Same-origin JSON-RPC proxy. The official Starknet nodes don't send CORS headers, so the browser
 // can't call them directly; it POSTs here (same origin, no CORS) and we forward server-side. The
@@ -14,9 +14,13 @@ import { NETWORK, UPSTREAM_RPC, UPSTREAM_RPC_COMPAT } from "@/lib/config";
 // cached — they pass straight through. (Only applies when the app routes through this proxy, i.e.
 // NEXT_PUBLIC_GOL_RPC_URL is unset; a direct CORS gateway bypasses it.)
 
-const upstream = (compat: boolean) =>
-  compat
+// `spec`: default → v0.10 (WASM SDK) · "compat" → v0.8 (starknet.js 7) · "v9" → v0.9 (starkzap).
+type Spec = "default" | "compat" | "v9";
+const upstream = (spec: Spec) =>
+  spec === "compat"
     ? UPSTREAM_RPC_COMPAT[NETWORK] ?? UPSTREAM_RPC_COMPAT.sepolia
+    : spec === "v9"
+    ? UPSTREAM_RPC_V9[NETWORK] ?? UPSTREAM_RPC_V9.sepolia
     : UPSTREAM_RPC[NETWORK] ?? UPSTREAM_RPC.sepolia;
 
 const READ_METHODS = new Set(["starknet_call", "starknet_getEvents"]);
@@ -33,8 +37,8 @@ function isCacheable(body: string): boolean {
   }
 }
 
-async function forward(compat: boolean, body: string): Promise<{ status: number; text: string }> {
-  const res = await fetch(upstream(compat), {
+async function forward(spec: Spec, body: string): Promise<{ status: number; text: string }> {
+  const res = await fetch(upstream(spec), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body,
@@ -44,15 +48,16 @@ async function forward(compat: boolean, body: string): Promise<{ status: number;
 }
 
 export async function POST(req: Request) {
-  const compat = new URL(req.url).searchParams.get("spec") === "compat";
+  const specParam = new URL(req.url).searchParams.get("spec");
+  const spec: Spec = specParam === "compat" ? "compat" : specParam === "v9" ? "v9" : "default";
   const body = await req.text();
   try {
     if (isCacheable(body)) {
-      const key = createHash("sha1").update(`${compat ? "compat:" : ""}${body}`).digest("hex");
+      const key = createHash("sha1").update(`${spec}:${body}`).digest("hex");
       // Cache only successful responses; a non-200 throws so it isn't cached (the caller retries).
       const cached = unstable_cache(
         async () => {
-          const r = await forward(compat, body);
+          const r = await forward(spec, body);
           if (r.status !== 200) throw new Error(`upstream ${r.status}`);
           return r;
         },
@@ -65,7 +70,7 @@ export async function POST(req: Request) {
         headers: { "content-type": "application/json", "cache-control": `public, max-age=${TTL_SECONDS}` },
       });
     }
-    const { status, text } = await forward(compat, body);
+    const { status, text } = await forward(spec, body);
     return new Response(text, {
       status,
       headers: { "content-type": "application/json", "cache-control": "no-store" },

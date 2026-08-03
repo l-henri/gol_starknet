@@ -18,6 +18,47 @@
 
 ---
 
+## 2026-08-03 — Email login (Privy) + sponsored gas (AVNU paymaster), built behind env flags
+- **Goal:** a no-wallet door into the garden: email OTP → a real Starknet account, gas
+  covered. Henri's choices: mainnet directly, sponsor EVERYTHING behind a per-account cap,
+  credentials as placeholders (no Privy/AVNU accounts yet), email promoted next to wallet
+  connect (which stays first-class and self-paying).
+- **Branch:** `feat/privy-email-login` (off `main`) · **Commits:** this commit.
+- **Changed:**
+  - **Deps:** `starkzap@3.0.0` (Privy onboarding strategy + paymaster + ArgentX v0.5.0
+    preset — the account class Privy's Starknet wallets pair with), `@privy-io/react-auth`
+    (email OTP UI), `@privy-io/node` (server: wallet create + rawSign + token verification).
+  - **Server:** `lib/privyServer.ts` + three routes — `/api/privy/wallet` (find-or-create
+    the user's Starknet wallet), `/api/privy/sign` (raw-sign proxy; verifies the Privy access
+    token AND wallet ownership — the security boundary), `/api/paymaster` (SNIP-29 proxy to
+    AVNU keeping the api key server-side, with a NONCE-BASED sponsorship cap: an account's
+    nonce is its lifetime tx count, so `nonce >= SPONSORED_TX_CAP` refuses sponsorship — no
+    database).
+  - **Client:** `lib/privyAuth.tsx` (Privy auth island — PrivyProvider wraps a bridge, not
+    the app; dynamic import), `lib/privyWallet.ts` (starkzap onboard: argentXV050,
+    `feeMode: paymaster`, `deploy: if_needed`), `lib/wallet.tsx` reworked to a dual backend
+    behind the unchanged `WalletCtx` seam — every connect/execute call site untouched; a
+    connect-chooser modal offers "Continue with email" (promoted) vs "Connect a Starknet
+    wallet"; email sessions restore silently on reload (localStorage marker + Privy session).
+  - **Plumbing:** `/api/rpc` gained `?spec=v9` (starkzap's starknet.js 9 speaks RPC 0.9;
+    the node exposes v0_9 — probed). `next.config.ts` IgnorePlugins starkzap's/Privy's
+    optional lazy peers (solana/hyperlane/tongo/cartridge/ethers/farcaster). `.env.example`
+    documents the five env vars. Setup + architecture in `docs/privy-email-login.md`.
+- **Verified:** `next build` ✅ (types + lint); bundle impact confined to lazy chunks
+  (shared First Load JS ~unchanged). **NOT verified: every live flow** — needs real Privy +
+  AVNU credentials (OTP, wallet creation, raw-sign, sponsored deploy/execute, cap refusal).
+  With the env vars unset the email door doesn't render and connect behaves exactly as before.
+- **Decisions:** starkzap over hand-rolled starknet.js (would have meant reimplementing
+  v3 tx-hash + SNIP-9 + PrivySigner + deploy plumbing); cap-by-nonce over a database
+  (on-chain truth, zero infra); PrivyProvider as an island (Privy SDK never ships unless
+  configured). Gas-cap caveat recorded: FEED_CAP was measured for direct execution — the
+  SNIP-9 paymaster path on argentXV050 needs a re-measure before trusting feeds for email
+  keepers. Sponsoring gas knowingly bends "users pay their own gas" (first-principles
+  review) — bounded by the cap, and the wallet door keeps the original economics.
+- **Next:** create the Privy app + AVNU paymaster account, set env vars on a preview
+  deploy, live test: email login → sponsored account deploy → breathe → /pets; re-measure
+  a sponsored feed; then merge.
+
 ## 2026-07-31 (10) — /pets shows what you own · owner edits the look in place · wanderers move
 - **Goal:** three Henri reports from the live mainnet site: (1) the creature he minted and owns
   never appears on /pets; (2) an owner can't change a creature's colours/speed; (3) garden

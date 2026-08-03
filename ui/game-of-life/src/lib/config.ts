@@ -16,6 +16,11 @@ export const UPSTREAM_RPC_COMPAT: Record<string, string> = {
   sepolia: "https://sepolia.nodes.starknet.org/rpc/v0_8",
   mainnet: "https://mainnet.nodes.starknet.org/rpc/v0_8",
 };
+// starkzap embeds starknet.js 9.x, which speaks RPC 0.9 — a third spec, same node.
+export const UPSTREAM_RPC_V9: Record<string, string> = {
+  sepolia: "https://sepolia.nodes.starknet.org/rpc/v0_9",
+  mainnet: "https://mainnet.nodes.starknet.org/rpc/v0_9",
+};
 
 const proxyBase = () => (typeof window !== "undefined" ? `${window.location.origin}/api/rpc` : "/api/rpc");
 
@@ -23,6 +28,18 @@ const proxyBase = () => (typeof window !== "undefined" ? `${window.location.orig
 export const RPC_URL = process.env.NEXT_PUBLIC_GOL_RPC_URL || proxyBase();
 // starknet.js calls (v0.8 — tx polling, tier detection).
 export const RPC_URL_COMPAT = process.env.NEXT_PUBLIC_GOL_RPC_URL_COMPAT || `${proxyBase()}?spec=compat`;
+
+// starkzap's RPC endpoint (v0.9 through the same-origin proxy).
+export const RPC_URL_V9 = process.env.NEXT_PUBLIC_GOL_RPC_URL_V9 || `${proxyBase()}?spec=v9`;
+
+// Privy email login (optional — the email door only appears when an app id is configured).
+export const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID || "";
+
+// AVNU paymaster upstreams (server-side proxy target; see app/api/paymaster/route.ts).
+export const UPSTREAM_PAYMASTER: Record<string, string> = {
+  sepolia: "https://sepolia.paymaster.avnu.fi",
+  mainnet: "https://starknet.paymaster.avnu.fi",
+};
 
 // Starkscan explorer (network-aware: sepolia.starkscan.co on testnet, starkscan.co on mainnet).
 export const explorerTxUrl = (hash: string): string =>
