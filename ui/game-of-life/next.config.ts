@@ -1,16 +1,28 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
-// starkzap's bridge / Solana-connect / confidential subsystems — and Privy's farcaster
-// mini-app integration — lazily `import()` optional peer deps we don't use (and don't
-// install). IgnorePlugin stops webpack resolving them at build time; if one of those code
-// paths were ever hit at runtime, the libraries' own loaders raise their friendly
-// "install X" errors — exactly the intended optional-peer behaviour.
-const OPTIONAL_PEERS =
-  /^(@solana\/web3\.js|@fatsolutions\/tongo-sdk|@hyperlane-xyz\/(registry|sdk|utils)|@cartridge\/controller|ethers|@farcaster\/mini-app-solana)$/;
+// starkzap's bridge / Solana-connect / confidential subsystems import optional peer deps we
+// don't install. They must NOT go through IgnorePlugin: starkzap's root index statically
+// re-exports modules that statically import these peers, and an ignored module THROWS at
+// load time — killing `import("starkzap")` entirely. Instead each peer is aliased to a
+// harmless proxy stub (see optional-peer-stub.cjs); the features it backs are never used.
+const STARKZAP_OPTIONAL_PEERS = [
+  "@solana/web3.js",
+  "@fatsolutions/tongo-sdk",
+  "@hyperlane-xyz/registry",
+  "@hyperlane-xyz/sdk",
+  "@hyperlane-xyz/utils",
+  "@cartridge/controller",
+  "ethers",
+];
 
 const nextConfig: NextConfig = {
   webpack: (config, { webpack }) => {
-    config.plugins.push(new webpack.IgnorePlugin({ resourceRegExp: OPTIONAL_PEERS }));
+    const stub = path.resolve(__dirname, "optional-peer-stub.cjs");
+    for (const peer of STARKZAP_OPTIONAL_PEERS) config.resolve.alias[peer] = stub;
+    // Privy's farcaster mini-app integration lazily imports this and handles its absence —
+    // IgnorePlugin (load-time throw) matches the intended optional-peer behaviour there.
+    config.plugins.push(new webpack.IgnorePlugin({ resourceRegExp: /^@farcaster\/mini-app-solana$/ }));
     return config;
   },
 };

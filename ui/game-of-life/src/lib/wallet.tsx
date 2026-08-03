@@ -154,6 +154,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [authKind, setAuthKind] = useState<"wallet" | "email" | null>(null);
   const [chooserOpen, setChooserOpen] = useState(false);
   const [privyEpoch, setPrivyEpoch] = useState(0); // bumps whenever the bridge reports state
+  // The Privy island is HEAVY (its SDK graph dwarfs the app), so it mounts lazily — only when
+  // the connect chooser opens, a past email session needs restoring, or while email-connected.
+  // Ordinary visitors never download it.
+  const [privyWanted, setPrivyWanted] = useState(false);
+  const pendingEmailRef = useRef(false); // "continue with email" clicked before the island was ready
   const emailWalletRef = useRef<EmailWallet | null>(null);
   const privyApiRef = useRef<PrivyApi | null>(null);
 
@@ -171,33 +176,51 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setAuthKind("email");
       setAddress(w.address);
       setChainId(TARGET_CHAIN_ID); // the keeper account lives on the app's chain by construction
+      setChooserOpen(false); // close only on success — failures stay visible in the panel
       try { localStorage.setItem(EMAIL_MARKER, "1"); } catch { /* private mode */ }
     } catch (e) {
+      console.error("[gol] email connect failed:", e);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setConnecting(false);
     }
   }, []);
 
+  // NOTE: the chooser stays open through the whole email flow (OTP modal overlays it) so
+  // progress and failures have somewhere to live — it closes itself on success.
   const connectEmail = useCallback(() => {
+    setError(null);
     const api = privyApiRef.current;
-    setChooserOpen(false);
-    if (!api || !api.ready) {
-      setError("Email login is still warming up — try again in a moment.");
+    if (!api?.ready) {
+      // island still mounting/booting — remember the intent; the epoch effect fires it
+      pendingEmailRef.current = true;
+      setPrivyWanted(true);
       return;
     }
     if (api.authenticated) void finishEmailConnect();
     else api.login(); // the OTP modal; the bridge's onLogin lands back in finishEmailConnect
   }, [finishEmailConnect]);
 
-  // A reload keeps the Privy session; if this browser had chosen the email door, walk back
-  // through it silently (signing is server-side, so no user gesture is needed).
+  // A past email session marks the browser — mount the island on load so it can restore.
   useEffect(() => {
-    if (address || connecting) return;
+    try { if (localStorage.getItem(EMAIL_MARKER) === "1") setPrivyWanted(true); } catch { /* private mode */ }
+  }, []);
+
+  // Runs whenever the bridge reports state: fire a queued "continue with email" click, or
+  // silently restore a past email session (signing is server-side — no gesture needed).
+  useEffect(() => {
     const api = privyApiRef.current;
+    if (!api?.ready || connecting) return;
+    if (pendingEmailRef.current) {
+      pendingEmailRef.current = false;
+      if (api.authenticated) void finishEmailConnect();
+      else api.login();
+      return;
+    }
+    if (address) return;
     let marker = false;
     try { marker = localStorage.getItem(EMAIL_MARKER) === "1"; } catch { /* private mode */ }
-    if (marker && api?.ready && api.authenticated) void finishEmailConnect();
+    if (marker && api.authenticated) void finishEmailConnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [privyEpoch]);
 
@@ -243,6 +266,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const connect = useCallback(async () => {
     if (PRIVY_APP_ID) {
       setChooserOpen(true);
+      setPrivyWanted(true); // pre-warm the island while the visitor reads the two doors
       return;
     }
     await connectInjected();
@@ -408,7 +432,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     <Ctx.Provider
       value={{ address, chainId, connecting, error, onAppChain, authKind, meteringTier, txEpoch, connect, disconnect, execute, waitForTx, waitForTxAccepted, switchToAppChain }}
     >
-      {PRIVY_APP_ID && (
+      {PRIVY_APP_ID && privyWanted && (
         <PrivyBridge
           appId={PRIVY_APP_ID}
           onApi={(api) => { privyApiRef.current = api; setPrivyEpoch((e) => e + 1); }}
@@ -418,6 +442,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       {children}
       {chooserOpen && (
         <ConnectChooser
+          connecting={connecting}
+          error={error}
           onEmail={connectEmail}
           onWallet={() => { setChooserOpen(false); void connectInjected(); }}
           onClose={() => setChooserOpen(false)}
@@ -429,16 +455,25 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
 /** The two doors into the garden. Email is the promoted path (no wallet, gas covered);
  *  a Starknet wallet remains first-class for the self-custody crowd. */
-function ConnectChooser({ onEmail, onWallet, onClose }: { onEmail: () => void; onWallet: () => void; onClose: () => void }) {
+function ConnectChooser({ connecting, error, onEmail, onWallet, onClose }: {
+  connecting: boolean;
+  error: string | null;
+  onEmail: () => void;
+  onWallet: () => void;
+  onClose: () => void;
+}) {
   return (
     <div className="connect-sheet" role="dialog" aria-modal="true" aria-label="Connect">
       <div className="connect-overlay" onClick={onClose} />
       <div className="connect-panel">
         <h3 className="connect-title">Step into the garden</h3>
-        <button className="btn set-free connect-opt" onClick={onEmail}>Continue with email</button>
-        <p className="connect-hint">No wallet needed — a keeper account is made for you, and the garden covers the gas.</p>
-        <button className="btn connect-opt" onClick={onWallet}>Connect a Starknet wallet</button>
+        <button className="btn set-free connect-opt" onClick={onEmail} disabled={connecting}>
+          {connecting ? <><span className="spinner" /> growing your keeper account…</> : "Continue with email"}
+        </button>
+        <p className="connect-hint">No wallet needed — a keeper account is made for you, and the garden covers the gas. First login takes a few breaths while your account is born on-chain.</p>
+        <button className="btn connect-opt" onClick={onWallet} disabled={connecting}>Connect a Starknet wallet</button>
         <p className="connect-hint">ArgentX, Braavos… your keys, your gas.</p>
+        {error && <p className="breathe-err" style={{ marginTop: 4 }}>{error}</p>}
         <button className="lens-btn connect-cancel" onClick={onClose}>not now</button>
       </div>
     </div>
