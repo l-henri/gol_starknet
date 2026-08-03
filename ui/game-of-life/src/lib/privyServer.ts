@@ -61,20 +61,28 @@ export class AuthError extends Error {}
 
 export type StarknetWallet = { id: string; publicKey: string };
 
-/** The user's Starknet wallets (usually 0 or 1). */
+// Ownership model: wallets are APP-MANAGED, mapped to the user via `external_id` — NOT
+// `owner: { user_id }`. A user-OWNED wallet requires the owner's key-quorum authorization on
+// every action ("No valid authorization keys or user signing keys available"), a flow built
+// for third-party-JWT auth setups. Privy's own Tier-2/Starknet recipe signs with the app
+// secret; user↔wallet enforcement lives in OUR routes (verified access token + this mapping).
+// external_id allows only [a-zA-Z0-9_-], and Privy user ids look like "did:privy:…" — sanitize.
+const extIdOf = (userId: string) => userId.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 64);
+
+/** The user's Starknet wallets (usually 0 or 1), by external-id mapping. */
 export async function starknetWalletsOf(userId: string): Promise<StarknetWallet[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const page: any = await privy().wallets().list({ user_id: userId, chain_type: "starknet" });
+  const page: any = await privy().wallets().list({ external_id: extIdOf(userId), chain_type: "starknet" });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const items: any[] = Array.isArray(page?.data) ? page.data : [];
   return items.map((w) => ({ id: String(w.id), publicKey: String(w.public_key ?? w.address ?? "") }));
 }
 
-/** Find the user's Starknet wallet, creating one (owned by the user) on first login. */
+/** Find the user's Starknet wallet, creating one (app-managed, user-mapped) on first login. */
 export async function findOrCreateStarknetWallet(userId: string): Promise<StarknetWallet> {
   const existing = await starknetWalletsOf(userId);
   if (existing.length > 0) return existing[0];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const w: any = await privy().wallets().create({ chain_type: "starknet", owner: { user_id: userId } });
+  const w: any = await privy().wallets().create({ chain_type: "starknet", external_id: extIdOf(userId) });
   return { id: String(w.id), publicKey: String(w.public_key ?? w.address ?? "") };
 }
