@@ -38,8 +38,10 @@ export function jsonError(status: number, message: string): Response {
   });
 }
 
-/** Verify the `Authorization: Bearer <privy access token>` header; return the Privy user id. */
-export async function requireUserId(req: Request): Promise<string> {
+/** Verify the `Authorization: Bearer <privy access token>` header. Returns the Privy user id
+ *  AND the raw token — wallets are USER-owned, so actions on them (rawSign) must carry the
+ *  user's JWT as authorization context; the app secret alone is deliberately not enough. */
+export async function requireUser(req: Request): Promise<{ userId: string; token: string }> {
   const auth = req.headers.get("authorization") ?? "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
   if (!token) throw new AuthError("missing bearer token");
@@ -49,7 +51,7 @@ export async function requireUserId(req: Request): Promise<string> {
       app_id: PRIVY_APP_ID,
       verification_key: verificationKey(),
     });
-    return claims.user_id;
+    return { userId: claims.user_id, token };
   } catch {
     throw new AuthError("invalid or expired token");
   }
