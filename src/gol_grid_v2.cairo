@@ -301,14 +301,15 @@ pub fn apply_d4(d4: u8, rows: @Array<u64>) -> Array<u64> {
     out
 }
 
-/// Rotate a row's bits left by `dc` columns (bit c -> bit (c+dc) mod N), via u128 headroom.
-fn rot_row_by(x: u64, dc: usize) -> u64 {
-    if dc == 0 {
+/// Rotate a row's bits left by the columns encoded in `mul` (= 2^dc, precomputed by the
+/// caller — hoisted out of per-row loops), via u128 headroom.
+fn rot_row_by_mul(x: u64, mul: u128) -> u64 {
+    if mul == 1 {
         return x;
     }
     let mask128: u128 = MASK.into();
     let pow41: u128 = 0x20000000000; // 2^41
-    let shifted: u128 = x.into() * pow2_128(dc);
+    let shifted: u128 = x.into() * mul;
     let lo: u128 = shifted & mask128;
     let hi: u128 = shifted / pow41; // bits >= 41 wrap around to the low end
     (lo | hi).try_into().unwrap()
@@ -318,11 +319,12 @@ fn rot_row_by(x: u64, dc: usize) -> u64 {
 pub fn translate(rows: @Array<u64>, dr: usize, dc: usize) -> Array<u64> {
     let drm = dr % N;
     let dcm = dc % N;
+    let mul = pow2_128(dcm); // once — NOT per row
     let mut out: Array<u64> = ArrayTrait::new();
     let mut r: usize = 0;
     while r < N {
         let src = (r + N - drm) % N;
-        out.append(rot_row_by(*rows[src], dcm));
+        out.append(rot_row_by_mul(*rows[src], mul));
         r += 1;
     };
     out
