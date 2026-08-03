@@ -35,14 +35,19 @@ pub fn clone_rows(a: @Array<u64>) -> Array<u64> {
 }
 
 /// Step `gens` times from `initial`, tracking the lexicographically smallest state seen (including
-/// `initial`) and whether a stepped state equals `trigger`. Returns `(triggered, smallest, final)`.
-/// No intermediate sequence is materialised (the v1 version returned the whole `Array<u256>`).
-fn run(initial: @Array<u64>, trigger: @Array<u64>, gens: usize) -> (bool, Array<u64>, Array<u64>) {
+/// `initial`) and whether a stepped state equals `trigger`. Also captures the state at index
+/// `capture_at` of the walk (0 = `initial`) — the loop minter's orbit-witness phase, taken for
+/// free from the walk instead of re-stepping afterwards. Returns
+/// `(triggered, smallest, final, captured)`. No intermediate sequence is materialised.
+fn run(
+    initial: @Array<u64>, trigger: @Array<u64>, gens: usize, capture_at: usize,
+) -> (bool, Array<u64>, Array<u64>, Array<u64>) {
     let mut current = clone_rows(initial);
     let mut smallest = clone_rows(initial);
+    let mut captured = clone_rows(initial);
     let mut triggered = false;
     let mut g: usize = 0;
-    while g < gens {
+    while g != gens {
         current = step(@current);
         if eq(@current, trigger) {
             triggered = true;
@@ -50,9 +55,12 @@ fn run(initial: @Array<u64>, trigger: @Array<u64>, gens: usize) -> (bool, Array<
         if lt(@current, @smallest) {
             smallest = clone_rows(@current);
         }
+        if g + 1 == capture_at {
+            captured = clone_rows(@current);
+        }
         g += 1;
     };
-    (triggered, smallest, current)
+    (triggered, smallest, current, captured)
 }
 
 /// Compute a `generations`-state partial path from `initial`, asserting `trigger` is not reached.
@@ -61,7 +69,7 @@ pub fn compute_partial_path(
 ) -> PartialPathData {
     assert(generations > 0, 'No path smaller than 1');
     // A segment of `generations` states spans indices 0..generations-1 -> step generations-1 times.
-    let (triggered, smallest, exitpoint) = run(initial, trigger, generations - 1);
+    let (triggered, smallest, exitpoint, _) = run(initial, trigger, generations - 1, 0);
     assert(!triggered, 'Triggered state reached');
     PartialPathData {
         entrypoint_id: token_hash(initial),
@@ -95,18 +103,23 @@ pub fn combine_partial_path(p1: PartialPathData, p2: PartialPathData) -> Partial
 
 /// Verify `initial` begins a single loop of exactly `generations` states. Panics if it isn't
 /// (returns to `initial` early, or fails to close). Returns
-/// `(true, smallest_state_in_loop, second_to_last_state)` — the third is the loop's predecessor of
-/// `initial` (needed by the path minter to check a path enters the loop from outside).
+/// `(true, smallest_state_in_loop, second_to_last_state, captured)` — the third is the loop's
+/// predecessor of `initial` (needed by the path minter to check a path enters the loop from
+/// outside); the fourth is `step^capture_at(initial)` (0 = `initial`), taken from the walk for
+/// free — the loop minter's orbit-witness phase.
 pub fn is_single_loop(
-    initial: @Array<u64>, generations: usize,
-) -> (bool, Array<u64>, Array<u64>) {
+    initial: @Array<u64>, generations: usize, capture_at: usize,
+) -> (bool, Array<u64>, Array<u64>, Array<u64>) {
     assert(generations > 0, 'No loop is smaller than 1');
+    assert(capture_at < generations, 'capture out of range');
     // trigger = initial: hitting it before the last step means a shorter loop -> reject.
-    let (triggered, smallest, second_to_last) = run(initial, initial, generations - 1);
+    let (triggered, smallest, second_to_last, captured) = run(
+        initial, initial, generations - 1, capture_at,
+    );
     assert(!triggered, 'triggered in ISLFIS');
     let last = step(@second_to_last);
     assert(eq(@last, initial), 'no loop in ISLFIS');
-    (true, smallest, second_to_last)
+    (true, smallest, second_to_last, captured)
 }
 
 /// True iff `initial` is a single loop of `generations` AND is that loop's canonical (smallest)
@@ -114,7 +127,7 @@ pub fn is_single_loop(
 pub fn is_single_loop_and_entrypoint_is_smallest(
     initial: @Array<u64>, generations: usize,
 ) -> bool {
-    let (is_loop, smallest, _) = is_single_loop(initial, generations);
+    let (is_loop, smallest, _, _) = is_single_loop(initial, generations, 0);
     is_loop && eq(@smallest, initial)
 }
 
@@ -153,9 +166,11 @@ mod tests {
     #[test]
     fn single_loop_blinker() {
         // A is period-2; A is lexicographically smaller than B (differ first at row 4: 0 < 4).
-        let (is_loop, smallest, _) = is_single_loop(@blinker_a(), 2);
+        let (is_loop, smallest, _, captured) = is_single_loop(@blinker_a(), 2, 1);
         assert(is_loop, 'A is a loop');
         assert(eq(@smallest, @blinker_a()), 'A is the smallest');
+        // capture_at = 1: the walk hands back step^1(A) = B for free
+        assert(eq(@captured, @blinker_b()), 'captured = B');
     }
 
     #[test]
@@ -168,9 +183,10 @@ mod tests {
     #[test]
     fn still_life_is_a_loop_of_one() {
         let block = grid_with(@array![(10_usize, 0b110_u64), (11_usize, 0b110_u64)]);
-        let (is_loop, smallest, _) = is_single_loop(@block, 1);
+        let (is_loop, smallest, _, captured) = is_single_loop(@block, 1, 0);
         assert(is_loop, 'block is still');
         assert(eq(@smallest, @block), 'block smallest is self');
+        assert(eq(@captured, @block), 'capture 0 = self');
     }
 
     #[test]
@@ -202,6 +218,12 @@ mod tests {
     #[should_panic(expected: 'triggered in ISLFIS')]
     fn wrong_loop_length_panics() {
         // A is period 2: asking for length 3 re-hits A at step 2 (the initial trigger) -> reject.
-        is_single_loop(@blinker_a(), 3);
+        is_single_loop(@blinker_a(), 3, 0);
+    }
+
+    #[test]
+    #[should_panic(expected: 'capture out of range')]
+    fn capture_beyond_walk_panics() {
+        is_single_loop(@blinker_a(), 2, 2);
     }
 }

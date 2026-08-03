@@ -78,6 +78,14 @@ mint_path(drawn: GridState, length, loop_period, canonical: GridState, d4, dr, d
    already passes through `step^k(drawn)`); paths
    `assert apply_symmetry(d4, dr, dc, drawn_start) == canonical`. **One transform — family
    membership is fully verified, not optimistic.**
+   > **2026-08-03 implementation note:** the 2026-07-06 implementation deviated from this text —
+   > it anchored k on the walk's TIME-lex-min and re-stepped k times after the walk (up to 2× the
+   > period in steps). Code and SDK now match the spec as written: k is drawn-relative and
+   > `step^k(drawn)` is captured during the walk. Deployed Sepolia/mainnet minters still have the
+   > old semantics until redeployed; the SDK on this commit produces drawn-relative k, so it
+   > REQUIRES a redeployed minter (`mint_loop` with k>0 against the old classes reverts).
+   > Tiled mints (`mint_loop_from_partial_paths`) always anchored on the state handed in —
+   > unchanged.
 3. `token_id = Poseidon(canonical)`; ERC-721 mint reverts on collision → copies can't exist.
 4. Store **both** states: `canonical` (identity preimage, fraud-proof base) and `drawn`
    (display state — the artist's chosen orientation and position are preserved; render params,

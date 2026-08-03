@@ -66,8 +66,8 @@ pub mod GolPathMinterV2 {
             );
             // loop_entry must begin a single loop of loop_length; get the loop's own predecessor.
             // (is_single_loop panics if loop_entry isn't a clean loop of that length.)
-            let (is_loop, smallest, loop_prev) = gol_utilities_v2::is_single_loop(
-                @loop_entry, loop_length,
+            let (is_loop, smallest, loop_prev, _) = gol_utilities_v2::is_single_loop(
+                @loop_entry, loop_length, 0,
             );
             assert(is_loop, 'Not entering a loop');
             // The path must ENTER the loop from outside: its predecessor of loop_entry differs from

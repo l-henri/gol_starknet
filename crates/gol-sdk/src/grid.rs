@@ -225,25 +225,16 @@ pub fn symmetry_canonical(rows: &Rows) -> (Rows, u8, usize, usize) {
 
 /// The v3 LOOP family canonical: the lex-min over the full symmetry orbit of EVERY phase of the
 /// cycle, with the witness the v3 minter verifies — `(canonical, d4, dr, dc, k)` such that
-/// `apply_symmetry(d4, dr, dc, step^k(time_smallest)) == canonical`, `k < period`, anchored on the
-/// cycle's TIME-lex-min (which the contract derives while proving the loop). `member` may be any
-/// state on the cycle.
+/// `apply_symmetry(d4, dr, dc, step^k(member)) == canonical`, `k < period`, anchored on `member`
+/// ITSELF (the state handed to the contract: the drawn state for `mint_loop`, the tiled walk's
+/// anchor for `mint_loop_from_partial_paths`). 2026-08-03: was anchored on the cycle's
+/// TIME-lex-min, which made the single-shot minter re-step k times after the loop walk; the
+/// contract now captures `step^k(drawn)` during the walk, so k is drawn-relative and the walk is
+/// the only stepping. `member` may be any state on the cycle.
 pub fn loop_family_canonical(member: &Rows, period: u32) -> (Rows, u8, usize, usize, u32) {
-    // find the time-lex-min anchor
-    let mut anchor = *member;
-    let mut cur = *member;
-    for _ in 1..period {
-        cur = step(&cur);
-        if lt(&cur, &anchor) {
-            anchor = cur;
-        }
-    }
-    // global min over orbit × phase, tracking the witness from the anchor
-    let mut phase = anchor;
-    let (mut best, mut bd4, mut bdr, mut bdc) = {
-        let (c, d4, dr, dc) = symmetry_canonical(&phase);
-        (c, d4, dr, dc)
-    };
+    // global min over orbit × phase, tracking the witness from `member` itself
+    let mut phase = *member;
+    let (mut best, mut bd4, mut bdr, mut bdc) = symmetry_canonical(&phase);
     let mut bk = 0u32;
     for k in 1..period {
         phase = step(&phase);
@@ -513,14 +504,22 @@ mod tests {
     fn loop_family_canonical_is_family_invariant_and_witnessed() {
         let a = blinker_a();
         let (canon, d4, dr, dc, k) = loop_family_canonical(&a, 2);
-        // witness verifies exactly as the v3 minter does: from the time-lex-min anchor
-        let b = step(&a);
-        let anchor = if lt(&b, &a) { b } else { a };
-        let mut phase = anchor;
+        // witness verifies exactly as the v3 minter does: from the member handed in (the drawn
+        // state), whose step^k the contract captures during the loop walk (2026-08-03 semantics)
+        let mut phase = a;
         for _ in 0..k {
             phase = step(&phase);
         }
         assert_eq!(apply_symmetry(d4, dr, dc, &phase), canon);
+        // a NON-time-min member anchors just as soundly: k is relative to that member
+        let b = step(&a);
+        let (canon_b, d4b, drb, dcb, kb) = loop_family_canonical(&b, 2);
+        assert_eq!(canon, canon_b, "same canonical from phase B");
+        let mut phase_b = b;
+        for _ in 0..kb {
+            phase_b = step(&phase_b);
+        }
+        assert_eq!(apply_symmetry(d4b, drb, dcb, &phase_b), canon);
         // any family member yields the same canonical
         let shifted = translate(&blinker_a(), 12, 30);
         let (canon2, ..) = loop_family_canonical(&shifted, 2);

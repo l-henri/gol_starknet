@@ -2,7 +2,9 @@
 //! (docs/v3-identity-spec.md §4). The drawn state is verified as a clean loop exactly as v2 did
 //! (walking the cycle), but the "must be time-smallest" gate is dropped: canonicality now lives in
 //! the id. The claimed orbit canonical is verified as a family member with ONE transform, anchored
-//! on the walk's time-lex-min: `apply_symmetry(g, step^k(time_smallest)) == canonical`.
+//! on the DRAWN state: `apply_symmetry(g, step^k(drawn)) == canonical`, with `step^k(drawn)`
+//! captured during the loop walk itself (2026-08-03; previously anchored on the walk's
+//! time-lex-min, which re-stepped k extra times — up to 2x the period in total).
 //! Minimality of the canonical is the NFT contract's optimistic claim (prove_malformed defends it).
 
 #[starknet::contract]
@@ -126,14 +128,21 @@ pub mod GolLoopMinterV3 {
             recipient: ContractAddress,
         ) -> bool {
             assert(loop_length > 0, 'Loop as to be at least 1');
+            assert(k.into() < loop_length, 'k out of range');
             let rows = gol_grid_v2::unpack(@drawn);
             // Walk the cycle: `drawn` must be a single loop of exactly loop_length. The walk also
-            // yields the TIME-lex-min — the verified anchor for the orbit witness. (v2's
-            // "drawn == smallest" gate is intentionally gone.)
-            let (is_loop, time_smallest, _) = gol_utilities_v2::is_single_loop(@rows, loop_length);
+            // captures step^k(drawn) — the orbit witness's phase, anchored at the DRAWN state.
+            // (2026-08-03: k was previously relative to the walk's time-lex-min, which cost up to
+            // k extra steps after the walk; any verified cycle member anchors equally soundly, so
+            // the phase now comes from the walk for free. v2's "drawn == smallest" gate is
+            // intentionally gone.)
+            let (is_loop, _, _, phase) = gol_utilities_v2::is_single_loop(
+                @rows, loop_length, k.into(),
+            );
             assert(is_loop, 'Not a loop');
-            let canon_rows = self
-                .verify_canonical(@time_smallest, @canonical, d4, dr, dc, k, loop_length);
+            let cand = gol_grid_v2::apply_symmetry(d4, dr.into(), dc.into(), @phase);
+            let canon_rows = gol_grid_v2::unpack(@canonical);
+            assert(gol_grid_v2::eq(@cand, @canon_rows), 'bad canonical witness');
             self.do_mint(@rows, loop_length, @canon_rows, canonical, recipient);
             true
         }

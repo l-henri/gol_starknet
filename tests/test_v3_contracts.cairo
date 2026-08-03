@@ -196,6 +196,41 @@ mod tests {
     }
 
     #[test]
+    fn loop_mint_witness_anchors_at_drawn() {
+        // Locks the 2026-08-03 anchor semantics: k is relative to the DRAWN state, not the
+        // walk's time-lex-min. Draw phase B (NOT the time-min); step^1(B) = A; witness = the
+        // translation taking A to the claimed canonical.
+        let d = deploy_all();
+        let (a, smallest) = blinker();
+        assert(eq(@a, @smallest), 'A is the time-min');
+        let drawn_b = step(@a);
+        let canonical_rows = translate(@smallest, 3, 5);
+        let canonical = pack(@canonical_rows);
+        let id = token_id(@canonical_rows);
+        start_cheat_caller_address(d.loop_minter, d.creator);
+        let ok = IGolLoopMinterV3Dispatcher { contract_address: d.loop_minter }
+            .mint_loop(pack(@drawn_b), 2, canonical, 0, 3, 5, 1, d.creator);
+        stop_cheat_caller_address(d.loop_minter);
+        assert(ok, 'minted from phase B');
+        // display keeps the drawn (B) orientation; identity is the canonical
+        let lf = IGolLifeFormsV3Dispatcher { contract_address: d.lifeforms };
+        let data = lf.get_lifeform_data(id);
+        assert(eq(@gol_starknet::gol_grid_v2::unpack(@data.current_state), @drawn_b), 'drawn kept');
+    }
+
+    #[test]
+    #[should_panic(expected: 'k out of range')]
+    fn loop_mint_rejects_k_at_period() {
+        let d = deploy_all();
+        let (drawn, smallest) = blinker();
+        let canonical = pack(@translate(@smallest, 3, 5));
+        start_cheat_caller_address(d.loop_minter, d.creator);
+        IGolLoopMinterV3Dispatcher { contract_address: d.loop_minter }
+            .mint_loop(pack(@drawn), 2, canonical, 0, 3, 5, 2, d.creator);
+        stop_cheat_caller_address(d.loop_minter);
+    }
+
+    #[test]
     #[should_panic(expected: 'bad canonical witness')]
     fn loop_mint_rejects_foreign_canonical() {
         let d = deploy_all();

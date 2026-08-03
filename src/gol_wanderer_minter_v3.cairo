@@ -86,8 +86,8 @@ pub mod GolWandererMinterV3 {
             let (path_prev, loop_entry) = gol_utilities_v2::step_to(
                 @path_rows, length_to_loop_entrypoint,
             );
-            let (is_loop, smallest, loop_prev) = gol_utilities_v2::is_single_loop(
-                @loop_entry, loop_length,
+            let (is_loop, smallest, loop_prev, _) = gol_utilities_v2::is_single_loop(
+                @loop_entry, loop_length, 0,
             );
             assert(is_loop, 'Not entering a loop');
             assert(!gol_grid_v2::eq(@loop_prev, @path_prev), 'Incorrect loop entrypoint');
