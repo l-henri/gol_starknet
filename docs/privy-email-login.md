@@ -58,12 +58,15 @@ Privy email OTP  ─────────────────────
 ## Setup (to go live)
 
 1. **Privy** (dashboard.privy.io): create an app, enable **Email** login. Collect: App ID →
-   `NEXT_PUBLIC_PRIVY_APP_ID`, App secret → `PRIVY_APP_SECRET`, verification key →
-   `PRIVY_VERIFICATION_KEY`. Starknet wallets are Tier-2 (raw sign) — no extra dashboard
-   config needed; wallets are created server-side owned by the user.
+   `NEXT_PUBLIC_PRIVY_APP_ID` and App secret → `PRIVY_APP_SECRET`. That's all — access
+   tokens are verified against the app's public JWKS endpoint automatically
+   (`PRIVY_VERIFICATION_KEY` is an optional override that saves the cached JWKS fetch; the
+   key lives on the dashboard's Settings page if ever wanted). Starknet wallets are Tier-2
+   (raw sign) — no extra dashboard config needed; wallets are created server-side owned by
+   the user.
 2. **AVNU** (portal): create a paymaster account, fund it with credits, get an API key →
    `PAYMASTER_API_KEY`. Sponsored mode is refused without it.
-3. Set the vars in `.env.local` / Vercel (see `ui/game-of-life/.env.example`), redeploy.
+3. Set the vars in `.env.local` / Vercel (see `ui/game-of-life/.env.local.example`), redeploy.
    With `NEXT_PUBLIC_PRIVY_APP_ID` unset the email door simply doesn't exist — connect
    behaves exactly as before.
 4. Tune `SPONSORED_TX_CAP` (default 25 tx per account, lifetime).

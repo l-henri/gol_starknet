@@ -17,6 +17,7 @@
     "@privy-io/react-auth": "^3.36.1",
     "@starknet-io/get-starknet": "^4.0.8",
     "gol-sdk-wasm": "file:./sdk-pkg",
+    "jose": "^6.2.7",
     "next": "15.5.19",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

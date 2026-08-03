@@ -7,13 +7,23 @@
 // no key material ever passes through here, only transaction hashes and signatures.
 
 import { PrivyClient, verifyAccessToken } from "@privy-io/node";
+import { createRemoteJWKSet, type JWTVerifyGetKey } from "jose";
 
 export const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? "";
 const PRIVY_APP_SECRET = process.env.PRIVY_APP_SECRET ?? "";
-// The app's token-verification key (SPKI), from the Privy dashboard (App settings → Basics).
+// Optional: the app's token-verification key (SPKI) from the Privy dashboard (Settings).
+// When unset we verify against Privy's public JWKS endpoint for the app instead — one less
+// credential to manage; the key override just saves the (cached) JWKS fetch.
 const PRIVY_VERIFICATION_KEY = process.env.PRIVY_VERIFICATION_KEY ?? "";
 
-export const privyConfigured = () => !!(PRIVY_APP_ID && PRIVY_APP_SECRET && PRIVY_VERIFICATION_KEY);
+export const privyConfigured = () => !!(PRIVY_APP_ID && PRIVY_APP_SECRET);
+
+let jwks: JWTVerifyGetKey | null = null;
+function verificationKey(): string | JWTVerifyGetKey {
+  if (PRIVY_VERIFICATION_KEY) return PRIVY_VERIFICATION_KEY;
+  if (!jwks) jwks = createRemoteJWKSet(new URL(`https://auth.privy.io/api/v1/apps/${PRIVY_APP_ID}/jwks.json`));
+  return jwks;
+}
 
 let client: PrivyClient | null = null;
 export function privy(): PrivyClient {
@@ -37,7 +47,7 @@ export async function requireUserId(req: Request): Promise<string> {
     const claims = await verifyAccessToken({
       access_token: token,
       app_id: PRIVY_APP_ID,
-      verification_key: PRIVY_VERIFICATION_KEY,
+      verification_key: verificationKey(),
     });
     return claims.user_id;
   } catch {
