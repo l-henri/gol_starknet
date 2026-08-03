@@ -27,14 +27,22 @@ pub const POW_ROW: felt252 = 0x20000000000; // 2^41 — row stride within a pack
 // Bitboard stepper (proven in spike/v2_stepper)
 // ---------------------------------------------------------------------------
 
-/// Left-neighbour mask: bit i takes column i-1, torus wrap (bit 37 -> bit 0).
+const TOPBIT_NZ: NonZero<u64> = 0x10000000000; // 2^40, as a divisor
+const TWO_NZ: NonZero<u64> = 2;
+
+/// Left-neighbour mask: bit i takes column i-1, torus wrap (bit 40 -> bit 0).
+/// One divmod, one OR: for x = q·2^40 + r the rotation is r·2 | q — the parts are
+/// disjoint and already ≤ MASK, so no masking is needed (1 bitwise op, was 2).
 fn rotl(x: u64) -> u64 {
-    ((x * 2) | (x / TOPBIT)) & MASK
+    let (q, r) = DivRem::div_rem(x, TOPBIT_NZ);
+    (r * 2) | q
 }
 
-/// Right-neighbour mask: bit i takes column i+1, torus wrap (bit 0 -> bit 37).
+/// Right-neighbour mask: bit i takes column i+1, torus wrap (bit 0 -> bit 40).
+/// For x = q·2 + r the rotation is q | r·2^40 — disjoint, ≤ MASK (1 bitwise op, was 3).
 fn rotr(x: u64) -> u64 {
-    ((x / 2) | ((x & 1) * TOPBIT)) & MASK
+    let (q, r) = DivRem::div_rem(x, TWO_NZ);
+    q | (r * TOPBIT)
 }
 
 /// Half adder over bitmasks: (sum, carry) per bit.
@@ -49,53 +57,55 @@ fn fa(a: u64, b: u64, c: u64) -> (u64, u64) {
     (s2, c1 | c2)
 }
 
-/// Next state of one row given the rows above (u), current (m), below (d).
-fn step_row(u: u64, m: u64, d: u64) -> u64 {
-    let ul = rotl(u);
-    let ur = rotr(u);
-    let ml = rotl(m);
-    let mr = rotr(m);
-    let dl = rotl(d);
-    let dr = rotr(d);
-
-    // Sum the 8 neighbour masks per bit into a 4-bit count (ones, twos, fours, eights).
-    let (s1, c1) = fa(ul, u, ur);
-    let (s2, c2) = fa(ml, mr, dl);
-    let (s3, c3) = ha(d, dr);
-    let (ones, ca) = fa(s1, s2, s3);
-    let (t1, tc1) = fa(c1, c2, c3);
-    let (twos, tc2) = ha(t1, ca);
-    let (fours, eights) = ha(tc1, tc2);
-
-    let not_ones = ones ^ MASK;
-    let not_fours = fours ^ MASK;
-    let not_eights = eights ^ MASK;
-
-    let eq3 = ones & twos & not_fours & not_eights; // count == 3
-    let eq2 = not_ones & twos & not_fours & not_eights; // count == 2
-
-    // born if ==3; survives if alive and ==2 (alive & ==3 is covered by eq3)
-    (eq3 | (m & eq2)) & MASK
-}
-
 /// One generation over the whole NxN torus.
+///
+/// Two passes sharing the horizontal work: pass 1 rotates and sums each row ONCE
+/// (t + 2·tc = l+m+r, the 3-cell sum any adjacent row needs; p + 2·pc = l+r, the 2-cell
+/// sum the row itself needs), pass 2 adds the three row-sums per output row. Same
+/// full-adder network as the original step_row, deduplicated: 29 bitwise ops + 2 divmods
+/// per row instead of 53 + 6 (each input row was previously rotated/summed three times,
+/// once per adjacent output row). Inputs must be masked 41-bit rows (pack/unpack form).
 pub fn step(rows: @Array<u64>) -> Array<u64> {
-    let mut out = ArrayTrait::new();
+    // Pass 1: per-row horizontal sum/carry planes.
+    let mut h: Array<(u64, u64, u64, u64)> = ArrayTrait::new();
     let mut r: usize = 0;
-    while r < N {
-        let u = *rows[if r == 0 {
+    while r != N {
+        let m = *rows[r];
+        let l = rotl(m);
+        let rt = rotr(m);
+        let (t, tc) = fa(l, m, rt);
+        let (p, pc) = ha(l, rt);
+        h.append((t, tc, p, pc));
+        r += 1;
+    };
+    // Pass 2: neighbour count of row i = (l+m+r)(i-1) + (l+r)(i) + (l+m+r)(i+1),
+    // accumulated into per-bit count planes (ones, twos, fours, eights).
+    let mut out: Array<u64> = ArrayTrait::new();
+    let mut i: usize = 0;
+    while i != N {
+        let up = if i == 0 {
             N - 1
         } else {
-            r - 1
-        }];
-        let m = *rows[r];
-        let d = *rows[if r == N - 1 {
+            i - 1
+        };
+        let dn = if i == N - 1 {
             0
         } else {
-            r + 1
-        }];
-        out.append(step_row(u, m, d));
-        r += 1;
+            i + 1
+        };
+        let (t_u, tc_u, _, _) = *h[up];
+        let (_, _, p, pc) = *h[i];
+        let (t_d, tc_d, _, _) = *h[dn];
+        let (ones, ca) = fa(t_u, p, t_d);
+        let (t2, c2a) = fa(tc_u, pc, tc_d);
+        let (twos, c2b) = ha(t2, ca);
+        let (fours, eights) = ha(c2a, c2b);
+        // Alive iff count == 3, or count == 2 and currently alive: both need twos set
+        // with fours/eights clear; ones distinguishes 3 (born) from 2 (needs m). This is
+        // the old eq3 | (m & eq2) with the shared factor pulled out.
+        let m = *rows[i];
+        out.append((ones | m) & twos & (fours ^ MASK) & (eights ^ MASK));
+        i += 1;
     };
     out
 }
@@ -705,7 +715,8 @@ mod tests {
 
     // #[ignore]d so the default suite stays fast/green; run with
     // `snforge test bench_step --ignored`. Per-gen = (bench_step_101 - bench_step_1)/100
-    // ~= 2.64M L2 gas/generation at 41x41 (measured 2026-06-22).
+    // ~= 1.64M L2 gas/generation at 41x41 (measured 2026-08-03, shared-horizontal-sums
+    // stepper; was 2.64M with the per-row step_row on 2026-06-22).
     #[test]
     #[ignore]
     fn bench_step_1() {
