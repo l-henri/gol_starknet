@@ -18,6 +18,30 @@
 
 ---
 
+## 2026-08-04 (2) — Sepolia dress rehearsal of the gas-classes migration: PASSED end-to-end
+- **Goal:** rehearse every mainnet migration motion on a disposable Sepolia stack before
+  touching production.
+- **Branch:** `main` (perf/stepper-gas merged this morning, fast-forward to 173764c).
+- **Changed:** [docs/migration-runbook.md](../migration-runbook.md) (NEW — the mainnet
+  sequence with every measured number and gotcha) + README index. No contract changes.
+- **Verified (all on-chain, Sepolia, real receipts):**
+  - 4 new classes declared (~261 STRK actuals); hashes match local computation.
+  - Fresh stack from the OLD 07-06 classes (one UDC multicall), old-style blinker mint.
+  - **In-place upgrade**: feed marginal per-gen **2,600,839 → 1,128,745 (−56.6%)**;
+    pre-upgrade creature's age/state bit-identical to the off-chain reference after.
+  - **Minter cutover** (deploy+grant+revoke): k=1 drawn-anchored mint SUCCEEDED via the
+    new minter (drawn phase-B preserved for display); revoked old minter rejects mints.
+- **Decisions:** mainnet order = declares → NFT upgrades → deploy+grant new minters →
+  SDK/wasm/site ship → THEN revoke old (site would break in the gap otherwise).
+- **Gotchas recorded in the runbook:** declare contract_class needs debug-info stripped +
+  formatSpaces abi (else 'invalid signature'); explicit nonce + wait-for-advance between
+  strkd txs; strkd Sepolia RPC repointed to publicnode (SNF rate limit); strkd `-32006`
+  funding precondition bug (misreads node rate-limit as 'manager not deployed') — issue
+  report generated, Henri has the prefilled URL.
+- **Next:** execute the mainnet migration per the runbook (gol-mainnet account confirmed
+  accessible with an active grant; fund declares first; scan mainnet partial paths).
+- **Blockers:** none.
+
 ## 2026-08-04 — cairo-auditor pass on perf/stepper-gas: clean; one pre-existing nit fixed
 - **Goal:** the mandatory pre-merge audit gate for the gas branch.
 - **Branch:** `perf/stepper-gas` · **Commits:** 7bf09f3.
