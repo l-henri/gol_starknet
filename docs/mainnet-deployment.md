@@ -20,6 +20,28 @@ Class-hash cross-check: NUT, LoopMinterV3 and WandererMinterV3 hash **identicall
 deployments** (source unchanged); LifeformsV3 / WanderersV3 / PetBonds differ because they carry
 the 2026-07-24→29 changes (provenance, genesis, `image` metadata, CEI).
 
+## 2026-08-04 — gas-classes migration (perf/stepper-gas, docs/migration-runbook.md)
+
+Feed cost **2,600,839 → 1,148,845 L2 gas/generation** (real receipts on the genesis void:
+pre `0x3a645074…e712`, post `0x3a741969…079e` + `0x43243aaf…92ff`). Executed per the
+runbook after the same-day Sepolia dress rehearsal.
+
+| Change | Value | tx |
+|---|---|---|
+| GolLifeformsV3 upgraded in place | new class `0x1c4cb60804ee32b7f749c2500be2af3aac1065c5171039a3078fac624fe4317` | `0x76e2171c9c340da3492a0df4458f40c0d471f5bd43452e82170091bb05bbfd7` |
+| GolWanderersV3 upgraded in place | new class `0x4e05202f7ed69bf1692d9651fc533cc116fc3cf2eae18362f7e6ad6859afed8` | (same multicall) |
+| **GolLoopMinterV3 REDEPLOYED** | `0x7697efb274b53182aae8daa9945b2674f1d2ad14d29a3950a03b8d2fc4e675b` (class `0x1e9641b2…125f253c`) | `0x7925ab0e346ce5ab960f99d5af20f158cbf56868a79fd3b2cedf87d483407ad` (block 12_759_573) |
+| **GolWandererMinterV3 REDEPLOYED** | `0x32931ffd7802f82499e0f9fbe5bf00bc7c86e06d07c11cac73b51e5ceb56341` (class `0x1e078956…6e760470`) | (same multicall, + both grants) |
+| Declares (4 classes, ~267 STRK) | lifeforms `0x1e83673d…167f5`, others in scratchpad `declare-results-main.json` | |
+| First k>0 mint via the new minter | token `0x6bdfddaa5370bf279bfde266583f49506c19f8d2b186ba407c422fb7f95bfe2` (blinker, drawn = phase B, k=1) | `0x5dd3dd79ce02fa0a7381faa16459a671581ac020b9d3c9eb24e533bb51994d` |
+
+The new loop minter anchors the witness at the DRAWN state (`step^k(drawn)` captured
+during the loop walk — v3-identity-spec §4.2 as written) and both minters persist
+`pack(verified rows)` as the canonical (2026-08-04 audit hardening). **The old minters
+(`0x00e92f01…441b3d`, `0x05bf9b9d…0069ac`) still hold MINTER_ROLE until the site cutover
+completes; revoke is the final step.** The old wanderer minter holds 2 partial-path
+segments owned by `0x378b9c3c…d94f014` that the revoke orphans (no escrow at risk).
+
 ## Transactions (all strkd-approved by Henri, block ~12,553,9xx)
 
 - Funding: `0x13a56413cbceb05fdca393722448563efa17dd94d889ee4a82c0246aacb2750` (20 STRK) +

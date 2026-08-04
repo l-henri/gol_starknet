@@ -96,11 +96,16 @@ pub fn deployments(net: Network) -> Option<GolAddresses> {
                 "0x01259a8b553e5ae806620ff422eb85ccbce2b8ff034235e8d09e36060058f64e",
             ),
             nutrient: felt("0x075a2e584fea61cc3e8580fd6b96e065b2e038863c9d8bf4113b29d58eb0ced1"),
+            // 2026-08-04 gas-classes migration (docs/migration-runbook.md): minters
+            // REDEPLOYED at block 12_759_573 with the drawn-anchored witness + cheap
+            // stepper; the previous minters (0x00e92f01…, 0x05bf9b9d…) are revoked.
+            // This SDK's drawn-relative k REVERTS on the old loop minter — do not
+            // point it back.
             loop_minter: felt(
-                "0x00e92f01378b0b9c9b9a22c994a24bff5ed897be6c5d218aa0b8adf56f441b3d",
+                "0x07697efb274b53182aae8daa9945b2674f1d2ad14d29a3950a03b8d2fc4e675b",
             ),
             path_minter: felt(
-                "0x05bf9b9d20523fa4a502cc16ae76f26a228dd73de7d1bcd4078b89cc5e0069ac",
+                "0x032931ffd7802f82499e0f9fbe5bf00bc7c86e06d07c11cac73b51e5ceb56341",
             ),
             pets: felt("0x0492226c4ffc142e1c1c3c248bd8c9398e4379ddf28ce2d7d6eefbdfdae7e8ec"),
             bench: None,
