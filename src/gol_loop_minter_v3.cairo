@@ -87,7 +87,6 @@ pub mod GolLoopMinterV3 {
             drawn_rows: @Array<u64>,
             loop_length: usize,
             canon_rows: @Array<u64>,
-            canonical: GridState,
             recipient: ContractAddress,
         ) {
             let empty = gol_grid_v2::is_empty(drawn_rows);
@@ -103,13 +102,16 @@ pub mod GolLoopMinterV3 {
             let lifeforms = IGolLifeFormsV3Dispatcher {
                 contract_address: self.gol_lifeforms_nft.read(),
             };
+            // Persist pack(verified rows), NEVER the raw calldata struct: unpack() ignores the
+            // unused high bits of each word, so a caller could otherwise smuggle garbage bits
+            // into the permanent canonical record (2026-08-04 audit).
             lifeforms
                 .mint(
                     recipient,
                     get_caller_address(),
                     gol_grid_v2::token_id(canon_rows),
                     lifeform,
-                    canonical,
+                    gol_grid_v2::pack(canon_rows),
                 );
         }
     }
@@ -143,7 +145,7 @@ pub mod GolLoopMinterV3 {
             let cand = gol_grid_v2::apply_symmetry(d4, dr.into(), dc.into(), @phase);
             let canon_rows = gol_grid_v2::unpack(@canonical);
             assert(gol_grid_v2::eq(@cand, @canon_rows), 'bad canonical witness');
-            self.do_mint(@rows, loop_length, @canon_rows, canonical, recipient);
+            self.do_mint(@rows, loop_length, @canon_rows, recipient);
             true
         }
 
@@ -243,7 +245,14 @@ pub mod GolLoopMinterV3 {
                 contract_address: self.gol_lifeforms_nft.read(),
             };
             lifeforms
-                .mint(recipient, caller, gol_grid_v2::token_id(@canon_rows), lifeform, canonical);
+                .mint(
+                    recipient,
+                    caller,
+                    gol_grid_v2::token_id(@canon_rows),
+                    lifeform,
+                    // pack(verified rows), never the raw calldata struct (2026-08-04 audit)
+                    gol_grid_v2::pack(@canon_rows),
+                );
         }
     }
 }

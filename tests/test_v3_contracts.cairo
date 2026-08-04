@@ -218,6 +218,50 @@ mod tests {
         assert(eq(@gol_starknet::gol_grid_v2::unpack(@data.current_state), @drawn_b), 'drawn kept');
     }
 
+    // 2026-08-04 audit regression: unpack() ignores the unused high bits of each packed word
+    // (w0 holds 6x41 = 246 bits of a felt252), so a caller can pass a `canonical` struct with
+    // garbage above bit 245 that unpacks — and hashes — identically to the clean encoding.
+    // The minter must persist pack(verified rows), never the raw calldata struct.
+    const W0_GARBAGE: felt252 = 0xC0000000000000000000000000000000000000000000000000000000000000; // 3·2^246
+
+    #[test]
+    fn loop_mint_strips_garbage_bits_from_canonical() {
+        let d = deploy_all();
+        let (drawn, smallest) = blinker();
+        let canonical_rows = translate(@smallest, 3, 5);
+        let clean = pack(@canonical_rows);
+        let dirty = GridState { w0: clean.w0 + W0_GARBAGE, ..clean };
+        let id = token_id(@canonical_rows);
+        start_cheat_caller_address(d.loop_minter, d.creator);
+        let ok = IGolLoopMinterV3Dispatcher { contract_address: d.loop_minter }
+            .mint_loop(pack(@drawn), 2, dirty, 0, 3, 5, 0, d.creator);
+        stop_cheat_caller_address(d.loop_minter);
+        assert(ok, 'dirty encoding still mints');
+        let lf = IGolLifeFormsV3Dispatcher { contract_address: d.lifeforms };
+        let stored = lf.get_canonical_state(id);
+        assert(stored == clean, 'stored = pack(rows)');
+        assert(stored != dirty, 'garbage bits stripped');
+    }
+
+    #[test]
+    fn wanderer_mint_strips_garbage_bits_from_canonical() {
+        let d = deploy_all();
+        let start = grid_with(@array![(1_usize, 0b110_u64), (2_usize, 0b010_u64)]);
+        let canonical_rows = translate(@start, 4, 6);
+        let clean = pack(@canonical_rows);
+        let dirty = GridState { w0: clean.w0 + W0_GARBAGE, ..clean };
+        let id = token_id(@canonical_rows);
+        start_cheat_caller_address(d.wanderer_minter, d.creator);
+        let ok = IGolWandererMinterV3Dispatcher { contract_address: d.wanderer_minter }
+            .mint_path(pack(@start), 1, 1, dirty, 0, 4, 6, d.creator);
+        stop_cheat_caller_address(d.wanderer_minter);
+        assert(ok, 'dirty encoding still mints');
+        let w = IGolWanderersV3Dispatcher { contract_address: d.wanderers };
+        let stored = w.get_canonical_state(id);
+        assert(stored == clean, 'stored = pack(rows)');
+        assert(stored != dirty, 'garbage bits stripped');
+    }
+
     #[test]
     #[should_panic(expected: 'k out of range')]
     fn loop_mint_rejects_k_at_period() {

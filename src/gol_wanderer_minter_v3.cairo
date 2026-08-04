@@ -118,7 +118,8 @@ pub mod GolWandererMinterV3 {
                     get_caller_address(),
                     gol_grid_v2::token_id(@canon_rows),
                     path_data,
-                    canonical,
+                    // pack(verified rows), never the raw calldata struct (2026-08-04 audit)
+                    gol_grid_v2::pack(@canon_rows),
                 );
             true
         }
@@ -222,7 +223,12 @@ pub mod GolWandererMinterV3 {
             };
             wanderers
                 .mint(
-                    recipient, caller, gol_grid_v2::token_id(@canon_rows), path_data, canonical,
+                    recipient,
+                    caller,
+                    gol_grid_v2::token_id(@canon_rows),
+                    path_data,
+                    // pack(verified rows), never the raw calldata struct (2026-08-04 audit)
+                    gol_grid_v2::pack(@canon_rows),
                 );
         }
     }
