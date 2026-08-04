@@ -18,6 +18,24 @@
 
 ---
 
+## 2026-08-04 — cairo-auditor pass on perf/stepper-gas: clean; one pre-existing nit fixed
+- **Goal:** the mandatory pre-merge audit gate for the gas branch.
+- **Branch:** `perf/stepper-gas` · **Commits:** 7bf09f3.
+- **Changed:** audit itself changed nothing in the perf work. It surfaced ONE below-threshold
+  finding (P2, confidence 70) that PREDATES the branch (mainnet has it): the minters persisted
+  the RAW `canonical` calldata struct — whose unused high bits `unpack()` ignores — instead of
+  re-packing from the verified rows, unlike `current_state`/`start_state`. No current on-chain
+  consumer is exploitable (all unpack or compare hashes); fixed as defense-in-depth at all four
+  persist sites since the minters redeploy with this branch anyway.
+- **Verified:** targeted cairo-auditor run (4 vector agents, Execution Integrity FULL, 10
+  candidates FP-gated); finding independently verified against the downstream lifeforms/
+  wanderers code before accepting. `snforge test` 97 green (+2 dirty-encoding regressions).
+- **Decisions:** the perf changes themselves came back clean — no findings introduced by the
+  stepper rewrite, lane packing, or witness-anchor change.
+- **Next:** branch is merge-ready from the audit side; the open discussion is the migration
+  path (LOG 2026-08-03 (4) Next).
+- **Blockers:** none.
+
 ## 2026-08-03 (4) — Gas optimizations implemented: 2.64M → 1.15M/gen, mint walk halved
 - **Goal:** implement the research plan from entry (3) — get costs down as much as possible;
   migration/deployment deliberately deferred.

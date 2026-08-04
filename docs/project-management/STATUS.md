@@ -39,8 +39,10 @@ unverified in a browser (as is the 2026-07-31 breath basket, on any network).
   at the drawn state per spec — **SDK on that branch requires a redeployed loop minter**);
   translate/eq/lt micro-fixes. 95 tests green, one commit per optimization class. Research
   + measured results: [gas-optimization-research.md](../gas-optimization-research.md).
-  Next: cairo-auditor pass, then the migration discussion (minters redeploy + role
-  re-grant + SDK/wasm ship together; lifeforms upgrades in place). LOG 2026-08-03 (3)+(4).
+  **Audited 2026-08-04: clean** — no findings from the perf changes; one pre-existing
+  below-threshold nit (raw canonical persisted, not re-packed) fixed on the branch, 97 tests
+  green. Next: the migration discussion (minters redeploy + role re-grant + SDK/wasm ship
+  together; lifeforms upgrades in place). LOG 2026-08-03 (3)+(4), 2026-08-04.
 - **2026-08-03 email login — LIVE-VERIFIED, merged to `main`:** Privy email OTP → a real
   Starknet account (ArgentX v0.5.0, app-managed key in Privy), all acts sponsored via AVNU
   paymaster behind a nonce-based per-account cap; connect chooser promotes email, wallets
