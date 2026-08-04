@@ -6,7 +6,16 @@
 **Last updated:** 2026-08-03
 **Framing:** WIP **art piece**, not a commercial product — the outcome is burning gas and creating art.
 
-## 🎉 MAINNET (2026-07-31)
+## 🎉 MAINNET (2026-07-31 · gas classes 2026-08-04)
+
+**2026-08-04: the gas-optimized classes are LIVE on mainnet.** Feeds cost **1,148,845 L2
+gas/generation (was 2,600,839, −56%)** — real genesis-void receipts. Lifeforms/Wanderers
+upgraded in place; minters REDEPLOYED (LoopMinter `0x7697efb2…675b`, WandererMinter
+`0x32931ffd…6341`, block 12_759_573) with the drawn-anchored witness — first k>0 mint
+verified on-chain; old minters revoked after the site cutover (commit `04c7420`, pushed —
+Vercel deploy verified). Full record: [mainnet-deployment.md](../mainnet-deployment.md)
+§2026-08-04 + [migration-runbook.md](../migration-runbook.md). Open follow-ups:
+FEED_CAP 82 → ~190 (needs one legacy-account receipt), two strkd gap reports.
 
 **The v3 stack is LIVE on Starknet mainnet and the production site points at it.** Six contracts
 (fresh NUT · LifeformsV3/BACT · LoopMinterV3 · WanderersV3/WNDR · WandererMinterV3 · PetBonds)
@@ -27,7 +36,7 @@ the 2026-07-29 deep cairo-auditor pass (no finding ≥75) is the launch basis. S
 ⚠️ **No wallet click-through on the live mainnet site yet** — mint/breathe with real funds is
 unverified in a browser (as is the 2026-07-31 breath basket, on any network).
 
-**Build/test:** `scarb build` ✅ · `snforge test` ✅ (91, +11 ignored benches) · `cargo test -p gol-sdk` ✅ (44) · `next build` ✅ · `tsc` ✅
+**Build/test:** `scarb build` ✅ · `snforge test` ✅ (97, +11 ignored benches) · `cargo test -p gol-sdk` ✅ (44) · `next build` ✅ · `tsc` ✅
 **Live site:** https://gol-starknet.vercel.app — **PRODUCTION IS ON MAINNET since 2026-07-31** (branch `mainnet` merged into `main` after Henri's preview click-through; Vercel auto-deploys `main`). Explorer links: Starkscan.
 **Tx tooling:** all on-chain transactions via **strkd** — pair `gol-bench` + `kind:"agent"`; per-request `chainId` (felt, e.g. `0x534e5f4d41494e`); never sncast/raw keys. Mainnet fee craft (tight bounds, biggest-first declares) in [mainnet-deployment.md](../mainnet-deployment.md).
 

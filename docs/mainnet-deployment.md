@@ -37,10 +37,13 @@ runbook after the same-day Sepolia dress rehearsal.
 
 The new loop minter anchors the witness at the DRAWN state (`step^k(drawn)` captured
 during the loop walk — v3-identity-spec §4.2 as written) and both minters persist
-`pack(verified rows)` as the canonical (2026-08-04 audit hardening). **The old minters
-(`0x00e92f01…441b3d`, `0x05bf9b9d…0069ac`) still hold MINTER_ROLE until the site cutover
-completes; revoke is the final step.** The old wanderer minter holds 2 partial-path
-segments owned by `0x378b9c3c…d94f014` that the revoke orphans (no escrow at risk).
+`pack(verified rows)` as the canonical (2026-08-04 audit hardening). Site cut over the
+same day (commit `04c7420`, Vercel deploy verified), then the old minters
+(`0x00e92f01…441b3d`, `0x05bf9b9d…0069ac`) were **REVOKED** — tx
+`0x39cd80584041522a38a5769cf20fcb0eaa4e2e947463fb27d5d27b581145cdb`, roles verified 0x0
+old / 0x1 new on both NFTs. The old wanderer minter held 2 partial-path segments owned by
+`0x378b9c3c…d94f014`, orphaned by the revoke (no escrow at risk — segments are
+pre-payment; the owner can re-register on the new minter).
 
 ## Transactions (all strkd-approved by Henri, block ~12,553,9xx)
 

@@ -18,6 +18,30 @@
 
 ---
 
+## 2026-08-04 (3) — MAINNET MIGRATION EXECUTED: gas classes live, feeds at 1.15M/gen
+- **Goal:** run the migration runbook on mainnet, same day as the rehearsal.
+- **Branch:** `main` · **Commits:** 04c7420 (SDK address book + wasm + deployment doc),
+  pushed — first push of the whole gas line to origin (perf work + migration together).
+- **Changed on-chain (gol-mainnet, ~272 STRK declares + fees, funded +350):**
+  1. 4 classes declared (Lifeforms 101.6 + Wanderers 96.7 + minters 34.4/34.6 STRK).
+  2. Lifeforms + Wanderers **upgraded in place** (`0x76e2171c…f965a`).
+  3. New minters deployed + granted at block 12_759_573 (`0x7925ab0e…07ad`):
+     LoopMinter `0x7697efb2…675b`, WandererMinter `0x32931ffd…6341`.
+  4. First k>0 mainnet mint: blinker drawn at phase B, k=1 (`0x5dd3dd79…94d`).
+  5. Site cut over (Vercel deploy of 04c7420 verified via GitHub deploy status —
+     curl sees only the bot checkpoint), THEN old minters revoked
+     (`0x39cd8058…5cdb`), roles verified both directions.
+- **Verified:** genesis void feed receipts — **2,600,839 → 1,148,845 L2 gas/gen
+  (−55.8%)**, within 0.01% of the local bench; genesis age 134, state still all-zero.
+- **Gotchas beyond the runbook (recorded there):** publicnode caps request bodies (declare
+  broadcast via the SNF node instead — accepts 1.1MB, and the wallet-signed declare needs
+  the envelope fields reassembled: strkd's signed_transaction omits signature/bounds/DA
+  fields — strkd gap to report); strkd's mainnet write path (starkscan gateway) allows
+  1 write/min → 65s backoff between txs.
+- **Next:** FEED_CAP 82 → ~190 after one real legacy-account feed receipt; report the two
+  strkd gaps; watch the first organic mints/feeds on the new stack.
+- **Blockers:** none. THE ART IS 2.3× CHEAPER TO BURN.
+
 ## 2026-08-04 (2) — Sepolia dress rehearsal of the gas-classes migration: PASSED end-to-end
 - **Goal:** rehearse every mainnet migration motion on a disposable Sepolia stack before
   touching production.
