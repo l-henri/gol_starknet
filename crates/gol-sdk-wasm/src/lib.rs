@@ -130,7 +130,13 @@ impl GolSdk {
 
     /// Lifeform by token id (decimal or `0x` hex), or `null` if unminted.
     pub async fn lifeform(&self, token_id: &str) -> Result<JsValue, JsValue> {
-        match self.client.reads().lifeform(parse_u256(token_id)?).await.map_err(err)? {
+        match self
+            .client
+            .reads()
+            .lifeform(parse_u256(token_id)?)
+            .await
+            .map_err(err)?
+        {
             Some(lf) => to_js(&JsLifeform::of(&lf)),
             None => Ok(JsValue::NULL),
         }
@@ -140,7 +146,13 @@ impl GolSdk {
     /// (unminted, grandfathered pre-field mint, or the deployed class predates the entrypoint).
     #[wasm_bindgen(js_name = discoverer)]
     pub async fn discoverer(&self, token_id: &str) -> Result<JsValue, JsValue> {
-        match self.client.reads().discoverer(parse_u256(token_id)?).await.map_err(err)? {
+        match self
+            .client
+            .reads()
+            .discoverer(parse_u256(token_id)?)
+            .await
+            .map_err(err)?
+        {
             Some(f) => Ok(JsValue::from_str(&felt_to_hex(&f))),
             None => Ok(JsValue::NULL),
         }
@@ -149,7 +161,13 @@ impl GolSdk {
     /// The wanderer's discoverer as a hex address, or `null` — same semantics as `discoverer`.
     #[wasm_bindgen(js_name = pathDiscoverer)]
     pub async fn path_discoverer(&self, token_id: &str) -> Result<JsValue, JsValue> {
-        match self.client.reads().path_discoverer(parse_u256(token_id)?).await.map_err(err)? {
+        match self
+            .client
+            .reads()
+            .path_discoverer(parse_u256(token_id)?)
+            .await
+            .map_err(err)?
+        {
             Some(f) => Ok(JsValue::from_str(&felt_to_hex(&f))),
             None => Ok(JsValue::NULL),
         }
@@ -158,7 +176,13 @@ impl GolSdk {
     /// Decoded `token_uri` (name/description/animation_url/attributes), or `null`.
     #[wasm_bindgen(js_name = tokenUri)]
     pub async fn token_uri(&self, token_id: &str) -> Result<JsValue, JsValue> {
-        match self.client.reads().token_uri(parse_u256(token_id)?).await.map_err(err)? {
+        match self
+            .client
+            .reads()
+            .token_uri(parse_u256(token_id)?)
+            .await
+            .map_err(err)?
+        {
             Some(uri) => to_js(&uri),
             None => Ok(JsValue::NULL),
         }
@@ -167,7 +191,12 @@ impl GolSdk {
     /// NUT balance as a `0x` hex string (wrap with `BigInt()` in JS).
     #[wasm_bindgen(js_name = nutBalance)]
     pub async fn nut_balance(&self, address: &str) -> Result<JsValue, JsValue> {
-        let bal = self.client.reads().nut_balance(parse_felt(address)?).await.map_err(err)?;
+        let bal = self
+            .client
+            .reads()
+            .nut_balance(parse_felt(address)?)
+            .await
+            .map_err(err)?;
         Ok(JsValue::from_str(&bal.to_hex()))
     }
 
@@ -178,7 +207,10 @@ impl GolSdk {
             self.client.config.rpc_url.clone(),
             self.client.config.addresses.clone(),
         );
-        let owned = ds.owned_lifeforms(parse_felt(address)?).await.map_err(err)?;
+        let owned = ds
+            .owned_lifeforms(parse_felt(address)?)
+            .await
+            .map_err(err)?;
         let js: Vec<JsLifeform> = owned.iter().map(JsLifeform::of).collect();
         to_js(&js)
     }
@@ -245,7 +277,15 @@ impl GolSdk {
             self.client.config.addresses.clone(),
         );
         let mints = ds.recent_mints_with_blocks().await.map_err(err)?;
-        to_js(&mints.iter().map(|(t, b)| JsMint { token_id: t.to_hex(), block: *b }).collect::<Vec<_>>())
+        to_js(
+            &mints
+                .iter()
+                .map(|(t, b)| JsMint {
+                    token_id: t.to_hex(),
+                    block: *b,
+                })
+                .collect::<Vec<_>>(),
+        )
     }
 
     /// Path mints with their block numbers, newest first (burned paths still listed — hydrate to
@@ -257,7 +297,15 @@ impl GolSdk {
             self.client.config.addresses.clone(),
         );
         let mints = ds.recent_path_mints_with_blocks().await.map_err(err)?;
-        to_js(&mints.iter().map(|(t, b)| JsMint { token_id: t.to_hex(), block: *b }).collect::<Vec<_>>())
+        to_js(
+            &mints
+                .iter()
+                .map(|(t, b)| JsMint {
+                    token_id: t.to_hex(),
+                    block: *b,
+                })
+                .collect::<Vec<_>>(),
+        )
     }
 
     /// Total generations breathed per account, descending: `[{ address, generations }]` — the
@@ -277,7 +325,10 @@ impl GolSdk {
         to_js(
             &totals
                 .iter()
-                .map(|(a, g)| JsBreather { address: felt_to_hex(a), generations: *g })
+                .map(|(a, g)| JsBreather {
+                    address: felt_to_hex(a),
+                    generations: *g,
+                })
                 .collect::<Vec<_>>(),
         )
     }
@@ -310,14 +361,20 @@ impl GolSdk {
     /// `pets.reap(creature_id, holder)` — burn a lapsed bond, 1 NUT minted to the caller.
     #[wasm_bindgen(js_name = reapCall)]
     pub fn reap_call(&self, creature_id: &str, holder: &str) -> Result<JsValue, JsValue> {
-        let call = self.client.writes().reap(parse_u256(creature_id)?, parse_felt(holder)?);
+        let call = self
+            .client
+            .writes()
+            .reap(parse_u256(creature_id)?, parse_felt(holder)?);
         calls_to_js(&[("reap", &call)])
     }
 
     /// `pets.transfer_bond(creature_id, to)` — daycare hand-off (the clock rides along).
     #[wasm_bindgen(js_name = transferBondCall)]
     pub fn transfer_bond_call(&self, creature_id: &str, to: &str) -> Result<JsValue, JsValue> {
-        let call = self.client.writes().transfer_bond(parse_u256(creature_id)?, parse_felt(to)?);
+        let call = self
+            .client
+            .writes()
+            .transfer_bond(parse_u256(creature_id)?, parse_felt(to)?);
         calls_to_js(&[("transfer_bond", &call)])
     }
 
@@ -338,7 +395,10 @@ impl GolSdk {
         to_js(
             &pairs
                 .iter()
-                .map(|(c, h)| JsPair { creature_id: c.to_hex(), holder: felt_to_hex(h) })
+                .map(|(c, h)| JsPair {
+                    creature_id: c.to_hex(),
+                    holder: felt_to_hex(h),
+                })
                 .collect::<Vec<_>>(),
         )
     }
@@ -358,17 +418,28 @@ impl GolSdk {
             last_pet: f64,
             reapable: bool,
         }
-        to_js(&JsBond { held, last_pet: last_pet as f64, reapable })
+        to_js(&JsBond {
+            held,
+            last_pet: last_pet as f64,
+            reapable,
+        })
     }
 
     /// Bond status for MANY creatures against one holder in a single batched round-trip:
     /// `[{ creature_id, held, last_pet, reapable }]`, in input order (`creature_ids` echoes back
     /// verbatim). The batched counterpart to `bondStatus` — use for /pets-style sweeps.
     #[wasm_bindgen(js_name = bondStatuses)]
-    pub async fn bond_statuses(&self, creature_ids: JsValue, holder: &str) -> Result<JsValue, JsValue> {
+    pub async fn bond_statuses(
+        &self,
+        creature_ids: JsValue,
+        holder: &str,
+    ) -> Result<JsValue, JsValue> {
         let ids: Vec<String> =
             serde_wasm_bindgen::from_value(creature_ids).map_err(|e| js_err(e.to_string()))?;
-        let parsed = ids.iter().map(|s| parse_u256(s)).collect::<Result<Vec<_>, _>>()?;
+        let parsed = ids
+            .iter()
+            .map(|s| parse_u256(s))
+            .collect::<Result<Vec<_>, _>>()?;
         let statuses = self
             .client
             .rpc()
@@ -402,8 +473,16 @@ impl GolSdk {
     pub async fn lifeforms_batch(&self, token_ids: JsValue) -> Result<JsValue, JsValue> {
         let ids: Vec<String> =
             serde_wasm_bindgen::from_value(token_ids).map_err(|e| js_err(e.to_string()))?;
-        let parsed = ids.iter().map(|s| parse_u256(s)).collect::<Result<Vec<_>, _>>()?;
-        let lfs = self.client.rpc().lifeforms_batch(&parsed).await.map_err(err)?;
+        let parsed = ids
+            .iter()
+            .map(|s| parse_u256(s))
+            .collect::<Result<Vec<_>, _>>()?;
+        let lfs = self
+            .client
+            .rpc()
+            .lifeforms_batch(&parsed)
+            .await
+            .map_err(err)?;
         to_js(&lfs.iter().map(JsLifeform::of).collect::<Vec<_>>())
     }
 
@@ -432,10 +511,10 @@ impl GolSdk {
         dc: u8,
         k: u32,
     ) -> Result<JsValue, JsValue> {
-        let call = self
-            .client
-            .writes()
-            .prove_malformed_loop(parse_u256(token_id_hex)?, d4, dr, dc, k);
+        let call =
+            self.client
+                .writes()
+                .prove_malformed_loop(parse_u256(token_id_hex)?, d4, dr, dc, k);
         calls_to_js(&[("prove_malformed", &call)])
     }
 
@@ -448,10 +527,10 @@ impl GolSdk {
         dr: u8,
         dc: u8,
     ) -> Result<JsValue, JsValue> {
-        let call = self
-            .client
-            .writes()
-            .prove_malformed_wanderer(parse_u256(token_id_hex)?, d4, dr, dc);
+        let call =
+            self.client
+                .writes()
+                .prove_malformed_wanderer(parse_u256(token_id_hex)?, d4, dr, dc);
         calls_to_js(&[("prove_malformed", &call)])
     }
 
@@ -463,10 +542,11 @@ impl GolSdk {
         n: u32,
         beneficiary: &str,
     ) -> Result<JsValue, JsValue> {
-        let call = self
-            .client
-            .writes()
-            .breathe_life_for(parse_u256(token_id_hex)?, n, parse_felt(beneficiary)?);
+        let call = self.client.writes().breathe_life_for(
+            parse_u256(token_id_hex)?,
+            n,
+            parse_felt(beneficiary)?,
+        );
         calls_to_js(&[("move_lifeform_forward_n_for", &call)])
     }
 
@@ -502,14 +582,23 @@ impl GolSdk {
     /// generations and mints `n` NUT in one tx. `n` is clamped to >= 1 (the contract asserts n > 0).
     #[wasm_bindgen(js_name = breatheLifeCall)]
     pub fn breathe_life_call(&self, token_id: &str, n: u32) -> Result<JsValue, JsValue> {
-        let call = self.client.writes().breathe_life(parse_u256(token_id)?, n.max(1));
+        let call = self
+            .client
+            .writes()
+            .breathe_life(parse_u256(token_id)?, n.max(1));
         calls_to_js(&[("move_lifeform_forward_n", &call)])
     }
 
     /// Per-token render params (`{ bg, cell, speed }`), or `null` if unminted.
     #[wasm_bindgen(js_name = renderParams)]
     pub async fn render_params(&self, token_id: &str) -> Result<JsValue, JsValue> {
-        match self.client.reads().render_params(parse_u256(token_id)?).await.map_err(err)? {
+        match self
+            .client
+            .reads()
+            .render_params(parse_u256(token_id)?)
+            .await
+            .map_err(err)?
+        {
             Some(rp) => to_js(&rp),
             None => Ok(JsValue::NULL),
         }
@@ -559,7 +648,12 @@ impl GolSdk {
             dr: u32,
             dc: u32,
         }
-        to_js(&Orbit { canonical: rows_to_js(&canonical), d4, dr: dr as u32, dc: dc as u32 })
+        to_js(&Orbit {
+            canonical: rows_to_js(&canonical),
+            d4,
+            dr: dr as u32,
+            dc: dc as u32,
+        })
     }
 
     /// Search for a challenge witness relating two start states:
@@ -581,7 +675,12 @@ impl GolSdk {
                     dc: u32,
                     k: u32,
                 }
-                to_js(&Witness { d4, dr: dr as u32, dc: dc as u32, k })
+                to_js(&Witness {
+                    d4,
+                    dr: dr as u32,
+                    dc: dc as u32,
+                    k,
+                })
             }
             None => Ok(JsValue::NULL),
         }
@@ -598,7 +697,10 @@ impl GolSdk {
                     period: u32,
                     smallest: Vec<f64>,
                 }
-                to_js(&FoundLoop { period, smallest: rows_to_js(&smallest) })
+                to_js(&FoundLoop {
+                    period,
+                    smallest: rows_to_js(&smallest),
+                })
             }
             None => Ok(JsValue::NULL),
         }
@@ -632,12 +734,21 @@ impl GolSdk {
         }
         let base = JsFate {
             kind: "",
-            period: None, canonical: None, sequence_length: None, loop_period: None,
-            loop_canonical: None, loop_entry: None, life_state: None, steps: None,
+            period: None,
+            canonical: None,
+            sequence_length: None,
+            loop_period: None,
+            loop_canonical: None,
+            loop_entry: None,
+            life_state: None,
+            steps: None,
         };
         let out = match engine::classify_fate(&rows_from_js(rows)?, max_steps) {
             engine::Fate::Loop { period, canonical } => JsFate {
-                kind: "loop", period: Some(period), canonical: Some(rows_to_js(&canonical)), ..base
+                kind: "loop",
+                period: Some(period),
+                canonical: Some(rows_to_js(&canonical)),
+                ..base
             },
             engine::Fate::Path(p) => JsFate {
                 kind: "path",
@@ -648,7 +759,11 @@ impl GolSdk {
                 life_state: Some(p.life_state.as_str().to_string()),
                 ..base
             },
-            engine::Fate::Transient { steps } => JsFate { kind: "transient", steps: Some(steps), ..base },
+            engine::Fate::Transient { steps } => JsFate {
+                kind: "transient",
+                steps: Some(steps),
+                ..base
+            },
         };
         to_js(&out)
     }
@@ -656,7 +771,13 @@ impl GolSdk {
     /// Path creature by token id (decimal or `0x` hex), or `null` if not minted (or burned).
     #[wasm_bindgen(js_name = pathLifeform)]
     pub async fn path_lifeform(&self, token_id: &str) -> Result<JsValue, JsValue> {
-        match self.client.reads().path_lifeform(parse_u256(token_id)?).await.map_err(err)? {
+        match self
+            .client
+            .reads()
+            .path_lifeform(parse_u256(token_id)?)
+            .await
+            .map_err(err)?
+        {
             Some(p) => to_js(&JsPath::of(&p)),
             None => Ok(JsValue::NULL),
         }
@@ -665,7 +786,13 @@ impl GolSdk {
     /// Per-token render params on the path NFT (`{ bg, cell, speed }`), or `null` if not minted.
     #[wasm_bindgen(js_name = pathRenderParams)]
     pub async fn path_render_params(&self, token_id: &str) -> Result<JsValue, JsValue> {
-        match self.client.reads().path_render_params(parse_u256(token_id)?).await.map_err(err)? {
+        match self
+            .client
+            .reads()
+            .path_render_params(parse_u256(token_id)?)
+            .await
+            .map_err(err)?
+        {
             Some(rp) => to_js(&rp),
             None => Ok(JsValue::NULL),
         }
@@ -699,10 +826,13 @@ impl GolSdk {
         dr: u8,
         dc: u8,
     ) -> Result<JsValue, JsValue> {
-        let call = self
-            .client
-            .writes()
-            .challenge_burn(parse_u256(older_id)?, parse_u256(younger_id)?, d4, dr, dc);
+        let call = self.client.writes().challenge_burn(
+            parse_u256(older_id)?,
+            parse_u256(younger_id)?,
+            d4,
+            dr,
+            dc,
+        );
         calls_to_js(&[("challenge_burn", &call)])
     }
 

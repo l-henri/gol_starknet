@@ -115,7 +115,11 @@ impl EventScanDataSource {
         // NUT outlives collection versions — scan from ITS deploy block, not the collection's.
         let keys = vec![vec![selector("Transfer")], vec![Felt::ZERO], vec![]];
         let events = self
-            .scan_all_from(self.addresses.nutrient, keys, self.addresses.nutrient_deploy_block)
+            .scan_all_from(
+                self.addresses.nutrient,
+                keys,
+                self.addresses.nutrient_deploy_block,
+            )
             .await?;
         let mut totals: Vec<(Felt, u64)> = Vec::new();
         for ev in &events {
@@ -171,7 +175,11 @@ impl EventScanDataSource {
     }
 
     /// Page through every matching event, following the continuation token.
-    async fn scan_all(&self, address: Felt, keys: Vec<Vec<Felt>>) -> Result<Vec<RawEvent>, GolError> {
+    async fn scan_all(
+        &self,
+        address: Felt,
+        keys: Vec<Vec<Felt>>,
+    ) -> Result<Vec<RawEvent>, GolError> {
         self.scan_all_from(address, keys, self.from_block).await
     }
 
@@ -216,7 +224,11 @@ impl DataSource for EventScanDataSource {
         self.reader.lifeform(token_id).await
     }
 
-    async fn activity(&self, token_id: Option<U256>, limit: u32) -> Result<Vec<MoveEvent>, GolError> {
+    async fn activity(
+        &self,
+        token_id: Option<U256>,
+        limit: u32,
+    ) -> Result<Vec<MoveEvent>, GolError> {
         let keys = vec![vec![selector("NewMove")]];
         let events = self.scan_all(self.addresses.lifeforms, keys).await?;
         let mut out: Vec<MoveEvent> = events

@@ -14,7 +14,8 @@ fn main() {
     let (period, canonical) = find_loop(&glider, 4096).expect("glider loops");
     // recipient = the strkd agent account
     let recipient =
-        Felt::from_hex("0x026d87a881bc82eb038c4cc214fbccd16ea72b424b523a7b2b2551a2e495e70f").unwrap();
+        Felt::from_hex("0x026d87a881bc82eb038c4cc214fbccd16ea72b424b523a7b2b2551a2e495e70f")
+            .unwrap();
     let plan = w.plan_loop_mint(&canonical, period, recipient, 60, 60, 8);
     eprintln!(
         "period={period} token_id={} txCount={} tooLong={} singleShot={}",
@@ -27,7 +28,13 @@ fn main() {
     for (i, step) in plan.steps.iter().enumerate() {
         for c in &step.calls {
             let cd: Vec<String> = c.calldata.iter().map(felt_to_hex).collect();
-            println!("STEP{}\t{}\t{}\t{}", i, felt_to_hex(&c.to), felt_to_hex(&c.selector), cd.join(","));
+            println!(
+                "STEP{}\t{}\t{}\t{}",
+                i,
+                felt_to_hex(&c.to),
+                felt_to_hex(&c.selector),
+                cd.join(",")
+            );
         }
     }
 }

@@ -2,8 +2,8 @@
 //! never changes when stepped, so its live-cell density is held CONSTANT across every generation —
 //! letting us measure how per-generation gas depends on density alone (period and dynamics fixed).
 
-use gol_sdk::grid::{step, GridState, N};
 use gol_sdk::felt_to_hex;
+use gol_sdk::grid::{step, GridState, N};
 
 fn blocks(n_per_side: usize) -> [u64; N] {
     // 2×2 blocks at (4i,4j); 4-spacing keeps each block isolated (still-life) and clear of the wrap.

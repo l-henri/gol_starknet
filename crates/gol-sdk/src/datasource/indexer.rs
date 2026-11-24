@@ -63,7 +63,8 @@ impl IndexerDataSource {
     ) -> Result<Self, GolError> {
         let api_key = std::env::var("STARKSCAN_API_KEY")
             .map_err(|_| GolError::Config("STARKSCAN_API_KEY not set".into()))?;
-        let base = std::env::var("STARKSCAN_BASE_URL").unwrap_or_else(|_| DEFAULT_BASE_URL.to_string());
+        let base =
+            std::env::var("STARKSCAN_BASE_URL").unwrap_or_else(|_| DEFAULT_BASE_URL.to_string());
         Ok(Self::new(base, chain, api_key, rpc_url, addresses))
     }
 
@@ -109,7 +110,10 @@ impl IndexerDataSource {
             for item in items {
                 out.push(parse_starkscan_event(item)?);
             }
-            cursor = resp.get("nextCursor").and_then(Value::as_str).map(String::from);
+            cursor = resp
+                .get("nextCursor")
+                .and_then(Value::as_str)
+                .map(String::from);
             if cursor.is_none() {
                 break;
             }
@@ -143,7 +147,11 @@ impl DataSource for IndexerDataSource {
         self.reader.lifeform(token_id).await
     }
 
-    async fn activity(&self, token_id: Option<U256>, limit: u32) -> Result<Vec<MoveEvent>, GolError> {
+    async fn activity(
+        &self,
+        token_id: Option<U256>,
+        limit: u32,
+    ) -> Result<Vec<MoveEvent>, GolError> {
         // NewMove keys=[selector]; fields live in data = [token_id.low, token_id.high, age].
         let events = self
             .fetch_events(self.addresses.lifeforms, selector("NewMove"), None)
@@ -181,7 +189,9 @@ fn parse_topic(item: &Value, key: &str) -> Result<Option<Felt>, GolError> {
         Some(Value::String(s)) => Ok(Some(
             Felt::from_hex(s).map_err(|e| GolError::Encoding(e.to_string()))?,
         )),
-        Some(other) => Err(GolError::Encoding(format!("topic {key}: unexpected {other}"))),
+        Some(other) => Err(GolError::Encoding(format!(
+            "topic {key}: unexpected {other}"
+        ))),
     }
 }
 
@@ -201,7 +211,10 @@ fn parse_starkscan_event(item: &Value) -> Result<StarkscanEvent, GolError> {
         })
         .transpose()?
         .unwrap_or_default();
-    let block_number = item.get("blockNumber").and_then(Value::as_u64).unwrap_or_default();
+    let block_number = item
+        .get("blockNumber")
+        .and_then(Value::as_u64)
+        .unwrap_or_default();
     let tx_hash = match item.get("txHash").and_then(Value::as_str) {
         Some(s) => Felt::from_hex(s).map_err(|e| GolError::Encoding(e.to_string()))?,
         None => Felt::ZERO,

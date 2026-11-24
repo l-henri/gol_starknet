@@ -74,7 +74,9 @@ pub fn deployments(net: Network) -> Option<GolAddresses> {
         Network::Sepolia => Some(GolAddresses {
             lifeforms: felt("0x001e8e1c75f960faebd6f24c4321aad2f76e54dce00d11d690cb58ff1666ceec"),
             // Wanderers: the PATH-creature NFT (field name kept for API stability).
-            path_lifeforms: felt("0x00d43450e4cc02677b193f0a0f25daf1a85a1fcb1071d24674c1db485763042c"),
+            path_lifeforms: felt(
+                "0x00d43450e4cc02677b193f0a0f25daf1a85a1fcb1071d24674c1db485763042c",
+            ),
             nutrient: felt("0x060e0a0bd9aafec5fd0346e49eb4c5c47f9c7d6b7f26c705aaf21fd53a84e2c9"),
             loop_minter: felt("0x0351576a60a9f0423784e0bd2d5e4e630f4b21f49a0b55cf89045e8e1006f3ba"),
             path_minter: felt("0x06d00789bc1808e41fe708aad5f76c978585f184f9a7931f7bb6300c52f23573"),
@@ -101,12 +103,8 @@ pub fn deployments(net: Network) -> Option<GolAddresses> {
             // stepper; the previous minters (0x00e92f01…, 0x05bf9b9d…) are revoked.
             // This SDK's drawn-relative k REVERTS on the old loop minter — do not
             // point it back.
-            loop_minter: felt(
-                "0x07697efb274b53182aae8daa9945b2674f1d2ad14d29a3950a03b8d2fc4e675b",
-            ),
-            path_minter: felt(
-                "0x032931ffd7802f82499e0f9fbe5bf00bc7c86e06d07c11cac73b51e5ceb56341",
-            ),
+            loop_minter: felt("0x07697efb274b53182aae8daa9945b2674f1d2ad14d29a3950a03b8d2fc4e675b"),
+            path_minter: felt("0x032931ffd7802f82499e0f9fbe5bf00bc7c86e06d07c11cac73b51e5ceb56341"),
             pets: felt("0x0492226c4ffc142e1c1c3c248bd8c9398e4379ddf28ce2d7d6eefbdfdae7e8ec"),
             bench: None,
             // Everything (deploys + wiring + genesis) landed in one tx at block 12_553_924.

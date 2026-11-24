@@ -43,15 +43,37 @@ mod tests {
     #[test]
     fn selector_fixtures() {
         let cases = [
-            ("get_grid_size", "0x2afe8275316b08353f4c1eb94470f9351664c081e3601d1274d00f492eb0dfd"),
-            ("balance_of", "0x35a73cd311a05d46deda634c5ee045db92f811b4e74bca4437fcb5302b7af33"),
-            ("approve", "0x219209e083275171774dab1df80982e9df2096516f06319c5c6d71ae0a8480c"),
-            ("move_lifeform_forward", "0xce26c947fa5a9ffb57a3cc884d504aa5ad01cb2c4b90451e66ba2227d6b7e"),
-            ("mint_loop", "0x1450d9ac1812908645720f27da2d0dbc0bf1ddb3abf6f49cca68acd1bbf9760"),
-            ("iterate_life_once", "0x3ab75419222f443c43591ba9df3c35461bc23fd537d9f1daa11c05b864a4585"),
+            (
+                "get_grid_size",
+                "0x2afe8275316b08353f4c1eb94470f9351664c081e3601d1274d00f492eb0dfd",
+            ),
+            (
+                "balance_of",
+                "0x35a73cd311a05d46deda634c5ee045db92f811b4e74bca4437fcb5302b7af33",
+            ),
+            (
+                "approve",
+                "0x219209e083275171774dab1df80982e9df2096516f06319c5c6d71ae0a8480c",
+            ),
+            (
+                "move_lifeform_forward",
+                "0xce26c947fa5a9ffb57a3cc884d504aa5ad01cb2c4b90451e66ba2227d6b7e",
+            ),
+            (
+                "mint_loop",
+                "0x1450d9ac1812908645720f27da2d0dbc0bf1ddb3abf6f49cca68acd1bbf9760",
+            ),
+            (
+                "iterate_life_once",
+                "0x3ab75419222f443c43591ba9df3c35461bc23fd537d9f1daa11c05b864a4585",
+            ),
         ];
         for (name, want) in cases {
-            assert_eq!(selector(name), Felt::from_hex(want).unwrap(), "selector({name})");
+            assert_eq!(
+                selector(name),
+                Felt::from_hex(want).unwrap(),
+                "selector({name})"
+            );
         }
     }
 
@@ -59,11 +81,13 @@ mod tests {
     fn event_selector_fixtures() {
         assert_eq!(
             selector("Transfer"),
-            Felt::from_hex("0x99cd8bde557814842a3121e8ddfd433a539b8c9f14bf31ebf108d12e6196e9").unwrap()
+            Felt::from_hex("0x99cd8bde557814842a3121e8ddfd433a539b8c9f14bf31ebf108d12e6196e9")
+                .unwrap()
         );
         assert_eq!(
             selector("NewLifeForm"),
-            Felt::from_hex("0x11f46882e19ad05d3762feda18b95af02b4d04ff264650de9665ede8f823262").unwrap()
+            Felt::from_hex("0x11f46882e19ad05d3762feda18b95af02b4d04ff264650de9665ede8f823262")
+                .unwrap()
         );
     }
 
@@ -78,7 +102,8 @@ mod tests {
         let h = move_message_hash(Felt::from_hex("0x123").unwrap(), &msg);
         assert_eq!(
             h,
-            Felt::from_hex("0x5323c371f0c4baa097ef72c63e84b77a294a67cfa03a6adfec6dfc2e4033a25").unwrap()
+            Felt::from_hex("0x5323c371f0c4baa097ef72c63e84b77a294a67cfa03a6adfec6dfc2e4033a25")
+                .unwrap()
         );
     }
 }

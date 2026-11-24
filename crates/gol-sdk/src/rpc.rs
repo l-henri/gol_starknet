@@ -7,9 +7,12 @@ use serde_json::{json, Value};
 use crate::config::{ContractKey, GolAddresses};
 use crate::encoding::selector;
 use crate::error::GolError;
-use crate::reader::Reader;
 use crate::grid::GridState;
-use crate::types::{felt_hex, felt_to_bool, felt_to_u128, Felt, LifeState, LifeformData, OwnedLifeform, OwnedPath, PathForm, RenderParams, TokenUri, U256};
+use crate::reader::Reader;
+use crate::types::{
+    felt_hex, felt_to_bool, felt_to_u128, Felt, LifeState, LifeformData, OwnedLifeform, OwnedPath,
+    PathForm, RenderParams, TokenUri, U256,
+};
 
 /// JSON-RPC `CONTRACT_ERROR` — a call that reverted (e.g. `owner_of` on an unminted token).
 const CONTRACT_ERROR: i64 = 40;
@@ -104,7 +107,11 @@ impl RpcReader {
         cd.push(holder);
         let last = self.call_raw(pets, selector("last_pet_of"), &cd).await?;
         let reap = self.call_raw(pets, selector("is_reapable"), &cd).await?;
-        Ok((held, felt_to_u128(at(&last, 0)?) as u64, felt_to_u128(at(&reap, 0)?) == 1))
+        Ok((
+            held,
+            felt_to_u128(at(&last, 0)?) as u64,
+            felt_to_u128(at(&reap, 0)?) == 1,
+        ))
     }
 
     /// Pet-bond status for MANY creatures against one holder in a single batched HTTP round-trip
@@ -133,7 +140,10 @@ impl RpcReader {
         }
         let results = self.call_batch(&calls).await?;
         let first = |r: &Option<Vec<Felt>>| -> u128 {
-            r.as_ref().and_then(|v| v.first()).map(felt_to_u128).unwrap_or(0)
+            r.as_ref()
+                .and_then(|v| v.first())
+                .map(felt_to_u128)
+                .unwrap_or(0)
         };
         Ok((0..creatures.len())
             .map(|i| {
@@ -146,7 +156,12 @@ impl RpcReader {
             .collect())
     }
 
-    async fn call_raw(&self, to: Felt, sel: Felt, calldata: &[Felt]) -> Result<Vec<Felt>, GolError> {
+    async fn call_raw(
+        &self,
+        to: Felt,
+        sel: Felt,
+        calldata: &[Felt],
+    ) -> Result<Vec<Felt>, GolError> {
         Ok(self
             .call_inner(to, sel, calldata, false)
             .await?
@@ -199,7 +214,8 @@ impl RpcReader {
             let id = item
                 .get("id")
                 .and_then(Value::as_u64)
-                .ok_or_else(|| GolError::Read("batch item missing id".into()))? as usize;
+                .ok_or_else(|| GolError::Read("batch item missing id".into()))?
+                as usize;
             if id >= out.len() {
                 continue;
             }
@@ -216,9 +232,9 @@ impl RpcReader {
                 .ok_or_else(|| GolError::Read("batch item missing result".into()))?
                 .iter()
                 .map(|v| {
-                    let s = v
-                        .as_str()
-                        .ok_or_else(|| GolError::Encoding("non-string felt in batch result".into()))?;
+                    let s = v.as_str().ok_or_else(|| {
+                        GolError::Encoding("non-string felt in batch result".into())
+                    })?;
                     Felt::from_hex(s).map_err(|e| GolError::Encoding(e.to_string()))
                 })
                 .collect::<Result<Vec<_>, _>>()?;
@@ -252,7 +268,13 @@ impl RpcReader {
             .call_batch(
                 &minted
                     .iter()
-                    .map(|&i| (addr, selector("get_lifeform_data"), ids[i].to_calldata().to_vec()))
+                    .map(|&i| {
+                        (
+                            addr,
+                            selector("get_lifeform_data"),
+                            ids[i].to_calldata().to_vec(),
+                        )
+                    })
                     .collect::<Vec<_>>(),
             )
             .await?;
@@ -263,7 +285,11 @@ impl RpcReader {
                 None => continue,
             };
             if let Some(Some(felts)) = datas.get(k) {
-                out.push(OwnedLifeform { token_id: ids[i], owner, data: decode_lifeform(felts)? });
+                out.push(OwnedLifeform {
+                    token_id: ids[i],
+                    owner,
+                    data: decode_lifeform(felts)?,
+                });
             }
         }
         Ok(out)
@@ -293,7 +319,13 @@ impl RpcReader {
             .call_batch(
                 &minted
                     .iter()
-                    .map(|&i| (addr, selector("get_path_data"), ids[i].to_calldata().to_vec()))
+                    .map(|&i| {
+                        (
+                            addr,
+                            selector("get_path_data"),
+                            ids[i].to_calldata().to_vec(),
+                        )
+                    })
                     .collect::<Vec<_>>(),
             )
             .await?;
@@ -304,7 +336,11 @@ impl RpcReader {
                 None => continue,
             };
             if let Some(Some(felts)) = datas.get(k) {
-                out.push(OwnedPath { token_id: ids[i], owner, data: decode_path_form(felts)? });
+                out.push(OwnedPath {
+                    token_id: ids[i],
+                    owner,
+                    data: decode_path_form(felts)?,
+                });
             }
         }
         Ok(out)
@@ -362,7 +398,10 @@ impl RpcReader {
             .get("events")
             .and_then(Value::as_array)
             .ok_or_else(|| GolError::Read("getEvents: missing events array".into()))?;
-        let parsed = events.iter().map(parse_raw_event).collect::<Result<Vec<_>, _>>()?;
+        let parsed = events
+            .iter()
+            .map(parse_raw_event)
+            .collect::<Result<Vec<_>, _>>()?;
         Ok((parsed, cont))
     }
 }
@@ -393,12 +432,20 @@ fn parse_felt_vec(v: Option<&Value>) -> Result<Vec<Felt>, GolError> {
 fn parse_raw_event(ev: &Value) -> Result<RawEvent, GolError> {
     let keys = parse_felt_vec(ev.get("keys"))?;
     let data = parse_felt_vec(ev.get("data"))?;
-    let block_number = ev.get("block_number").and_then(Value::as_u64).unwrap_or_default();
+    let block_number = ev
+        .get("block_number")
+        .and_then(Value::as_u64)
+        .unwrap_or_default();
     let tx_hash = match ev.get("transaction_hash").and_then(Value::as_str) {
         Some(s) => Felt::from_hex(s).map_err(|e| GolError::Encoding(e.to_string()))?,
         None => Felt::ZERO,
     };
-    Ok(RawEvent { keys, data, block_number, tx_hash })
+    Ok(RawEvent {
+        keys,
+        data,
+        block_number,
+        tx_hash,
+    })
 }
 
 fn at(felts: &[Felt], i: usize) -> Result<&Felt, GolError> {
@@ -410,11 +457,11 @@ fn at(felts: &[Felt], i: usize) -> Result<&Felt, GolError> {
 fn decode_lifeform(f: &[Felt]) -> Result<LifeformData, GolError> {
     // v2 layout: is_loop, is_still, is_alive, is_dead, sequence_length, current_state (7-felt
     // GridState w0..w6), age — 13 felts.
-    let state = GridState::from_felts(
-        f.get(5..12)
-            .ok_or_else(|| GolError::Encoding("lifeform: result too short for GridState".into()))?,
-    )
-    .ok_or_else(|| GolError::Encoding("lifeform: bad GridState".into()))?;
+    let state =
+        GridState::from_felts(f.get(5..12).ok_or_else(|| {
+            GolError::Encoding("lifeform: result too short for GridState".into())
+        })?)
+        .ok_or_else(|| GolError::Encoding("lifeform: bad GridState".into()))?;
     Ok(LifeformData {
         is_loop: felt_to_bool(at(f, 0)?),
         is_still: felt_to_bool(at(f, 1)?),
@@ -449,7 +496,11 @@ fn decode_path_form(f: &[Felt]) -> Result<PathForm, GolError> {
 impl Reader for RpcReader {
     async fn grid_size(&self) -> Result<u32, GolError> {
         let r = self
-            .call_raw(self.addr(ContractKey::Lifeforms)?, selector("get_grid_size"), &[])
+            .call_raw(
+                self.addr(ContractKey::Lifeforms)?,
+                selector("get_grid_size"),
+                &[],
+            )
             .await?;
         Ok(felt_to_u128(at(&r, 0)?) as u32)
     }
@@ -458,11 +509,14 @@ impl Reader for RpcReader {
         match self.owner_of(token_id).await? {
             None => Ok(None),
             Some(owner) => {
-                let data = self
-                    .lifeform_data(token_id)
-                    .await?
-                    .ok_or_else(|| GolError::Read("owner present but lifeform_data reverted".into()))?;
-                Ok(Some(OwnedLifeform { token_id, owner, data }))
+                let data = self.lifeform_data(token_id).await?.ok_or_else(|| {
+                    GolError::Read("owner present but lifeform_data reverted".into())
+                })?;
+                Ok(Some(OwnedLifeform {
+                    token_id,
+                    owner,
+                    data,
+                }))
             }
         }
     }
@@ -505,7 +559,8 @@ impl Reader for RpcReader {
             .await?;
         // Zero = grandfathered (pre-field mint) — reported as "no discoverer", like a revert on
         // a class that predates the entrypoint.
-        Ok(r.and_then(|v| v.into_iter().next()).filter(|f| *f != Felt::ZERO))
+        Ok(r.and_then(|v| v.into_iter().next())
+            .filter(|f| *f != Felt::ZERO))
     }
 
     async fn path_discoverer(&self, token_id: U256) -> Result<Option<Felt>, GolError> {
@@ -517,12 +572,17 @@ impl Reader for RpcReader {
                 true,
             )
             .await?;
-        Ok(r.and_then(|v| v.into_iter().next()).filter(|f| *f != Felt::ZERO))
+        Ok(r.and_then(|v| v.into_iter().next())
+            .filter(|f| *f != Felt::ZERO))
     }
 
     async fn nut_balance(&self, account: Felt) -> Result<U256, GolError> {
         let r = self
-            .call_raw(self.addr(ContractKey::Nutrient)?, selector("balance_of"), &[account])
+            .call_raw(
+                self.addr(ContractKey::Nutrient)?,
+                selector("balance_of"),
+                &[account],
+            )
             .await?;
         Ok(U256::from_felts(at(&r, 0)?, at(&r, 1)?))
     }
@@ -607,7 +667,11 @@ impl Reader for RpcReader {
                     .path_form(token_id)
                     .await?
                     .ok_or_else(|| GolError::Read("owner present but path_form reverted".into()))?;
-                Ok(Some(OwnedPath { token_id, owner, data }))
+                Ok(Some(OwnedPath {
+                    token_id,
+                    owner,
+                    data,
+                }))
             }
         }
     }
@@ -637,6 +701,7 @@ impl Reader for RpcReader {
         entrypoint: &str,
         calldata: &[Felt],
     ) -> Result<Vec<Felt>, GolError> {
-        self.call_raw(self.addr(target)?, selector(entrypoint), calldata).await
+        self.call_raw(self.addr(target)?, selector(entrypoint), calldata)
+            .await
     }
 }

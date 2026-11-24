@@ -266,9 +266,15 @@ mod tests {
     #[test]
     fn parses_decimal_beyond_u128() {
         // v2 token ids are 252-bit; their decimal form exceeds u128 (the old parser silently failed).
-        assert_eq!(U256::parse("340282366920938463463374607431768211455"), Some(U256::new(u128::MAX, 0))); // 2^128 - 1
-        assert_eq!(U256::parse("340282366920938463463374607431768211456"), Some(U256::new(0, 1))); // 2^128
-        // a real v2 token id round-trips between its decimal and hex forms.
+        assert_eq!(
+            U256::parse("340282366920938463463374607431768211455"),
+            Some(U256::new(u128::MAX, 0))
+        ); // 2^128 - 1
+        assert_eq!(
+            U256::parse("340282366920938463463374607431768211456"),
+            Some(U256::new(0, 1))
+        ); // 2^128
+           // a real v2 token id round-trips between its decimal and hex forms.
         let hex = "0x411c2166602957139ae2f005a79f979ed0b6233924360487293edc79cc00a23";
         let dec = "1840627337087318780751954265620527044040676149041008957592235432059066124835";
         assert_eq!(U256::parse(dec), U256::parse(hex));
