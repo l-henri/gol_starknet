@@ -9,19 +9,18 @@
 
 #[starknet::contract]
 pub mod GolLoopMinterV3 {
-    use starknet::{ContractAddress, get_caller_address};
-    use starknet::storage::{
-        StoragePointerReadAccess, StoragePointerWriteAccess, StoragePathEntry, Map,
-    };
     use core::num::traits::Zero;
     use gol_starknet::gol_grid_v2::GridState;
-    use gol_starknet::gol_grid_v2;
     use gol_starknet::gol_utilities_v2::PartialPathData;
-    use gol_starknet::gol_utilities_v2;
     use gol_starknet::interfaces_v2::LifeFormData;
     use gol_starknet::interfaces_v3::{
-        IGolLoopMinterV3, IGolLifeFormsV3Dispatcher, IGolLifeFormsV3DispatcherTrait,
+        IGolLifeFormsV3Dispatcher, IGolLifeFormsV3DispatcherTrait, IGolLoopMinterV3,
     };
+    use gol_starknet::{gol_grid_v2, gol_utilities_v2};
+    use starknet::storage::{
+        Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
+    };
+    use starknet::{ContractAddress, get_caller_address};
 
     #[storage]
     struct Storage {
@@ -75,7 +74,7 @@ pub mod GolLoopMinterV3 {
             while i < k {
                 rows = gol_grid_v2::step(@rows);
                 i += 1;
-            };
+            }
             let cand = gol_grid_v2::apply_symmetry(d4, dr.into(), dc.into(), @rows);
             let canon_rows = gol_grid_v2::unpack(canonical);
             assert(gol_grid_v2::eq(@cand, @canon_rows), 'bad canonical witness');
@@ -183,7 +182,9 @@ pub mod GolLoopMinterV3 {
                 .emit(
                     Event::PartialPathsCombined(
                         PartialPathsCombinedEvent {
-                            owner: minter, path_id_1: partial_path_id_1, path_id_2: partial_path_id_2,
+                            owner: minter,
+                            path_id_1: partial_path_id_1,
+                            path_id_2: partial_path_id_2,
                         },
                     ),
                 );
@@ -207,7 +208,9 @@ pub mod GolLoopMinterV3 {
             let main_path = self.partial_path_registry.entry(caller).entry(loop_id).read();
             assert(loop_id == main_path.trigger_id, 'Not the right loop');
             assert(main_path.length > 1, 'Not usable for short loops');
-            assert(loop_id == gol_grid_v2::grid_hash(@main_path.smallest), 'Not the smallest element');
+            assert(
+                loop_id == gol_grid_v2::grid_hash(@main_path.smallest), 'Not the smallest element',
+            );
             let exit_rows = gol_grid_v2::unpack(@main_path.exitpoint);
             let closed = gol_grid_v2::step(@exit_rows);
             assert(gol_grid_v2::token_hash(@closed) == loop_id, 'Loop does not loop');

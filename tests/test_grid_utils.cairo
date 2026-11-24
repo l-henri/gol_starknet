@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
     use core::array::ArrayTrait;
-    use snforge_std::{declare, ContractClassTrait, DeclareResultTrait};
     use gol_starknet::interfaces::{IGolUtilitiesDispatcher, IGolUtilitiesDispatcherTrait};
+    use snforge_std::{ContractClassTrait, DeclareResultTrait, declare};
 
     const GRID_SIZE: usize = 15;
 
@@ -23,13 +23,13 @@ mod tests {
                         alive = true;
                     }
                     k += 1;
-                };
+                }
                 row.append(alive);
                 c += 1;
-            };
+            }
             grid.append(row);
             r += 1;
-        };
+        }
         grid
     }
 
@@ -60,7 +60,10 @@ mod tests {
         let utils = deploy_utilities();
         let unpacked = utils
             .unpack_grid_from_uint(
-                utils.pack_grid_in_uint(grid_with(array![(0, 0), (0, 14), (14, 0), (14, 14)].span())),
+                utils
+                    .pack_grid_in_uint(
+                        grid_with(array![(0, 0), (0, 14), (14, 0), (14, 14)].span()),
+                    ),
             );
         assert(*unpacked.at(0).at(0), 'corner 0,0');
         assert(*unpacked.at(0).at(14), 'corner 0,14');
@@ -99,7 +102,7 @@ mod tests {
         while i < 13 {
             looped = utils.iterate_life_once(looped);
             i += 1;
-        };
+        }
         assert(utils.iterate_life_several_in_place(glider, 13) == looped, 'in_place == looped');
         // Zero generations is the identity.
         assert(utils.iterate_life_several_in_place(glider, 0) == glider, '0 gens is identity');
@@ -159,7 +162,8 @@ mod tests {
         assert(result != glider, 'sanity');
     }
 
-    // ── reference-output tests ────────────────────────────────────────────────
+    // ── reference-output tests
+    // ────────────────────────────────────────────────
     // Each expected value was computed by an independent Python GoL simulation
     // (reference: tests/test_grid_utils.cairo comment block) and is checked
     // against the Cairo implementation to ensure exact equivalence.
@@ -210,21 +214,21 @@ mod tests {
         let utils = deploy_utilities();
         // Vertical blinker at col 0, rows 6-8 — stresses col_left wrap at col 0.
         // After 2 steps it must return to the same state (period-2 oscillator).
-        let start = utils
-            .pack_grid_in_uint(grid_with(array![(6, 0), (7, 0), (8, 0)].span()));
-        assert(utils.iterate_life_several_in_place(start, 2) == start, 'left-edge blinker mismatch');
+        let start = utils.pack_grid_in_uint(grid_with(array![(6, 0), (7, 0), (8, 0)].span()));
+        assert(
+            utils.iterate_life_several_in_place(start, 2) == start, 'left-edge blinker mismatch',
+        );
     }
 
-    // ── toroidal wrap tests ───────────────────────────────────────────────────
+    // ── toroidal wrap tests
+    // ───────────────────────────────────────────────────
 
     #[test]
     fn test_toroidal_corner_block_still_life() {
         let utils = deploy_utilities();
         // 2x2 block spanning the torus corner: (14,14),(14,0),(0,14),(0,0)
         let corner_block = utils
-            .pack_grid_in_uint(
-                grid_with(array![(14, 14), (14, 0), (0, 14), (0, 0)].span()),
-            );
+            .pack_grid_in_uint(grid_with(array![(14, 14), (14, 0), (0, 14), (0, 0)].span()));
         assert(utils.iterate_life_once(corner_block) == corner_block, 'corner block still life');
     }
 
@@ -232,11 +236,9 @@ mod tests {
     fn test_toroidal_seam_blinker_oscillates() {
         let utils = deploy_utilities();
         // Vertical blinker spanning the top/bottom seam: (14,5),(0,5),(1,5)
-        let vertical = utils
-            .pack_grid_in_uint(grid_with(array![(14, 5), (0, 5), (1, 5)].span()));
+        let vertical = utils.pack_grid_in_uint(grid_with(array![(14, 5), (0, 5), (1, 5)].span()));
         // After one step it becomes the horizontal blinker centred at (0,5)
-        let horizontal = utils
-            .pack_grid_in_uint(grid_with(array![(0, 4), (0, 5), (0, 6)].span()));
+        let horizontal = utils.pack_grid_in_uint(grid_with(array![(0, 4), (0, 5), (0, 6)].span()));
         assert(utils.iterate_life_once(vertical) == horizontal, 'should become horizontal');
         assert(utils.iterate_life_once(horizontal) == vertical, 'should return to vertical');
     }

@@ -5,26 +5,23 @@
 
 #[starknet::contract]
 pub mod GolLifeformsV2 {
+    use core::num::traits::Zero;
+    use gol_starknet::gol_grid_v2::GridState;
+    use gol_starknet::interfaces::{IGolNutrientTokenDispatcher, IGolNutrientTokenDispatcherTrait};
+    use gol_starknet::interfaces_v2::{IGolLifeFormsV2, LifeFormData, RenderParams, SPEED_MAX};
+    use gol_starknet::{gol_grid_v2, gol_metadata_v2};
+    use openzeppelin::access::accesscontrol::{AccessControlComponent, DEFAULT_ADMIN_ROLE};
+    use openzeppelin::interfaces::erc20::{IERC20Dispatcher, IERC20DispatcherTrait};
+    use openzeppelin::interfaces::erc721::{IERC721Metadata, IERC721MetadataCamelOnly};
+    use openzeppelin::interfaces::upgrades::IUpgradeable;
     use openzeppelin::introspection::src5::SRC5Component;
     use openzeppelin::token::erc721::{ERC721Component, ERC721HooksEmptyImpl};
-    use openzeppelin::interfaces::erc721::{IERC721Metadata, IERC721MetadataCamelOnly};
-    use openzeppelin::interfaces::erc20::{IERC20Dispatcher, IERC20DispatcherTrait};
-    use openzeppelin::access::accesscontrol::AccessControlComponent;
-    use openzeppelin::access::accesscontrol::DEFAULT_ADMIN_ROLE;
     use openzeppelin::upgrades::UpgradeableComponent;
-    use openzeppelin::interfaces::upgrades::IUpgradeable;
-    use starknet::ClassHash;
-    use starknet::{ContractAddress, get_caller_address, get_contract_address};
-    use starknet::storage::{Map, StorageMapReadAccess, StorageMapWriteAccess};
-    use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
-    use core::num::traits::Zero;
-    use gol_starknet::gol_grid_v2;
-    use gol_starknet::gol_grid_v2::GridState;
-    use gol_starknet::gol_metadata_v2;
-    use gol_starknet::interfaces_v2::{IGolLifeFormsV2, LifeFormData, RenderParams, SPEED_MAX};
-    use gol_starknet::interfaces::{
-        IGolNutrientTokenDispatcher, IGolNutrientTokenDispatcherTrait,
+    use starknet::storage::{
+        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
+        StoragePointerWriteAccess,
     };
+    use starknet::{ClassHash, ContractAddress, get_caller_address, get_contract_address};
 
     component!(path: ERC721Component, storage: erc721, event: ERC721Event);
     component!(path: SRC5Component, storage: src5, event: SRC5Event);
@@ -43,11 +40,13 @@ pub mod GolLifeformsV2 {
     impl SRC5Impl = SRC5Component::SRC5Impl<ContractState>;
     impl ERC721InternalImpl = ERC721Component::InternalImpl<ContractState>;
     #[abi(embed_v0)]
-    impl AccessControlImpl = AccessControlComponent::AccessControlImpl<ContractState>;
+    impl AccessControlImpl =
+        AccessControlComponent::AccessControlImpl<ContractState>;
     impl AccessControlInternalImpl = AccessControlComponent::InternalImpl<ContractState>;
     impl UpgradeableInternalImpl = UpgradeableComponent::InternalImpl<ContractState>;
 
-    // token_uri renders the lifeform's current 41x41 state as an on-chain SVG (see gol_metadata_v2).
+    // token_uri renders the lifeform's current 41x41 state as an on-chain SVG (see
+    // gol_metadata_v2).
     #[abi(embed_v0)]
     impl ERC721MetadataImpl of IERC721Metadata<ContractState> {
         fn name(self: @ContractState) -> ByteArray {
@@ -189,7 +188,12 @@ pub mod GolLifeformsV2 {
             self.lifeform_data.write(token_id, lifeform_data);
             // A: derive this token's render params from its token_id and store them.
             self.render_params.write(token_id, gol_metadata_v2::derive_params(token_id));
-            self.emit(Event::NewLifeForm(NewLifeFormEvent { owner: recipient, token_id, lifeform_data }));
+            self
+                .emit(
+                    Event::NewLifeForm(
+                        NewLifeFormEvent { owner: recipient, token_id, lifeform_data },
+                    ),
+                );
             self.total_supply.write(self.total_supply.read() + 1);
             // Charge the minter `sequence_length` NUT. (Audit #5) The charged NUT accumulates in
             // this contract as an INTENTIONAL sink — a counterweight to the free move-forward
@@ -200,7 +204,9 @@ pub mod GolLifeformsV2 {
                 contract_address: self.nutrient_token_contract.read(),
             };
             nutrient_token
-                .transfer_from(minter, get_contract_address(), sequence_length.into() * NUT_DECIMALS);
+                .transfer_from(
+                    minter, get_contract_address(), sequence_length.into() * NUT_DECIMALS,
+                );
         }
 
         fn get_lifeform_data(self: @ContractState, token_id: u256) -> LifeFormData {
@@ -227,8 +233,8 @@ pub mod GolLifeformsV2 {
 
         fn move_lifeform_forward_n(ref self: ContractState, token_id: u256, n: u32) {
             // Batch of move_lifeform_forward: one state read/write + one NUT mint of `n`, stepping
-            // `n` generations in a loop. Intentionally public, like the single-step version; cheaper
-            // than `n` separate calls (no per-step storage round-trip or per-step mint).
+            // `n` generations in a loop. Intentionally public, like the single-step version;
+            // cheaper than `n` separate calls (no per-step storage round-trip or per-step mint).
             assert(self.erc721.exists(token_id), 'Lifeform not minted');
             assert(n > 0, 'n must be positive');
             let mut lifeform_data = self.lifeform_data.read(token_id);
@@ -237,7 +243,7 @@ pub mod GolLifeformsV2 {
             while i < n {
                 rows = gol_grid_v2::step(@rows);
                 i += 1;
-            };
+            }
             lifeform_data.current_state = gol_grid_v2::pack(@rows);
             lifeform_data.age += n;
             self.lifeform_data.write(token_id, lifeform_data);
@@ -315,7 +321,7 @@ pub mod GolLifeformsV2 {
             while i < k {
                 rows = gol_grid_v2::step(@rows);
                 i += 1;
-            };
+            }
             let cand = gol_grid_v2::apply_symmetry(d4, dr.into(), dc.into(), @rows);
             assert(gol_grid_v2::token_id(@cand) == b_token_id, 'not a copy');
             // Burn B; bounty = B's mint price (sequence_length NUT), freshly minted to the

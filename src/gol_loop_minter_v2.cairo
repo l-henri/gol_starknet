@@ -5,18 +5,17 @@
 
 #[starknet::contract]
 pub mod GolLoopMinterV2 {
-    use starknet::{ContractAddress, get_caller_address};
-    use starknet::storage::{
-        StoragePointerReadAccess, StoragePointerWriteAccess, StoragePathEntry, Map,
-    };
     use core::num::traits::Zero;
-    use gol_starknet::gol_grid_v2::{GridState};
-    use gol_starknet::gol_grid_v2;
+    use gol_starknet::gol_grid_v2::GridState;
     use gol_starknet::gol_utilities_v2::PartialPathData;
-    use gol_starknet::gol_utilities_v2;
     use gol_starknet::interfaces_v2::{
-        IGolLoopMinterV2, IGolLifeFormsV2Dispatcher, IGolLifeFormsV2DispatcherTrait, LifeFormData,
+        IGolLifeFormsV2Dispatcher, IGolLifeFormsV2DispatcherTrait, IGolLoopMinterV2, LifeFormData,
     };
+    use gol_starknet::{gol_grid_v2, gol_utilities_v2};
+    use starknet::storage::{
+        Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
+    };
+    use starknet::{ContractAddress, get_caller_address};
 
     #[storage]
     struct Storage {
@@ -61,7 +60,9 @@ pub mod GolLoopMinterV2 {
             assert(loop_length > 0, 'Loop as to be at least 1');
             let rows = gol_grid_v2::unpack(@loop_state);
             // loop_state must be a single loop of loop_length AND its canonical (smallest) state.
-            let ok = gol_utilities_v2::is_single_loop_and_entrypoint_is_smallest(@rows, loop_length);
+            let ok = gol_utilities_v2::is_single_loop_and_entrypoint_is_smallest(
+                @rows, loop_length,
+            );
             assert(ok, 'Not a loop');
             let empty = gol_grid_v2::is_empty(@rows);
             let lifeform = LifeFormData {
@@ -114,7 +115,9 @@ pub mod GolLoopMinterV2 {
                 .emit(
                     Event::PartialPathsCombined(
                         PartialPathsCombinedEvent {
-                            owner: minter, path_id_1: partial_path_id_1, path_id_2: partial_path_id_2,
+                            owner: minter,
+                            path_id_1: partial_path_id_1,
+                            path_id_2: partial_path_id_2,
                         },
                     ),
                 );
@@ -125,15 +128,17 @@ pub mod GolLoopMinterV2 {
         ) {
             let rows = gol_grid_v2::unpack(@loop_state);
             let loop_id = gol_grid_v2::token_hash(@rows);
-            // Audit #4: read the segment under the CALLER (where mint_partial_path/combine wrote it),
-            // not the recipient. Lets a caller mint to any recipient using their own registered
-            // segments; for the common recipient==caller case behaviour is unchanged.
+            // Audit #4: read the segment under the CALLER (where mint_partial_path/combine wrote
+            // it), not the recipient. Lets a caller mint to any recipient using their own
+            // registered segments; for the common recipient==caller case behaviour is unchanged.
             let caller = get_caller_address();
             let main_path = self.partial_path_registry.entry(caller).entry(loop_id).read();
             // The segment was registered for this loop and is canonical.
             assert(loop_id == main_path.trigger_id, 'Not the right loop');
             assert(main_path.length > 1, 'Not usable for short loops');
-            assert(loop_id == gol_grid_v2::grid_hash(@main_path.smallest), 'Not the smallest element');
+            assert(
+                loop_id == gol_grid_v2::grid_hash(@main_path.smallest), 'Not the smallest element',
+            );
             // Closure: stepping the exitpoint returns to the loop id.
             let exit_rows = gol_grid_v2::unpack(@main_path.exitpoint);
             let closed = gol_grid_v2::step(@exit_rows);

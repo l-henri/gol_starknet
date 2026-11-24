@@ -1,8 +1,8 @@
 //! On-chain rendering of a lifeform's metadata: an SVG of its grid plus ERC721
 //! JSON, returned as a base64 `data:` URI from `token_uri`.
 
-use crate::interfaces::LifeFormData;
 use crate::base64;
+use crate::interfaces::LifeFormData;
 
 const GRID_SIZE: u32 = 15;
 const CELL: u32 = 10; // px per cell -> 150x150 viewport
@@ -19,7 +19,7 @@ pub fn u32_to_decimal(value: u32) -> ByteArray {
         }
         digits.append((48 + (n % 10)).try_into().unwrap());
         n = n / 10;
-    };
+    }
     reverse_digits(digits)
 }
 
@@ -36,7 +36,7 @@ pub fn u256_to_decimal(value: u256) -> ByteArray {
         let digit: u8 = (48 + (n % 10).low).try_into().unwrap();
         digits.append(digit);
         n = n / 10;
-    };
+    }
     reverse_digits(digits)
 }
 
@@ -49,7 +49,7 @@ fn reverse_digits(digits: Array<u8>) -> ByteArray {
         }
         i -= 1;
         out.append_byte(*digits.at(i));
-    };
+    }
     out
 }
 
@@ -77,9 +77,9 @@ pub fn render_svg(state: u256) -> ByteArray {
             }
             power = power * 2;
             col += 1;
-        };
+        }
         row += 1;
-    };
+    }
     svg.append(@"</svg>");
     svg
 }

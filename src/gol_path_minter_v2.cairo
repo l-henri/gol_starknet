@@ -4,19 +4,18 @@
 
 #[starknet::contract]
 pub mod GolPathMinterV2 {
-    use starknet::{ContractAddress, get_caller_address};
-    use starknet::storage::{
-        StoragePointerReadAccess, StoragePointerWriteAccess, StoragePathEntry, Map,
-    };
     use core::num::traits::Zero;
-    use gol_starknet::gol_grid_v2::{GridState};
-    use gol_starknet::gol_grid_v2;
+    use gol_starknet::gol_grid_v2::GridState;
     use gol_starknet::gol_utilities_v2::PartialPathData;
-    use gol_starknet::gol_utilities_v2;
     use gol_starknet::interfaces_v2::{
-        IGolPathMinterV2, IGolPathLifeFormsV2Dispatcher, IGolPathLifeFormsV2DispatcherTrait,
-        PathFormData, LifeState,
+        IGolPathLifeFormsV2Dispatcher, IGolPathLifeFormsV2DispatcherTrait, IGolPathMinterV2,
+        LifeState, PathFormData,
     };
+    use gol_starknet::{gol_grid_v2, gol_utilities_v2};
+    use starknet::storage::{
+        Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
+    };
+    use starknet::{ContractAddress, get_caller_address};
 
     #[storage]
     struct Storage {
@@ -74,7 +73,8 @@ pub mod GolPathMinterV2 {
             // the loop's internal predecessor (otherwise path_start is already in the loop).
             assert(!gol_grid_v2::eq(@loop_prev, @path_prev), 'Incorrect loop entrypoint');
             let empty = gol_grid_v2::is_empty(@loop_entry);
-            // Three-way life state: dead (empty) / frozen (still life, period 1) / alive (period>1).
+            // Three-way life state: dead (empty) / frozen (still life, period 1) / alive
+            // (period>1).
             let life_state = if empty {
                 LifeState::Dead
             } else if loop_length == 1 {
@@ -89,13 +89,15 @@ pub mod GolPathMinterV2 {
                 target_loop_id: gol_grid_v2::token_hash(@smallest),
                 target_period: loop_length,
                 minted_at: 0, // stamped by the NFT at mint
-                escrow: 0, // stamped by the NFT at mint
+                escrow: 0 // stamped by the NFT at mint
             };
             let lifeforms = IGolPathLifeFormsV2Dispatcher {
                 contract_address: self.gol_path_lifeforms_nft.read(),
             };
             lifeforms
-                .mint(recipient, get_caller_address(), gol_grid_v2::token_id(@path_rows), path_data);
+                .mint(
+                    recipient, get_caller_address(), gol_grid_v2::token_id(@path_rows), path_data,
+                );
             true
         }
 
@@ -133,7 +135,9 @@ pub mod GolPathMinterV2 {
                 .emit(
                     Event::PartialPathsCombined(
                         PartialPathsCombinedEvent {
-                            owner: minter, path_id_1: partial_path_id_1, path_id_2: partial_path_id_2,
+                            owner: minter,
+                            path_id_1: partial_path_id_1,
+                            path_id_2: partial_path_id_2,
                         },
                     ),
                 );
@@ -151,11 +155,7 @@ pub mod GolPathMinterV2 {
             let main_exit_rows = gol_grid_v2::unpack(@main_path.exitpoint);
             let loop_entry = gol_grid_v2::step(@main_exit_rows);
             let loop_entry_id = gol_grid_v2::token_hash(@loop_entry);
-            let loop_partial = self
-                .partial_path_registry
-                .entry(caller)
-                .entry(loop_entry_id)
-                .read();
+            let loop_partial = self.partial_path_registry.entry(caller).entry(loop_entry_id).read();
             assert(loop_partial.trigger_id == loop_entry_id, 'Not the right loop');
             // The loop closes: stepping its exitpoint returns to its entrypoint.
             let loop_exit_rows = gol_grid_v2::unpack(@loop_partial.exitpoint);
@@ -182,7 +182,7 @@ pub mod GolPathMinterV2 {
                 target_loop_id: gol_grid_v2::grid_hash(@loop_partial.smallest),
                 target_period: loop_length,
                 minted_at: 0, // stamped by the NFT at mint
-                escrow: 0, // stamped by the NFT at mint
+                escrow: 0 // stamped by the NFT at mint
             };
             let lifeforms = IGolPathLifeFormsV2Dispatcher {
                 contract_address: self.gol_path_lifeforms_nft.read(),

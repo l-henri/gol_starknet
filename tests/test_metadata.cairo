@@ -1,8 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use gol_starknet::base64;
-    use gol_starknet::gol_metadata;
     use gol_starknet::interfaces::LifeFormData;
+    use gol_starknet::{base64, gol_metadata};
 
     #[test]
     fn test_base64_known_vectors() {
@@ -27,7 +26,9 @@ mod tests {
     #[test]
     fn test_render_svg_empty() {
         assert(
-            gol_metadata::render_svg(0) == "<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150' shape-rendering='crispEdges'><rect width='150' height='150' fill='#fff'/></svg>",
+            gol_metadata::render_svg(
+                0,
+            ) == "<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150' shape-rendering='crispEdges'><rect width='150' height='150' fill='#fff'/></svg>",
             'empty svg',
         );
     }
@@ -36,7 +37,9 @@ mod tests {
     fn test_render_svg_single_cell() {
         // bit 0 set => cell (row 0, col 0) at x=0,y=0
         assert(
-            gol_metadata::render_svg(1) == "<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150' shape-rendering='crispEdges'><rect width='150' height='150' fill='#fff'/><rect x='0' y='0' width='10' height='10'/></svg>",
+            gol_metadata::render_svg(
+                1,
+            ) == "<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150' shape-rendering='crispEdges'><rect width='150' height='150' fill='#fff'/><rect x='0' y='0' width='10' height='10'/></svg>",
             'single cell svg',
         );
     }
@@ -84,7 +87,7 @@ mod tests {
                 break;
             }
             i += 1;
-        };
+        }
         assert(matches, 'uri prefix');
     }
 }

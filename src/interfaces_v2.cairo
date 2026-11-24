@@ -2,15 +2,18 @@
 //! a `u256`; the ERC-721 `token_id` is the Poseidon hash of the canonical state. See
 //! `docs/v2-grid-redesign.md`.
 
-use starknet::ContractAddress;
 use gol_starknet::gol_grid_v2::GridState;
+use starknet::ContractAddress;
 
-/// Exclusive upper bound on a lifeform's display speed (generations/second): valid speed in [1,200).
+/// Exclusive upper bound on a lifeform's display speed (generations/second): valid speed in
+/// [1,200).
 pub const SPEED_MAX: u16 = 200;
 
 /// Per-token render parameters. Colors are 24-bit 0xRRGGBB; speed is generations/second.
-/// Invariant (enforced at mint-derivation and in set_render_params): bg != cell, 0 < speed < SPEED_MAX.
-/// A stored speed of 0 is the "unset" sentinel -> the renderer falls back to derive_params(token_id).
+/// Invariant (enforced at mint-derivation and in set_render_params): bg != cell, 0 < speed <
+/// SPEED_MAX.
+/// A stored speed of 0 is the "unset" sentinel -> the renderer falls back to
+/// derive_params(token_id).
 #[derive(Drop, Serde, Copy, starknet::Store, PartialEq)]
 pub struct RenderParams {
     pub bg: u32,
@@ -37,8 +40,8 @@ pub struct LifeFormData {
 /// Store: unit-variant enum stores as a felt; `Alive` is the zero/default variant.
 #[derive(Drop, Copy, Serde, PartialEq, starknet::Store)]
 pub enum LifeState {
-    // `#[default]` is the value an uninitialized storage slot deserializes to; all reads are guarded
-    // by `exists(token_id)` so it's only a formality, but the Store derive requires one.
+    // `#[default]` is the value an uninitialized storage slot deserializes to; all reads are
+    // guarded by `exists(token_id)` so it's only a formality, but the Store derive requires one.
     #[default]
     Alive,
     Frozen,
@@ -87,9 +90,7 @@ pub trait IGolLifeFormsV2<TContractState> {
     /// Render params for a token: the stored ones, or (if unset) those derived from its token_id.
     fn get_render_params(self: @TContractState, token_id: u256) -> RenderParams;
     /// Owner-only: customise a token's render params. Asserts bg != cell and 0 < speed < SPEED_MAX.
-    fn set_render_params(
-        ref self: TContractState, token_id: u256, bg: u32, cell: u32, speed: u16,
-    );
+    fn set_render_params(ref self: TContractState, token_id: u256, bg: u32, cell: u32, speed: u16);
     /// Mint order (strictly increasing from 1). 0 = minted before the nonce upgrade
     /// ("grandfathered": tied oldest tier — cannot burn each other, can burn any later copy).
     fn get_mint_nonce(self: @TContractState, token_id: u256) -> u64;
@@ -112,13 +113,20 @@ pub trait IGolLifeFormsV2<TContractState> {
 
 #[starknet::interface]
 pub trait IGolLoopMinterV2<TContractState> {
-    /// Mint a loop: `loop_state` must be a single loop of `loop_length` AND its canonical (smallest)
+    /// Mint a loop: `loop_state` must be a single loop of `loop_length` AND its canonical
+    /// (smallest)
     /// state. Public — the verification is the gate.
     fn mint_loop(
-        ref self: TContractState, loop_state: GridState, loop_length: usize, recipient: ContractAddress,
+        ref self: TContractState,
+        loop_state: GridState,
+        loop_length: usize,
+        recipient: ContractAddress,
     ) -> bool;
     fn mint_partial_path(
-        ref self: TContractState, path_start: GridState, path_length: usize, trigger_state: GridState,
+        ref self: TContractState,
+        path_start: GridState,
+        path_length: usize,
+        trigger_state: GridState,
     );
     fn combine_partial_path(
         ref self: TContractState, partial_path_id_1: felt252, partial_path_id_2: felt252,
@@ -141,7 +149,10 @@ pub trait IGolPathMinterV2<TContractState> {
         recipient: ContractAddress,
     ) -> bool;
     fn mint_partial_path(
-        ref self: TContractState, path_start: GridState, path_length: usize, trigger_state: GridState,
+        ref self: TContractState,
+        path_start: GridState,
+        path_length: usize,
+        trigger_state: GridState,
     );
     fn combine_partial_path(
         ref self: TContractState, partial_path_id_1: felt252, partial_path_id_2: felt252,
@@ -155,7 +166,8 @@ pub trait IGolPathMinterV2<TContractState> {
 #[starknet::interface]
 pub trait IGolPathLifeFormsV2<TContractState> {
     /// Mint a path lifeform. Guarded: only MINTER_ROLE (the path minter). The contract stamps
-    /// `minted_at` and escrows `sequence_length` NUT from `minter`, overriding those fields on input.
+    /// `minted_at` and escrows `sequence_length` NUT from `minter`, overriding those fields on
+    /// input.
     fn mint(
         ref self: TContractState,
         recipient: ContractAddress,

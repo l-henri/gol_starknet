@@ -78,7 +78,7 @@ pub fn step_bitboard(rows: @Array<u64>) -> Array<u64> {
         let d = *rows[(r + 1) % N];
         out.append(step_row(u, m, d));
         r += 1;
-    };
+    }
     out
 }
 
@@ -89,7 +89,7 @@ pub fn run_bitboard(rows: Array<u64>, gens: usize) -> Array<u64> {
     while g < gens {
         cur = step_bitboard(@cur);
         g += 1;
-    };
+    }
     cur
 }
 
@@ -103,7 +103,7 @@ fn pow2(e: usize) -> u64 {
     while i < e {
         p *= 2;
         i += 1;
-    };
+    }
     p
 }
 
@@ -138,10 +138,10 @@ pub fn step_naive(rows: @Array<u64>) -> Array<u64> {
                 new_row += pow2(c);
             }
             c += 1;
-        };
+        }
         out.append(new_row);
         r += 1;
-    };
+    }
     out
 }
 
@@ -151,7 +151,7 @@ pub fn run_naive(rows: Array<u64>, gens: usize) -> Array<u64> {
     while g < gens {
         cur = step_naive(@cur);
         g += 1;
-    };
+    }
     cur
 }
 
@@ -172,10 +172,10 @@ pub fn grid_with(rowvals: @Array<(usize, u64)>) -> Array<u64> {
                 v = val;
             }
             k += 1;
-        };
+        }
         g.append(v);
         r += 1;
-    };
+    }
     g
 }
 
@@ -190,7 +190,7 @@ pub fn eq(a: @Array<u64>, b: @Array<u64>) -> bool {
             ok = false;
         }
         i += 1;
-    };
+    }
     ok
 }
 
@@ -201,7 +201,7 @@ pub fn checksum(rows: @Array<u64>) -> u64 {
     while i < rows.len() {
         s = s ^ *rows[i];
         i += 1;
-    };
+    }
     s
 }
 
@@ -211,23 +211,15 @@ pub fn checksum(rows: @Array<u64>) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        N, step_bitboard, step_naive, run_bitboard, grid_with, eq, checksum,
-    };
+    use super::{N, checksum, eq, grid_with, run_bitboard, step_bitboard, step_naive};
 
     // A reusable busy seed (several non-trivial rows spread across the grid).
     fn seed() -> Array<u64> {
         grid_with(
             @array![
-                (1_usize, 0b1110_u64),
-                (2_usize, 0b0100_u64),
-                (7_usize, 0x155_u64),
-                (8_usize, 0x2aa_u64),
-                (15_usize, 0x3ff_u64),
-                (16_usize, 0x201_u64),
-                (25_usize, 0x12345_u64),
-                (30_usize, 0x3ffff_u64),
-                (37_usize, 0b111_u64),
+                (1_usize, 0b1110_u64), (2_usize, 0b0100_u64), (7_usize, 0x155_u64),
+                (8_usize, 0x2aa_u64), (15_usize, 0x3ff_u64), (16_usize, 0x201_u64),
+                (25_usize, 0x12345_u64), (30_usize, 0x3ffff_u64), (37_usize, 0b111_u64),
             ],
         )
     }

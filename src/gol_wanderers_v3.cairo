@@ -2,32 +2,34 @@
 //! loop) under the orbit-canonical identity model (docs/v3-identity-spec.md). Identity =
 //! Poseidon(orbit canonical of the start); `start_state` stays the DRAWN start for display.
 //! Static snapshots — never feedable, earn no NUT. Two permissionless burns:
-//!   * `challenge_burn` — the TIME direction (forward sub-paths / stepped copies), carried from v2
+//!   * `challenge_burn` — the TIME direction (forward sub-paths / stepped copies), carried from
+//!   v2
 //!     with the `(g, k)` witness and the mint-nonce direction guard;
 //!   * `prove_malformed` — the identity direction (a non-minimal claimed canonical).
 //! Both pay the token's escrowed mint charge to the caller.
 
 #[starknet::contract]
 pub mod GolWanderersV3 {
+    use core::num::traits::Zero;
+    use gol_starknet::gol_grid_v2::GridState;
+    use gol_starknet::interfaces_v2::{
+        LifeFormData, LifeState, PathFormData, RenderParams, SPEED_MAX,
+    };
+    use gol_starknet::interfaces_v3::IGolWanderersV3;
+    use gol_starknet::{gol_grid_v2, gol_metadata_v2};
+    use openzeppelin::access::accesscontrol::{AccessControlComponent, DEFAULT_ADMIN_ROLE};
+    use openzeppelin::interfaces::erc20::{IERC20Dispatcher, IERC20DispatcherTrait};
+    use openzeppelin::interfaces::erc721::{IERC721Metadata, IERC721MetadataCamelOnly};
+    use openzeppelin::interfaces::upgrades::IUpgradeable;
     use openzeppelin::introspection::src5::SRC5Component;
     use openzeppelin::token::erc721::{ERC721Component, ERC721HooksEmptyImpl};
-    use openzeppelin::interfaces::erc721::{IERC721Metadata, IERC721MetadataCamelOnly};
-    use openzeppelin::interfaces::erc20::{IERC20Dispatcher, IERC20DispatcherTrait};
-    use openzeppelin::access::accesscontrol::AccessControlComponent;
-    use openzeppelin::access::accesscontrol::DEFAULT_ADMIN_ROLE;
     use openzeppelin::upgrades::UpgradeableComponent;
-    use openzeppelin::interfaces::upgrades::IUpgradeable;
-    use starknet::ClassHash;
-    use starknet::{ContractAddress, get_caller_address, get_contract_address, get_block_timestamp};
-    use starknet::storage::{Map, StorageMapReadAccess, StorageMapWriteAccess};
-    use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
-    use core::num::traits::Zero;
-    use gol_starknet::gol_grid_v2;
-    use gol_starknet::gol_grid_v2::GridState;
-    use gol_starknet::gol_metadata_v2;
-    use gol_starknet::interfaces_v3::IGolWanderersV3;
-    use gol_starknet::interfaces_v2::{
-        PathFormData, LifeState, LifeFormData, RenderParams, SPEED_MAX,
+    use starknet::storage::{
+        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
+        StoragePointerWriteAccess,
+    };
+    use starknet::{
+        ClassHash, ContractAddress, get_block_timestamp, get_caller_address, get_contract_address,
     };
 
     component!(path: ERC721Component, storage: erc721, event: ERC721Event);
@@ -46,7 +48,8 @@ pub mod GolWanderersV3 {
     impl SRC5Impl = SRC5Component::SRC5Impl<ContractState>;
     impl ERC721InternalImpl = ERC721Component::InternalImpl<ContractState>;
     #[abi(embed_v0)]
-    impl AccessControlImpl = AccessControlComponent::AccessControlImpl<ContractState>;
+    impl AccessControlImpl =
+        AccessControlComponent::AccessControlImpl<ContractState>;
     impl AccessControlInternalImpl = AccessControlComponent::InternalImpl<ContractState>;
     impl UpgradeableInternalImpl = UpgradeableComponent::InternalImpl<ContractState>;
 
@@ -185,9 +188,7 @@ pub mod GolWanderersV3 {
         ) {
             self.accesscontrol.assert_only_role(MINTER_ROLE);
             assert(path_data.sequence_length > 0, 'sequence_length_zero');
-            assert(
-                gol_grid_v2::grid_hash(@canonical).into() == token_id, 'id != hash(canonical)',
-            );
+            assert(gol_grid_v2::grid_hash(@canonical).into() == token_id, 'id != hash(canonical)');
             // Copy prevention: same family -> same canonical -> same id -> this reverts.
             self.erc721.mint(recipient, token_id);
             let mut nonce = self.next_nonce.read();
@@ -270,7 +271,8 @@ pub mod GolWanderersV3 {
             let older = self.path_data.read(older_id);
             let younger = self.path_data.read(younger_id);
             assert(
-                self.mint_nonce.read(older_id) < self.mint_nonce.read(younger_id), 'older not older',
+                self.mint_nonce.read(older_id) < self.mint_nonce.read(younger_id),
+                'older not older',
             );
             let identity = d4 == 0 && dr == 0 && dc == 0;
             if identity {
@@ -285,7 +287,7 @@ pub mod GolWanderersV3 {
             while i < k {
                 rows = gol_grid_v2::step(@rows);
                 i += 1;
-            };
+            }
             let cand = gol_grid_v2::apply_symmetry(d4, dr.into(), dc.into(), @rows);
             assert(
                 gol_grid_v2::token_hash(@cand) == gol_grid_v2::grid_hash(@younger.start_state),

@@ -38,10 +38,10 @@ pub trait IGolBench<TContractState> {
 
 #[starknet::contract]
 mod GolBench {
-    use super::{GolUtilitiesComponent, MoveMessage};
-    use starknet::{SyscallResultTrait, ContractAddress, get_contract_address};
     use core::poseidon::poseidon_hash_span;
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
+    use starknet::{ContractAddress, SyscallResultTrait, get_contract_address};
+    use super::{GolUtilitiesComponent, MoveMessage};
 
     component!(path: GolUtilitiesComponent, storage: golutilities, event: GolUtilitiesEvent);
 
@@ -86,7 +86,7 @@ mod GolBench {
             while i < n {
                 s = self.golutilities.iterate_life_once(s);
                 i += 1;
-            };
+            }
             self.state.write(s);
             self.age.write(self.age.read() + n);
         }
@@ -96,9 +96,7 @@ mod GolBench {
             self.age.write(self.age.read() + n);
         }
         fn proof_facts_len(self: @ContractState) -> u32 {
-            let info = starknet::syscalls::get_execution_info_v3_syscall()
-                .unwrap_syscall()
-                .unbox();
+            let info = starknet::syscalls::get_execution_info_v3_syscall().unwrap_syscall().unbox();
             let tx_info = info.tx_info.unbox();
             tx_info.proof_facts.len()
         }
@@ -110,13 +108,14 @@ mod GolBench {
             starknet::syscalls::send_message_to_l1_syscall(0, payload.span()).unwrap_syscall();
         }
         fn verify_move_forward(ref self: ContractState, message: MoveMessage) {
-            let info = starknet::syscalls::get_execution_info_v3_syscall()
-                .unwrap_syscall()
-                .unbox();
+            let info = starknet::syscalls::get_execution_info_v3_syscall().unwrap_syscall().unbox();
             let proof_facts = info.tx_info.unbox().proof_facts;
             // proof_facts[8] is the Poseidon hash of the first (only) L2->L1 message the proof
             // committed; it must equal the hash recomputed from the message submitted here.
-            assert(*proof_facts.at(8) == message_hash(get_contract_address(), message), 'Proof message mismatch');
+            assert(
+                *proof_facts.at(8) == message_hash(get_contract_address(), message),
+                'Proof message mismatch',
+            );
             self.state.write(message.final_state);
             self.age.write(self.age.read() + message.generations);
         }
@@ -132,7 +131,7 @@ mod GolBench {
         while i < payload.len() {
             data.append(*payload.at(i));
             i += 1;
-        };
+        }
         poseidon_hash_span(data.span())
     }
 }

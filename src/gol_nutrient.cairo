@@ -1,15 +1,13 @@
-use super::interfaces::{IGolNutrientToken };
+use super::interfaces::IGolNutrientToken;
 
 #[starknet::contract]
 mod Nutrient {
-    use openzeppelin::token::erc20::{DefaultConfig, ERC20Component, ERC20HooksEmptyImpl};
-    use openzeppelin::introspection::src5::SRC5Component;
-    use openzeppelin::access::accesscontrol::AccessControlComponent;
-    use openzeppelin::access::accesscontrol::DEFAULT_ADMIN_ROLE;
-    use openzeppelin::upgrades::UpgradeableComponent;
+    use openzeppelin::access::accesscontrol::{AccessControlComponent, DEFAULT_ADMIN_ROLE};
     use openzeppelin::interfaces::upgrades::IUpgradeable;
-    use starknet::ClassHash;
-    use starknet::ContractAddress;
+    use openzeppelin::introspection::src5::SRC5Component;
+    use openzeppelin::token::erc20::{DefaultConfig, ERC20Component, ERC20HooksEmptyImpl};
+    use openzeppelin::upgrades::UpgradeableComponent;
+    use starknet::{ClassHash, ContractAddress};
 
     component!(path: ERC20Component, storage: erc20, event: ERC20Event);
     component!(path: SRC5Component, storage: src5, event: SRC5Event);
@@ -24,7 +22,8 @@ mod Nutrient {
     impl ERC20InternalImpl = ERC20Component::InternalImpl<ContractState>;
     // AccessControl
     #[abi(embed_v0)]
-    impl AccessControlImpl = AccessControlComponent::AccessControlImpl<ContractState>;
+    impl AccessControlImpl =
+        AccessControlComponent::AccessControlImpl<ContractState>;
     impl AccessControlInternalImpl = AccessControlComponent::InternalImpl<ContractState>;
     // Upgradeable
     impl UpgradeableInternalImpl = UpgradeableComponent::InternalImpl<ContractState>;
@@ -55,11 +54,7 @@ mod Nutrient {
     }
 
     #[constructor]
-    fn constructor(
-        ref self: ContractState,
-        initial_supply: u256,
-        creator: ContractAddress
-    ) {
+    fn constructor(ref self: ContractState, initial_supply: u256, creator: ContractAddress) {
         let name = "Bacteria nutrient";
         let symbol = "NUT";
 
@@ -70,10 +65,10 @@ mod Nutrient {
     }
     #[abi(embed_v0)]
     impl GolNutrientToken of super::IGolNutrientToken<ContractState> {
-        fn mint(ref self: ContractState, recipient: ContractAddress, amount: u256){
+        fn mint(ref self: ContractState, recipient: ContractAddress, amount: u256) {
             // Checking wether caller can mint
             self.accesscontrol.assert_only_role(MINTER_ROLE);
-            // Minting 
+            // Minting
             self.erc20.mint(recipient, amount);
         }
     }

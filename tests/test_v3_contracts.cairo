@@ -6,26 +6,26 @@
 #[cfg(test)]
 mod tests {
     use core::array::ArrayTrait;
-    use starknet::ContractAddress;
-    use snforge_std::{
-        declare, ContractClassTrait, DeclareResultTrait, start_cheat_caller_address,
-        stop_cheat_caller_address, start_cheat_block_timestamp, stop_cheat_block_timestamp,
+    use gol_starknet::gol_grid_v2::{
+        GridState, apply_symmetry, eq, grid_with, lt, pack, step, token_id, translate,
+    };
+    use gol_starknet::interfaces_v2::{LifeState, PathFormData};
+    use gol_starknet::interfaces_v3::{
+        IGolLifeFormsV3Dispatcher, IGolLifeFormsV3DispatcherTrait, IGolLoopMinterV3Dispatcher,
+        IGolLoopMinterV3DispatcherTrait, IGolWandererMinterV3Dispatcher,
+        IGolWandererMinterV3DispatcherTrait, IGolWanderersV3Dispatcher,
+        IGolWanderersV3DispatcherTrait,
     };
     use openzeppelin::interfaces::accesscontrol::{
         IAccessControlDispatcher, IAccessControlDispatcherTrait,
     };
     use openzeppelin::interfaces::erc20::{IERC20Dispatcher, IERC20DispatcherTrait};
     use openzeppelin::interfaces::erc721::{IERC721Dispatcher, IERC721DispatcherTrait};
-    use gol_starknet::gol_grid_v2::{
-        GridState, grid_with, step, lt, eq, pack, token_id, translate, apply_symmetry,
+    use snforge_std::{
+        ContractClassTrait, DeclareResultTrait, declare, start_cheat_block_timestamp,
+        start_cheat_caller_address, stop_cheat_block_timestamp, stop_cheat_caller_address,
     };
-    use gol_starknet::interfaces_v2::{PathFormData, LifeState};
-    use gol_starknet::interfaces_v3::{
-        IGolLifeFormsV3Dispatcher, IGolLifeFormsV3DispatcherTrait, IGolLoopMinterV3Dispatcher,
-        IGolLoopMinterV3DispatcherTrait, IGolWanderersV3Dispatcher,
-        IGolWanderersV3DispatcherTrait, IGolWandererMinterV3Dispatcher,
-        IGolWandererMinterV3DispatcherTrait,
-    };
+    use starknet::ContractAddress;
 
     const MINTER_ROLE: felt252 = selector!("MINTER_ROLE");
     const ONE_NUT: u256 = 1000000000000000000;
@@ -120,7 +120,9 @@ mod tests {
         let erc721 = IERC721Dispatcher { contract_address: d.lifeforms };
         assert(erc721.owner_of(id) == d.creator, 'genesis to deployer');
         let data = lf.get_lifeform_data(id);
-        assert(data.is_loop && data.is_still && data.is_dead && !data.is_alive, 'vacuum still life');
+        assert(
+            data.is_loop && data.is_still && data.is_dead && !data.is_alive, 'vacuum still life',
+        );
         assert(data.sequence_length == 1, 'period 1');
         assert(lf.get_canonical_state(id) == data.current_state, 'own canonical');
         assert(lf.get_escrow(id) == 0, 'no escrow');
@@ -190,7 +192,9 @@ mod tests {
         // shifted by (7,9); the witness back to the canonical (anchor+(3,5)) is the difference:
         // (3-7 mod 41, 5-9 mod 41) = (37, 37).
         let copy_drawn = translate(@drawn, 7, 9);
-        assert(eq(@translate(@translate(@smallest, 7, 9), 37, 37), @canonical_rows), 'witness math');
+        assert(
+            eq(@translate(@translate(@smallest, 7, 9), 37, 37), @canonical_rows), 'witness math',
+        );
         minter.mint_loop(pack(@copy_drawn), 2, canonical, 0, 37, 37, 0, d.creator);
         stop_cheat_caller_address(d.loop_minter);
     }
@@ -222,7 +226,8 @@ mod tests {
     // (w0 holds 6x41 = 246 bits of a felt252), so a caller can pass a `canonical` struct with
     // garbage above bit 245 that unpacks — and hashes — identically to the clean encoding.
     // The minter must persist pack(verified rows), never the raw calldata struct.
-    const W0_GARBAGE: felt252 = 0xC0000000000000000000000000000000000000000000000000000000000000; // 3·2^246
+    const W0_GARBAGE: felt252 =
+        0xC0000000000000000000000000000000000000000000000000000000000000; // 3·2^246
 
     #[test]
     fn loop_mint_strips_garbage_bits_from_canonical() {

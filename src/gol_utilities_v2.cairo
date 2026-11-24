@@ -6,7 +6,7 @@
 //! Equivalence is TIME-CYCLE ONLY: the canonical representative of a loop is its lexicographically
 //! smallest state (`lt`); spatial (translation/rotation) invariance is out of scope.
 
-use gol_starknet::gol_grid_v2::{GridState, step, lt, eq, token_hash, grid_hash, pack, unpack};
+use gol_starknet::gol_grid_v2::{GridState, eq, grid_hash, lt, pack, step, token_hash, unpack};
 
 /// A partial path segment of `length` states. Storage shape (see Phase-2 decision in
 /// docs/v2-grid-redesign.md):
@@ -30,7 +30,7 @@ pub fn clone_rows(a: @Array<u64>) -> Array<u64> {
     while i < a.len() {
         out.append(*a[i]);
         i += 1;
-    };
+    }
     out
 }
 
@@ -59,7 +59,7 @@ fn run(
             captured = clone_rows(@current);
         }
         g += 1;
-    };
+    }
     (triggered, smallest, current, captured)
 }
 
@@ -124,9 +124,7 @@ pub fn is_single_loop(
 
 /// True iff `initial` is a single loop of `generations` AND is that loop's canonical (smallest)
 /// state. Panics (via `is_single_loop`) if `initial` is not a clean loop of that length.
-pub fn is_single_loop_and_entrypoint_is_smallest(
-    initial: @Array<u64>, generations: usize,
-) -> bool {
+pub fn is_single_loop_and_entrypoint_is_smallest(initial: @Array<u64>, generations: usize) -> bool {
     let (is_loop, smallest, _, _) = is_single_loop(initial, generations, 0);
     is_loop && eq(@smallest, initial)
 }
@@ -140,16 +138,18 @@ pub fn step_to(initial: @Array<u64>, n: usize) -> (Array<u64>, Array<u64>) {
     while i < n - 1 {
         prev = step(@prev);
         i += 1;
-    };
+    }
     let last = step(@prev);
     (prev, last)
 }
 
 #[cfg(test)]
 mod tests {
-    use gol_starknet::gol_grid_v2::{grid_with, unpack, eq, grid_hash, token_hash};
-    use super::{compute_partial_path, combine_partial_path, is_single_loop,
-        is_single_loop_and_entrypoint_is_smallest};
+    use gol_starknet::gol_grid_v2::{eq, grid_hash, grid_with, token_hash, unpack};
+    use super::{
+        combine_partial_path, compute_partial_path, is_single_loop,
+        is_single_loop_and_entrypoint_is_smallest,
+    };
 
     // Blinker phase A (horizontal, row 5 cols 1..3) and phase B (vertical, col 2 rows 4..6).
     fn blinker_a() -> Array<u64> {
