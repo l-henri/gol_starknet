@@ -1,0 +1,20 @@
+# Packages checked by scripts/check.sh, and the hygiene checks this repository deliberately
+# does not meet yet, each with its reason.
+
+[[package]]
+path = "."
+lang = "cairo"
+
+[[package]]
+path = "."
+lang = "rust"
+
+[[package]]
+path = "ui/game-of-life"
+lang = "typescript"
+
+[skip]
+cairo-warnings = "The current contracts still produce lint and compiler warnings; cleaning them up is separate work."
+".:test-layout" = "Cairo suites sit directly in tests/, which is snforge's default layout."
+".:source-tests" = "Unit tests sit beside the code they cover, in both the Cairo sources and the Rust crates."
+"ui/game-of-life:tests" = "The web app has no automated tests yet."
