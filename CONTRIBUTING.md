@@ -15,14 +15,16 @@ git config core.hooksPath .githooks
 ## Check your change
 
 ```sh
-./scripts/check.sh          # format, build, web lint and type check, then tests
+./scripts/check.sh          # format, lint, build, web lint and type check, then tests
 ./scripts/check.sh --fast   # the same without tests; this is what the commit hook runs
 ```
 
 CI runs `./scripts/check.sh` on every pull request. A change is ready when it passes.
 
-`scripts/check.sh` is the one place the checks are defined. It does not yet run the Cairo linter
-or Clippy, because the current code still has findings; the script says so where each would go.
+`scripts/check.sh` is the one place the checks are defined. The Cairo linter and Clippy run
+through `scripts/ratchet.py`: the findings the code already had are recorded in `.ratchet/`, a new
+finding fails the check, and fixing an old one means shrinking the record (the failure message
+gives the command). The record only gets smaller.
 
 ## Where things go
 

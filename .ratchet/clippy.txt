@@ -1,0 +1,10 @@
+# Known findings of: cargo clippy --locked --all-targets
+# count<TAB>file: message. Shrink only.
+1	crates/gol-sdk-wasm/src/lib.rs: this function has too many arguments (8/7)
+1	crates/gol-sdk/examples/mint_batch.rs: unused import: `GridState`
+1	crates/gol-sdk/examples/mint_batch.rs: very complex type used. Consider factoring parts into `type` definitions
+1	crates/gol-sdk/examples/read_sepolia.rs: unused import: `GridState`
+1	crates/gol-sdk/src/datasource/event_scan.rs: consider using `sort_by_key`
+3	crates/gol-sdk/src/datasource/event_scan.rs: usage of `bool::then` in `filter_map`
+1	crates/gol-sdk/src/engine.rs: large size difference between variants
+1	crates/gol-sdk/src/writes.rs: this function has too many arguments (8/7)

@@ -1,0 +1,20 @@
+# Known findings of: scarb lint --test
+# count<TAB>file: message. Shrink only.
+4	src/gol_grid_v2.cairo: Plugin diagnostic: You seem to be trying to use `&` for parity check. Consider using `DivRem::div_rem()` instead.
+6	src/gol_lifeforms_v2.cairo: Plugin diagnostic: Redundant conversion: input and output types are the same.
+4	src/gol_lifeforms_v3.cairo: Plugin diagnostic: Redundant conversion: input and output types are the same.
+16	src/gol_loop_minter_v3.cairo: Plugin diagnostic: Redundant conversion: input and output types are the same.
+10	src/gol_metadata.cairo: Plugin diagnostic: you seem to be trying to use `loop`. Consider replacing this `loop` with a `while` loop for clarity and conciseness
+8	src/gol_metadata_v2.cairo: Plugin diagnostic: You seem to be trying to use `&` for parity check. Consider using `DivRem::div_rem()` instead.
+4	src/gol_path_lifeforms_v2.cairo: Plugin diagnostic: Redundant conversion: input and output types are the same.
+2	src/gol_utilities.cairo: Plugin diagnostic: Each `if`-statement adds one level of nesting, which makes code look more complex than it really is.
+4	src/gol_utilities.cairo: Plugin diagnostic: Redundant conversion: input and output types are the same.
+16	src/gol_utilities.cairo: Plugin diagnostic: you seem to be trying to use `loop`. Consider replacing this `loop` with a `while` loop for clarity and conciseness
+4	src/gol_wanderer_minter_v3.cairo: Plugin diagnostic: Redundant conversion: input and output types are the same.
+8	src/gol_wanderers_v3.cairo: Plugin diagnostic: Redundant conversion: input and output types are the same.
+2	tests/test_grid_utils.cairo: Plugin diagnostic: consider using `unwrap_syscall` instead of `unwrap`
+1	tests/test_grid_utils.cairo: Unused variable. Consider ignoring by prefixing with `_`.
+8	tests/test_pet_bonds.cairo: Plugin diagnostic: consider using `unwrap_syscall` instead of `unwrap`
+10	tests/test_v2_contracts.cairo: Plugin diagnostic: consider using `unwrap_syscall` instead of `unwrap`
+10	tests/test_v3_contracts.cairo: Plugin diagnostic: consider using `unwrap_syscall` instead of `unwrap`
+1	tests/test_v3_contracts.cairo: Unused import: `gol_starknet_integrationtest::test_v3_contracts::tests::apply_symmetry`
