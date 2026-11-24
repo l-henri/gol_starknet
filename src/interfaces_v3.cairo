@@ -8,9 +8,9 @@
 //! `RenderParams`) are reused from v2; the drawn state stays in them for display, the canonical is
 //! stored alongside as the identity preimage.
 
-use starknet::ContractAddress;
 use gol_starknet::gol_grid_v2::GridState;
 use gol_starknet::interfaces_v2::{LifeFormData, PathFormData, RenderParams};
+use starknet::ContractAddress;
 
 #[starknet::interface]
 pub trait IGolLifeFormsV3<TContractState> {
@@ -55,9 +55,7 @@ pub trait IGolLifeFormsV3<TContractState> {
     /// Permanent minimality fraud-proof: exhibit `(g, k)` with
     /// `apply_symmetry(g, step^k(canonical)) < canonical` (`k < period`). Burns the token and
     /// pays its escrow to the caller. Public — the on-chain check is the gate.
-    fn prove_malformed(
-        ref self: TContractState, token_id: u256, d4: u8, dr: u32, dc: u32, k: u32,
-    );
+    fn prove_malformed(ref self: TContractState, token_id: u256, d4: u8, dr: u32, dc: u32, k: u32);
 }
 
 #[starknet::interface]
@@ -112,7 +110,10 @@ pub trait IGolLoopMinterV3<TContractState> {
         recipient: ContractAddress,
     ) -> bool;
     fn mint_partial_path(
-        ref self: TContractState, path_start: GridState, path_length: usize, trigger_state: GridState,
+        ref self: TContractState,
+        path_start: GridState,
+        path_length: usize,
+        trigger_state: GridState,
     );
     fn combine_partial_path(
         ref self: TContractState, partial_path_id_1: felt252, partial_path_id_2: felt252,
@@ -150,7 +151,10 @@ pub trait IGolWandererMinterV3<TContractState> {
         recipient: ContractAddress,
     ) -> bool;
     fn mint_partial_path(
-        ref self: TContractState, path_start: GridState, path_length: usize, trigger_state: GridState,
+        ref self: TContractState,
+        path_start: GridState,
+        path_length: usize,
+        trigger_state: GridState,
     );
     fn combine_partial_path(
         ref self: TContractState, partial_path_id_1: felt252, partial_path_id_2: felt252,
@@ -168,9 +172,9 @@ pub trait IGolWandererMinterV3<TContractState> {
 
 #[starknet::interface]
 pub trait IGolPetBonds<TContractState> {
-    /// Pet a living loop creature: feeds it ONE generation (the ceremonial breath — the NUT reward
-    /// lands on the caller via `move_lifeform_forward_n_for`), mints the caller's bond for it if
-    /// absent, and refreshes the caller's 7-day clock. Public.
+    /// Pet a living loop creature: feeds it ONE generation (the ceremonial breath — the NUT
+    /// reward lands on the caller via `move_lifeform_forward_n_for`), mints the caller's bond for
+    /// it if absent, and refreshes the caller's 7-day clock. Public.
     fn pet(ref self: TContractState, creature_id: u256);
     /// Permissionless reaper: burn `holder`'s bond on `creature_id` if it has lapsed (no pet for
     /// LAPSE_SECONDS). Reward: REAP_REWARD NUT freshly minted to the caller.

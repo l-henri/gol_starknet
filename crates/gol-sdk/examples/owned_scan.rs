@@ -31,7 +31,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if let Some(lf) = owned.first() {
         let act = ds.activity(Some(lf.token_id), 5).await?;
-        println!("recent activity for {} ({} moves):", lf.token_id.to_hex(), act.len());
+        println!(
+            "recent activity for {} ({} moves):",
+            lf.token_id.to_hex(),
+            act.len()
+        );
         for m in &act {
             println!("  age={} @ block {}", m.age, m.block_number);
         }

@@ -5,10 +5,14 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
-  contracts:
-    name: Build & test contracts
+  check:
+    name: Format, build and test
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -16,8 +20,12 @@ jobs:
       - uses: software-mansion/setup-scarb@v1
       - uses: foundry-rs/setup-snfoundry@v3
 
-      - name: Build
-        run: scarb build
+      # rustup reads rust-toolchain.toml: the pinned channel with rustfmt and Clippy.
+      - run: rustup toolchain install
 
-      - name: Test
-        run: snforge test
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ui/game-of-life/.nvmrc
+
+      # Contracts, Rust SDK and web app: the same script the commit hook runs.
+      - run: ./scripts/check.sh

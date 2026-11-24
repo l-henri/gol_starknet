@@ -52,6 +52,6 @@ pub fn encode(data: ByteArray) -> ByteArray {
             pad
         });
         i += 3;
-    };
+    }
     out
 }

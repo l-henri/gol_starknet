@@ -6,7 +6,13 @@ use std::time::Instant;
 
 fn main() {
     // a busy, asymmetric grid (worst-ish case: deep lt comparisons, no early identity)
-    let mut g = grid_with(&[(1, 0b1110), (7, 0x155), (15, 0x3ff), (25, 0x12345), (37, 0b111)]);
+    let mut g = grid_with(&[
+        (1, 0b1110),
+        (7, 0x155),
+        (15, 0x3ff),
+        (25, 0x12345),
+        (37, 0b111),
+    ]);
     for _ in 0..30 {
         g = step(&g); // let it spread across the board
     }
@@ -43,5 +49,9 @@ fn main() {
     let b = apply_symmetry(3, 17, 5, &b);
     let t = Instant::now();
     let r = find_witness(&g, &b, 60);
-    println!("find_witness hit at k=50: {:.3} ms ({:?})", t.elapsed().as_secs_f64() * 1000.0, r);
+    println!(
+        "find_witness hit at k=50: {:.3} ms ({:?})",
+        t.elapsed().as_secs_f64() * 1000.0,
+        r
+    );
 }

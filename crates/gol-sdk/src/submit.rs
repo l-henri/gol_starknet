@@ -40,7 +40,11 @@ pub struct StrkdSubmitter {
 
 impl StrkdSubmitter {
     pub fn new(url: impl Into<String>, account: Felt, submit: bool) -> Self {
-        Self { url: url.into(), account, submit }
+        Self {
+            url: url.into(),
+            account,
+            submit,
+        }
     }
 }
 

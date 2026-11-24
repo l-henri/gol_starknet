@@ -146,13 +146,13 @@ pub fn token_id(rows: &Rows) -> U256 {
 fn d4_source(d4: u8, r: usize, c: usize, last: usize) -> (usize, usize) {
     match d4 {
         0 => (r, c),
-        1 => (last - c, r),          // forward: (r,c) -> (c, last-r)
-        2 => (last - r, last - c),   // forward: (r,c) -> (last-r, last-c)
-        3 => (c, last - r),          // forward: (r,c) -> (last-c, r)
-        4 => (r, last - c),          // forward: (r,c) -> (r, last-c)
-        5 => (last - r, c),          // forward: (r,c) -> (last-r, c)
-        6 => (c, r),                 // forward: (r,c) -> (c, r)
-        _ => (last - c, last - r),   // 7, forward: (r,c) -> (last-c, last-r)
+        1 => (last - c, r),        // forward: (r,c) -> (c, last-r)
+        2 => (last - r, last - c), // forward: (r,c) -> (last-r, last-c)
+        3 => (c, last - r),        // forward: (r,c) -> (last-c, r)
+        4 => (r, last - c),        // forward: (r,c) -> (r, last-c)
+        5 => (last - r, c),        // forward: (r,c) -> (last-r, c)
+        6 => (c, r),               // forward: (r,c) -> (c, r)
+        _ => (last - c, last - r), // 7, forward: (r,c) -> (last-c, last-r)
     }
 }
 
@@ -428,10 +428,8 @@ mod tests {
     #[test]
     fn token_id_matches_live_seeded_blinker() {
         let want = U256::from_felt(
-            &Felt::from_hex(
-                "0x743d91e948cc844ef3e08dc46ede35fe5ea085981a0176d3203810da80d9416",
-            )
-            .unwrap(),
+            &Felt::from_hex("0x743d91e948cc844ef3e08dc46ede35fe5ea085981a0176d3203810da80d9416")
+                .unwrap(),
         );
         assert_eq!(token_id(&blinker_a()), want);
     }

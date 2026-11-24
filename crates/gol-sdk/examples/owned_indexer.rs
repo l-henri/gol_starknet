@@ -21,9 +21,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ds = IndexerDataSource::from_env(chain.clone(), rpc, cfg.addresses.clone())?;
     let owned = ds.owned_lifeforms(Felt::from_hex(&owner)?).await?;
 
-    println!("[indexer/{chain}] owner {owner}\nowns {} lifeform(s):", owned.len());
+    println!(
+        "[indexer/{chain}] owner {owner}\nowns {} lifeform(s):",
+        owned.len()
+    );
     for lf in &owned {
-        println!("  token {} state={}", lf.token_id.to_hex(), lf.data.current_state.to_hex());
+        println!(
+            "  token {} state={}",
+            lf.token_id.to_hex(),
+            lf.data.current_state.to_hex()
+        );
     }
     Ok(())
 }

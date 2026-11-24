@@ -2,15 +2,19 @@
 //! (1) An L-tromino that reaches a 2x2 block (still life) in ONE step -> a frozen path of length 1.
 //! (2) A blinker phase A and its next step B (real adjacent states) for a challenge_burn live test.
 
-use gol_sdk::grid::{step, token_hash, GridState, N};
 use gol_sdk::felt_to_hex;
+use gol_sdk::grid::{step, token_hash, GridState, N};
 
 fn emit(label: &str, rows: &[u64; N]) {
     let gs = GridState::pack(rows);
     let cd: Vec<String> = gs.to_calldata().iter().map(felt_to_hex).collect();
     // token_id (u256) equals token_hash (felt) as a number; print the hex for use as a u256 on-chain.
     let tid = token_hash(rows);
-    println!("{label}\ttoken_id={}\tgridstate={}", felt_to_hex(&tid), cd.join(","));
+    println!(
+        "{label}\ttoken_id={}\tgridstate={}",
+        felt_to_hex(&tid),
+        cd.join(",")
+    );
 }
 
 fn main() {

@@ -42,7 +42,10 @@ pub struct GolWrites<'a> {
 
 impl<'a> GolWrites<'a> {
     pub fn new(addresses: &'a GolAddresses, nut_decimals: u32) -> Self {
-        Self { addresses, nut_decimals }
+        Self {
+            addresses,
+            nut_decimals,
+        }
     }
 
     /// `nutrient.approve(spender, amount)`.
@@ -62,8 +65,10 @@ impl<'a> GolWrites<'a> {
     /// + witness are computed here ([`crate::grid::loop_family_canonical`]).
     pub fn mint_loop(&self, drawn: &Rows, loop_length: u32, recipient: Felt) -> Vec<Call> {
         let (canonical, d4, dr, dc, k) = crate::grid::loop_family_canonical(drawn, loop_length);
-        let approve = self
-            .approve_nut(self.addresses.lifeforms, nut_cost_for_loop(loop_length, self.nut_decimals));
+        let approve = self.approve_nut(
+            self.addresses.lifeforms,
+            nut_cost_for_loop(loop_length, self.nut_decimals),
+        );
         let mut calldata = GridState::pack(drawn).to_calldata().to_vec();
         calldata.push(Felt::from(loop_length));
         calldata.extend_from_slice(&GridState::pack(&canonical).to_calldata());
@@ -74,7 +79,11 @@ impl<'a> GolWrites<'a> {
         calldata.push(recipient);
         vec![
             approve,
-            Call { to: self.addresses.loop_minter, selector: selector("mint_loop"), calldata },
+            Call {
+                to: self.addresses.loop_minter,
+                selector: selector("mint_loop"),
+                calldata,
+            },
         ]
     }
 
@@ -104,7 +113,11 @@ impl<'a> GolWrites<'a> {
         calldata.push(recipient);
         vec![
             approve,
-            Call { to: self.addresses.path_minter, selector: selector("mint_path"), calldata },
+            Call {
+                to: self.addresses.path_minter,
+                selector: selector("mint_path"),
+                calldata,
+            },
         ]
     }
 
@@ -221,8 +234,10 @@ impl<'a> GolWrites<'a> {
     ) -> Vec<Call> {
         let (canonical, d4, dr, dc, k) =
             crate::grid::loop_family_canonical(anchor, sequence_length);
-        let approve =
-            self.approve_nut(self.addresses.lifeforms, unit_cost(sequence_length, self.nut_decimals));
+        let approve = self.approve_nut(
+            self.addresses.lifeforms,
+            unit_cost(sequence_length, self.nut_decimals),
+        );
         let mut calldata = GridState::pack(anchor).to_calldata().to_vec();
         calldata.extend_from_slice(&GridState::pack(&canonical).to_calldata());
         calldata.push(Felt::from(d4));
@@ -249,8 +264,10 @@ impl<'a> GolWrites<'a> {
         recipient: Felt,
     ) -> Vec<Call> {
         let (canonical, d4, dr, dc) = crate::grid::symmetry_canonical(drawn_start);
-        let approve = self
-            .approve_nut(self.addresses.path_lifeforms, unit_cost(sequence_length, self.nut_decimals));
+        let approve = self.approve_nut(
+            self.addresses.path_lifeforms,
+            unit_cost(sequence_length, self.nut_decimals),
+        );
         let mut calldata = GridState::pack(drawn_start).to_calldata().to_vec();
         calldata.extend_from_slice(&GridState::pack(&canonical).to_calldata());
         calldata.push(Felt::from(d4));
@@ -352,7 +369,10 @@ impl<'a> GolWrites<'a> {
             let mpp = self.mint_partial_path(Minter::Path, &seg_state, seg_steps + 1, trigger);
             seg_index += 1;
             if b_prev == 0 {
-                steps.push(MintStep { label: format!("{label} {seg_index}"), calls: vec![mpp] });
+                steps.push(MintStep {
+                    label: format!("{label} {seg_index}"),
+                    calls: vec![mpp],
+                });
             } else {
                 let combine = self.combine_partial_path(Minter::Path, acc_id, token_hash(&current));
                 steps.push(MintStep {
@@ -409,15 +429,34 @@ impl<'a> GolWrites<'a> {
         let loop_entry_state = GridState::pack(&loop_entry);
         let mut steps: Vec<MintStep> = Vec::new();
         // Main path: `sequence_length` states (s0..s_{L-1}); its exitpoint steps to the loop entry.
-        self.tile_partial(start, sequence_length, &loop_entry_state, chunk, "path segment", &mut steps);
+        self.tile_partial(
+            start,
+            sequence_length,
+            &loop_entry_state,
+            chunk,
+            "path segment",
+            &mut steps,
+        );
         // Loop witness: `loop_period` states from the loop entry; keyed at token_hash(loop_entry).
-        self.tile_partial(&loop_entry, loop_period, &loop_entry_state, chunk, "loop segment", &mut steps);
+        self.tile_partial(
+            &loop_entry,
+            loop_period,
+            &loop_entry_state,
+            chunk,
+            "loop segment",
+            &mut steps,
+        );
         steps.push(MintStep {
             label: "mint".into(),
             calls: self.mint_path_from_partial_paths(start, sequence_length, recipient),
         });
         let tx_count = steps.len() as u32;
-        MintPlan { steps, tx_count, single_shot: false, too_long: tx_count > max_tx }
+        MintPlan {
+            steps,
+            tx_count,
+            single_shot: false,
+            too_long: tx_count > max_tx,
+        }
     }
 
     /// `lifeforms.move_lifeform_forward_n(token_id, n)` — advance `n` generations and mint `n` NUT to
@@ -502,10 +541,14 @@ impl<'a> GolWrites<'a> {
             let path_start_rows = current;
             let path_start = GridState::pack(&path_start_rows);
             // a segment of `seg_steps` steps spans seg_steps+1 states
-            let mpp = self.mint_partial_path(Minter::Loop, &path_start, seg_steps + 1, &canon_state);
+            let mpp =
+                self.mint_partial_path(Minter::Loop, &path_start, seg_steps + 1, &canon_state);
             seg_index += 1;
             if b_prev == 0 {
-                steps.push(MintStep { label: format!("segment {seg_index}"), calls: vec![mpp] });
+                steps.push(MintStep {
+                    label: format!("segment {seg_index}"),
+                    calls: vec![mpp],
+                });
             } else {
                 let combine =
                     self.combine_partial_path(Minter::Loop, loop_id, token_hash(&path_start_rows));
@@ -541,7 +584,10 @@ impl<'a> GolWrites<'a> {
                 let mpp =
                     self.mint_partial_path(Minter::Loop, &seg_state, seg_steps + 1, &orbit_state);
                 if b_prev == 0 {
-                    steps.push(MintStep { label: "phase segment".into(), calls: vec![mpp] });
+                    steps.push(MintStep {
+                        label: "phase segment".into(),
+                        calls: vec![mpp],
+                    });
                 } else {
                     let combine =
                         self.combine_partial_path(Minter::Loop, phase_key, token_hash(&cur));
@@ -561,7 +607,12 @@ impl<'a> GolWrites<'a> {
             calls: self.mint_loop_from_partial_paths(canonical, loop_length, recipient),
         });
         let tx_count = steps.len() as u32;
-        MintPlan { steps, tx_count, single_shot: false, too_long: tx_count > max_tx }
+        MintPlan {
+            steps,
+            tx_count,
+            single_shot: false,
+            too_long: tx_count > max_tx,
+        }
     }
 
     fn minter_addr(&self, minter: Minter) -> Felt {
@@ -605,7 +656,7 @@ mod tests {
         assert_eq!(calls[0].calldata[0], addrs.lifeforms);
         assert_eq!(calls[0].calldata[1], Felt::from(2u128 * 10u128.pow(18))); // low
         assert_eq!(calls[0].calldata[2], Felt::ZERO); // high
-        // call 1 = v3 witness mint: [drawn w0..w6, loop_length, canonical w0..w6, d4, dr, dc, k, recipient]
+                                                      // call 1 = v3 witness mint: [drawn w0..w6, loop_length, canonical w0..w6, d4, dr, dc, k, recipient]
         assert_eq!(calls[1].to, addrs.loop_minter);
         assert_eq!(calls[1].selector, selector("mint_loop"));
         let cd = &calls[1].calldata;
@@ -628,7 +679,11 @@ mod tests {
         let w = GolWrites::new(&addrs, 18);
         let call = w.set_render_params(
             U256::from_u128(0x99),
-            RenderParams { bg: 0x810da8, cell: 0xd9416, speed: 105 },
+            RenderParams {
+                bg: 0x810da8,
+                cell: 0xd9416,
+                speed: 105,
+            },
         );
         assert_eq!(call.to, addrs.lifeforms);
         assert_eq!(call.selector, selector("set_render_params"));
@@ -647,7 +702,10 @@ mod tests {
 
     #[test]
     fn nut_cost_scales_with_length() {
-        assert_eq!(nut_cost_for_loop(3, 18), U256::from_u128(3 * 10u128.pow(18)));
+        assert_eq!(
+            nut_cost_for_loop(3, 18),
+            U256::from_u128(3 * 10u128.pow(18))
+        );
         assert_eq!(nut_cost_for_path(0, 18), U256::from_u128(0));
     }
 
@@ -675,7 +733,10 @@ mod tests {
         let call = w.combine_partial_path(Minter::Path, Felt::from(0x11u32), Felt::from(0x22u32));
         assert_eq!(call.to, addrs.path_minter);
         assert_eq!(call.selector, selector("combine_partial_path"));
-        assert_eq!(call.calldata, vec![Felt::from(0x11u32), Felt::from(0x22u32)]);
+        assert_eq!(
+            call.calldata,
+            vec![Felt::from(0x11u32), Felt::from(0x22u32)]
+        );
     }
 
     #[test]
@@ -683,7 +744,8 @@ mod tests {
         let addrs = deployments(Network::Sepolia).unwrap();
         let w = GolWrites::new(&addrs, 18);
         let state = GridState::pack(&grid_with(&[(5, 0b1110)]));
-        let calls = w.mint_loop_from_partial_paths(&grid_with(&[(5, 0b1110)]), 2, Felt::from(0xabcu32));
+        let calls =
+            w.mint_loop_from_partial_paths(&grid_with(&[(5, 0b1110)]), 2, Felt::from(0xabcu32));
         assert_eq!(calls.len(), 2);
         // approve sequence_length(=2) NUT to lifeforms
         assert_eq!(calls[0].to, addrs.nutrient);
@@ -695,13 +757,18 @@ mod tests {
         assert_eq!(calls[1].calldata.len(), 19);
         assert_eq!(&calls[1].calldata[0..7], &state.to_calldata()[..]);
         let (canonical, ..) = crate::grid::loop_family_canonical(&grid_with(&[(5, 0b1110)]), 2);
-        assert_eq!(&calls[1].calldata[7..14], &GridState::pack(&canonical).to_calldata()[..]);
+        assert_eq!(
+            &calls[1].calldata[7..14],
+            &GridState::pack(&canonical).to_calldata()[..]
+        );
         assert_eq!(calls[1].calldata[18], Felt::from(0xabcu32));
     }
 
     #[test]
     fn plan_loop_mint_tiles_a_glider_and_matches_contract_checks() {
-        use crate::engine::{combine_partial_path, compute_partial_path, find_loop, PartialPathData};
+        use crate::engine::{
+            combine_partial_path, compute_partial_path, find_loop, PartialPathData,
+        };
         use crate::grid::{eq, grid_with, step, GridState};
         let addrs = deployments(Network::Sepolia).unwrap();
         let w = GolWrites::new(&addrs, 18);
@@ -728,18 +795,37 @@ mod tests {
             let mpp = &plan.steps[idx].calls[0];
             assert_eq!(mpp.selector, selector("mint_partial_path"));
             let plan_start = GridState::from_felts(&mpp.calldata[0..7]).unwrap();
-            assert!(eq(&plan_start.unpack(), &current), "segment {idx} path_start");
-            assert!(eq(&GridState::from_felts(&mpp.calldata[8..15]).unwrap().unpack(), &canonical), "trigger");
+            assert!(
+                eq(&plan_start.unpack(), &current),
+                "segment {idx} path_start"
+            );
+            assert!(
+                eq(
+                    &GridState::from_felts(&mpp.calldata[8..15])
+                        .unwrap()
+                        .unpack(),
+                    &canonical
+                ),
+                "trigger"
+            );
             // contract accepts the segment (trigger not hit inside it)
-            let seg = compute_partial_path(&current, &canonical, seg_steps + 1).expect("segment computes");
+            let seg = compute_partial_path(&current, &canonical, seg_steps + 1)
+                .expect("segment computes");
             acc = Some(match acc {
                 None => {
-                    assert_eq!(plan.steps[idx].calls.len(), 1, "first segment has no combine");
+                    assert_eq!(
+                        plan.steps[idx].calls.len(),
+                        1,
+                        "first segment has no combine"
+                    );
                     seg
                 }
                 Some(a) => {
                     assert_eq!(plan.steps[idx].calls.len(), 2);
-                    assert_eq!(plan.steps[idx].calls[1].selector, selector("combine_partial_path"));
+                    assert_eq!(
+                        plan.steps[idx].calls[1].selector,
+                        selector("combine_partial_path")
+                    );
                     combine_partial_path(a, seg).expect("segments chain & combine")
                 }
             });
@@ -752,13 +838,22 @@ mod tests {
         assert_eq!(idx, n_segments);
         let assembled = acc.unwrap();
         assert_eq!(assembled.length, period, "assembled length == loop period");
-        assert!(eq(&assembled.smallest.unpack(), &canonical), "smallest == canonical");
-        assert!(eq(&step(&assembled.exitpoint.unpack()), &canonical), "loop closes back to canonical");
+        assert!(
+            eq(&assembled.smallest.unpack(), &canonical),
+            "smallest == canonical"
+        );
+        assert!(
+            eq(&step(&assembled.exitpoint.unpack()), &canonical),
+            "loop closes back to canonical"
+        );
 
         // final step = approve + mint_loop_from_partial_paths
         let last = plan.steps.last().unwrap();
         assert_eq!(last.calls.len(), 2);
-        assert_eq!(last.calls[1].selector, selector("mint_loop_from_partial_paths"));
+        assert_eq!(
+            last.calls[1].selector,
+            selector("mint_loop_from_partial_paths")
+        );
     }
 
     #[test]
@@ -802,7 +897,9 @@ mod tests {
     // segment for BOTH the main path and the loop witness, then confirm the final mint step.
     #[test]
     fn plan_path_mint_tiles_main_and_loop_witness() {
-        use crate::engine::{classify_fate, combine_partial_path, compute_partial_path, Fate, PartialPathData};
+        use crate::engine::{
+            classify_fate, combine_partial_path, compute_partial_path, Fate, PartialPathData,
+        };
         use crate::grid::{eq, step};
         let addrs = deployments(Network::Sepolia).unwrap();
         let w = GolWrites::new(&addrs, 18);
@@ -825,13 +922,22 @@ mod tests {
             assert_eq!(mpp.selector, selector("mint_partial_path"));
             let seg_start = GridState::from_felts(&mpp.calldata[0..7]).unwrap();
             let seg_len = crate::types::felt_to_u128(&mpp.calldata[7]) as u32;
-            assert_eq!(&GridState::from_felts(&mpp.calldata[8..15]).unwrap(), &trigger, "trigger = loop entry");
-            let seg = compute_partial_path(&seg_start.unpack(), &loop_entry, seg_len).expect("segment computes");
+            assert_eq!(
+                &GridState::from_felts(&mpp.calldata[8..15]).unwrap(),
+                &trigger,
+                "trigger = loop entry"
+            );
+            let seg = compute_partial_path(&seg_start.unpack(), &loop_entry, seg_len)
+                .expect("segment computes");
             // the main path's first segment starts at `start`; the loop witness's at `loop_entry`.
             if !on_loop && eq(&seg_start.unpack(), &loop_entry) && main_acc.is_some() {
                 on_loop = true;
             }
-            let acc = if on_loop { &mut loop_acc } else { &mut main_acc };
+            let acc = if on_loop {
+                &mut loop_acc
+            } else {
+                &mut main_acc
+            };
             *acc = Some(match acc.take() {
                 None => seg,
                 Some(a) => combine_partial_path(a, seg).expect("segments combine"),
@@ -840,12 +946,21 @@ mod tests {
         let main = main_acc.unwrap();
         let looping = loop_acc.unwrap();
         assert_eq!(main.length, seq, "main length == sequence_length");
-        assert!(eq(&step(&main.exitpoint.unpack()), &loop_entry), "main exit steps to loop entry");
+        assert!(
+            eq(&step(&main.exitpoint.unpack()), &loop_entry),
+            "main exit steps to loop entry"
+        );
         assert_eq!(looping.length, period, "loop witness length == period");
-        assert!(eq(&step(&looping.exitpoint.unpack()), &loop_entry), "loop closes to entry");
+        assert!(
+            eq(&step(&looping.exitpoint.unpack()), &loop_entry),
+            "loop closes to entry"
+        );
         // final step = approve + mint_path_from_partial_paths
         let last = plan.steps.last().unwrap();
-        assert_eq!(last.calls[1].selector, selector("mint_path_from_partial_paths"));
+        assert_eq!(
+            last.calls[1].selector,
+            selector("mint_path_from_partial_paths")
+        );
     }
 
     #[test]
@@ -875,8 +990,15 @@ mod tests {
         let addrs = deployments(Network::Sepolia).unwrap();
         let w = GolWrites::new(&addrs, 18);
         let a_state = GridState::pack(&grid_with(&[(5, 0b1110)]));
-        let call =
-            w.challenge_burn_loop(U256::from_u128(0xa), U256::from_u128(0xb), &a_state, 0, 1, 0, 1);
+        let call = w.challenge_burn_loop(
+            U256::from_u128(0xa),
+            U256::from_u128(0xb),
+            &a_state,
+            0,
+            1,
+            0,
+            1,
+        );
         assert_eq!(call.to, addrs.lifeforms);
         assert_eq!(call.selector, selector("challenge_burn"));
         // [a.lo, a.hi, b.lo, b.hi, w0..w6, d4, dr, dc, k] = 4 + 7 + 4
@@ -890,11 +1012,12 @@ mod tests {
         let addrs = deployments(Network::Sepolia).unwrap();
         let w = GolWrites::new(&addrs, 18);
         let state = GridState::pack(&grid_with(&[(5, 0b1110)]));
-        let calls = w.mint_path_from_partial_paths(&grid_with(&[(5, 0b1110)]), 5, Felt::from(0xabcu32));
+        let calls =
+            w.mint_path_from_partial_paths(&grid_with(&[(5, 0b1110)]), 5, Felt::from(0xabcu32));
         assert_eq!(calls.len(), 2);
         assert_eq!(calls[0].to, addrs.nutrient);
         assert_eq!(calls[0].calldata[1], Felt::from(5u128 * 10u128.pow(18))); // 5 NUT
-        // v3: [start(7), canonical(7), d4, dr, dc, recipient] = 18 felts
+                                                                              // v3: [start(7), canonical(7), d4, dr, dc, recipient] = 18 felts
         assert_eq!(calls[1].to, addrs.path_minter);
         assert_eq!(calls[1].selector, selector("mint_path_from_partial_paths"));
         assert_eq!(calls[1].calldata.len(), 18);

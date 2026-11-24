@@ -5,7 +5,9 @@
 //!
 //!   cargo run -p gol-sdk --example mint_batch
 
-use gol_sdk::{engine, felt_to_hex, grid, token_id, Call, Felt, GolConfig, GolWrites, GridState, Network};
+use gol_sdk::{
+    engine, felt_to_hex, grid, token_id, Call, Felt, GolConfig, GolWrites, GridState, Network,
+};
 use serde_json::json;
 use std::collections::HashSet;
 
@@ -13,7 +15,16 @@ use std::collections::HashSet;
 const BLOCK: &[(usize, usize)] = &[(0, 0), (0, 1), (1, 0), (1, 1)];
 const BLINKER: &[(usize, usize)] = &[(0, 0), (0, 1), (0, 2)];
 const TUB: &[(usize, usize)] = &[(0, 1), (1, 0), (1, 2), (2, 1)];
-const BEACON: &[(usize, usize)] = &[(0, 0), (0, 1), (1, 0), (1, 1), (2, 2), (2, 3), (3, 2), (3, 3)];
+const BEACON: &[(usize, usize)] = &[
+    (0, 0),
+    (0, 1),
+    (1, 0),
+    (1, 1),
+    (2, 2),
+    (2, 3),
+    (3, 2),
+    (3, 3),
+];
 const TOAD: &[(usize, usize)] = &[(0, 1), (0, 2), (0, 3), (1, 0), (1, 1), (1, 2)];
 const BEEHIVE: &[(usize, usize)] = &[(0, 1), (0, 2), (1, 0), (1, 3), (2, 1), (2, 2)];
 
@@ -67,7 +78,10 @@ fn main() {
         );
         let tid = token_id(&smallest).to_hex();
         assert!(!existing.contains(&tid), "{name} ({tid}) already minted");
-        assert!(seen.insert(tid.clone()), "{name} ({tid}) duplicate in batch");
+        assert!(
+            seen.insert(tid.clone()),
+            "{name} ({tid}) duplicate in batch"
+        );
 
         let calls = w.mint_loop(&smallest, period, agent);
         mints.push(json!({
@@ -77,7 +91,10 @@ fn main() {
             "calls": calls.iter().map(call_json).collect::<Vec<_>>(),
         }));
     }
-    println!("{}", serde_json::to_string_pretty(&json!({ "count": mints.len(), "mints": mints })).unwrap());
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&json!({ "count": mints.len(), "mints": mints })).unwrap()
+    );
 }
 
 fn call_json(c: &Call) -> serde_json::Value {

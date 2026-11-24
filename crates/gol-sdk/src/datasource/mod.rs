@@ -36,7 +36,11 @@ pub trait DataSource {
     /// A single lifeform (owner + current state), or `None` if unminted.
     async fn lifeform(&self, token_id: U256) -> Result<Option<OwnedLifeform>, GolError>;
     /// `NewMove` activity, most-recent first, capped at `limit` (0 = unlimited). Optionally for one token.
-    async fn activity(&self, token_id: Option<U256>, limit: u32) -> Result<Vec<MoveEvent>, GolError>;
+    async fn activity(
+        &self,
+        token_id: Option<U256>,
+        limit: u32,
+    ) -> Result<Vec<MoveEvent>, GolError>;
 }
 
 /// Given candidate token ids, keep those `owner` still holds, with their live data.

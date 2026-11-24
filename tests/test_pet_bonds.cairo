@@ -4,21 +4,21 @@
 #[cfg(test)]
 mod tests {
     use core::array::ArrayTrait;
-    use starknet::ContractAddress;
-    use snforge_std::{
-        declare, ContractClassTrait, DeclareResultTrait, start_cheat_caller_address,
-        stop_cheat_caller_address, start_cheat_block_timestamp, stop_cheat_block_timestamp,
-    };
-    use openzeppelin::interfaces::accesscontrol::{
-        IAccessControlDispatcher, IAccessControlDispatcherTrait,
-    };
-    use openzeppelin::interfaces::erc20::{IERC20Dispatcher, IERC20DispatcherTrait};
-    use openzeppelin::interfaces::erc1155::{IERC1155Dispatcher, IERC1155DispatcherTrait};
-    use gol_starknet::gol_grid_v2::{grid_with, step, lt, pack, token_id, translate};
+    use gol_starknet::gol_grid_v2::{grid_with, lt, pack, step, token_id, translate};
     use gol_starknet::interfaces_v3::{
         IGolLifeFormsV3Dispatcher, IGolLifeFormsV3DispatcherTrait, IGolLoopMinterV3Dispatcher,
         IGolLoopMinterV3DispatcherTrait, IGolPetBondsDispatcher, IGolPetBondsDispatcherTrait,
     };
+    use openzeppelin::interfaces::accesscontrol::{
+        IAccessControlDispatcher, IAccessControlDispatcherTrait,
+    };
+    use openzeppelin::interfaces::erc1155::{IERC1155Dispatcher, IERC1155DispatcherTrait};
+    use openzeppelin::interfaces::erc20::{IERC20Dispatcher, IERC20DispatcherTrait};
+    use snforge_std::{
+        ContractClassTrait, DeclareResultTrait, declare, start_cheat_block_timestamp,
+        start_cheat_caller_address, stop_cheat_block_timestamp, stop_cheat_caller_address,
+    };
+    use starknet::ContractAddress;
 
     const MINTER_ROLE: felt252 = selector!("MINTER_ROLE");
     const ONE_NUT: u256 = 1000000000000000000;

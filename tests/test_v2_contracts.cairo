@@ -1,28 +1,28 @@
 #[cfg(test)]
 mod tests {
     use core::array::ArrayTrait;
-    use starknet::ContractAddress;
-    use snforge_std::{
-        declare, ContractClassTrait, DeclareResultTrait, start_cheat_caller_address,
-        stop_cheat_caller_address, start_cheat_block_timestamp, stop_cheat_block_timestamp,
+    use gol_starknet::gol_grid_v2::{
+        GridState, apply_symmetry, grid_with, lt, pack, step, token_id, translate,
+    };
+    use gol_starknet::interfaces_v2::{
+        IGolLifeFormsV2Dispatcher, IGolLifeFormsV2DispatcherTrait, IGolLoopMinterV2Dispatcher,
+        IGolLoopMinterV2DispatcherTrait, IGolPathLifeFormsV2Dispatcher,
+        IGolPathLifeFormsV2DispatcherTrait, IGolPathMinterV2Dispatcher,
+        IGolPathMinterV2DispatcherTrait, LifeFormData, LifeState, PathFormData,
     };
     use openzeppelin::interfaces::accesscontrol::{
         IAccessControlDispatcher, IAccessControlDispatcherTrait,
     };
     use openzeppelin::interfaces::erc20::{IERC20Dispatcher, IERC20DispatcherTrait};
     use openzeppelin::interfaces::erc721::{
-        IERC721MetadataDispatcher, IERC721MetadataDispatcherTrait, IERC721Dispatcher,
-        IERC721DispatcherTrait,
+        IERC721Dispatcher, IERC721DispatcherTrait, IERC721MetadataDispatcher,
+        IERC721MetadataDispatcherTrait,
     };
-    use gol_starknet::gol_grid_v2::{
-        GridState, grid_with, step, lt, pack, token_id, translate, apply_symmetry,
+    use snforge_std::{
+        ContractClassTrait, DeclareResultTrait, declare, start_cheat_block_timestamp,
+        start_cheat_caller_address, stop_cheat_block_timestamp, stop_cheat_caller_address,
     };
-    use gol_starknet::interfaces_v2::{
-        IGolLifeFormsV2Dispatcher, IGolLifeFormsV2DispatcherTrait, IGolLoopMinterV2Dispatcher,
-        IGolLoopMinterV2DispatcherTrait, IGolPathMinterV2Dispatcher,
-        IGolPathMinterV2DispatcherTrait, IGolPathLifeFormsV2Dispatcher,
-        IGolPathLifeFormsV2DispatcherTrait, LifeFormData, PathFormData, LifeState,
-    };
+    use starknet::ContractAddress;
 
     const MINTER_ROLE: felt252 = selector!("MINTER_ROLE");
     const ONE_NUT: u256 = 1000000000000000000;
@@ -70,8 +70,9 @@ mod tests {
         path_lifeforms.serialize(ref path_cd); // path minter points at the PATH NFT
         let (path_minter, _) = path_class.deploy(@path_cd).unwrap();
 
-        // lifeforms may mint NUT (the faucet). The path NFT does NOT mint NUT — it only holds/moves
-        // the escrow it pulls at mint, so it needs no MINTER_ROLE on the nutrient token.
+        // lifeforms may mint NUT (the faucet). The path NFT does NOT mint NUT — it only
+        // holds/moves the escrow it pulls at mint, so it needs no MINTER_ROLE on the nutrient
+        // token.
         start_cheat_caller_address(nutrient, creator);
         IAccessControlDispatcher { contract_address: nutrient }.grant_role(MINTER_ROLE, lifeforms);
         stop_cheat_caller_address(nutrient);
@@ -239,7 +240,9 @@ mod tests {
         let l_rows = grid_with(@array![(1_usize, 0b110_u64), (2_usize, 0b010_u64)]);
         let l_state = pack(@l_rows);
         let block_state = pack(@step(@l_rows));
-        let trig = pack(@grid_with(@array![(20_usize, 0b101_u64)])); // never hit on the 1-state main path
+        let trig = pack(
+            @grid_with(@array![(20_usize, 0b101_u64)]),
+        ); // never hit on the 1-state main path
         let id = token_id(@l_rows);
 
         start_cheat_caller_address(d.path_minter, d.creator);
@@ -256,8 +259,8 @@ mod tests {
 
     // Adversarial (refutes the audit's P0): register an UNRELATED blinker as the witness (keyed at
     // hash(blinker)) with trigger = block. The finalize reads registry[hash(block)], which is empty
-    // because the witness lives at hash(blinker) — so it reverts. The witness cannot be a disjoint
-    // loop; the registry keying forces witness.entrypoint == the landing state.
+    // because the witness lives at hash(blinker) — so it reverts. The witness cannot be a
+    // disjoint loop; the registry keying forces witness.entrypoint == the landing state.
     #[test]
     #[should_panic(expected: 'Not the right loop')]
     fn mint_path_from_partial_paths_forged_witness_reverts() {
@@ -396,8 +399,13 @@ mod tests {
         stop_cheat_caller_address(d.lifeforms);
         let (loop_state, _r) = blinker_canonical();
         let lf = LifeFormData {
-            is_loop: true, is_still: false, is_alive: true, is_dead: false,
-            sequence_length: 0, current_state: loop_state, age: 0,
+            is_loop: true,
+            is_still: false,
+            is_alive: true,
+            is_dead: false,
+            sequence_length: 0,
+            current_state: loop_state,
+            age: 0,
         };
         start_cheat_caller_address(d.lifeforms, d.creator);
         IGolLifeFormsV2Dispatcher { contract_address: d.lifeforms }
@@ -456,16 +464,29 @@ mod tests {
         stop_cheat_caller_address(d.path_lifeforms);
     }
 
-    // Mint a path record directly (creator as MINTER_ROLE), controlling start/length/target/timestamp.
-    // challenge_burn only checks the sub-path stepping + timestamps + target equality, so crafted-but-
-    // real-adjacent states exercise exactly that logic (path validity is the minter's job, tested above).
+    // Mint a path record directly (creator as MINTER_ROLE), controlling
+    // start/length/target/timestamp.
+    // challenge_burn only checks the sub-path stepping + timestamps + target equality, so
+    // crafted-but-
+    // real-adjacent states exercise exactly that logic (path validity is the minter's job, tested
+    // above).
     fn direct_mint(
-        d: Deployment, recipient: ContractAddress, id: u256, start: GridState, length: usize,
-        target: felt252, ts: u64,
+        d: Deployment,
+        recipient: ContractAddress,
+        id: u256,
+        start: GridState,
+        length: usize,
+        target: felt252,
+        ts: u64,
     ) {
         let pd = PathFormData {
-            life_state: LifeState::Alive, sequence_length: length, start_state: start,
-            target_loop_id: target, target_period: 2, minted_at: 0, escrow: 0,
+            life_state: LifeState::Alive,
+            sequence_length: length,
+            start_state: start,
+            target_loop_id: target,
+            target_period: 2,
+            minted_at: 0,
+            escrow: 0,
         };
         start_cheat_block_timestamp(d.path_lifeforms, ts);
         start_cheat_caller_address(d.path_lifeforms, d.creator);

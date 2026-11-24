@@ -114,7 +114,10 @@ pub fn is_single_loop(initial: &Rows, generations: u32) -> Result<LoopInfo, GolE
     if !eq(&last, initial) {
         return Err(GolError::Input("no loop in ISLFIS".into()));
     }
-    Ok(LoopInfo { smallest, second_to_last })
+    Ok(LoopInfo {
+        smallest,
+        second_to_last,
+    })
 }
 
 /// True iff `initial` is a single loop of `generations` AND is that loop's canonical (smallest)

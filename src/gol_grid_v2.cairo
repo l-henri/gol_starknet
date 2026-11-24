@@ -91,9 +91,7 @@ fn fa3(a: u128, b: u128, c: u128) -> (u128, u128) {
 
 /// The combine step on lane-words: neighbour count = t_up + p + t_dn (sum planes) with the
 /// matching carry planes, then alive iff count == 3, or == 2 with `m` alive.
-fn combine3(
-    t_up: u128, tc_up: u128, p: u128, pc: u128, t_dn: u128, tc_dn: u128, m: u128,
-) -> u128 {
+fn combine3(t_up: u128, tc_up: u128, p: u128, pc: u128, t_dn: u128, tc_dn: u128, m: u128) -> u128 {
     let (ones, ca) = fa3(t_up, p, t_dn);
     let (t2, c2a) = fa3(tc_up, pc, tc_dn);
     let (twos, c2b) = ha3(t2, ca);
@@ -123,7 +121,7 @@ pub fn step(rows: @Array<u64>) -> Array<u64> {
         let (p, pc) = ha(l, rt);
         h.append((t, tc, p, pc));
         r += 1;
-    };
+    }
     // Pass 2: neighbour count of row i = (l+m+r)(i-1) + (l+r)(i) + (l+m+r)(i+1), three rows
     // at a time. Word w holds rows base..base+2; its up-plane holds rows base-1..base+1 and
     // its down-plane rows base+1..base+3 — packed straight from `h` by index, wrap included.
@@ -156,7 +154,7 @@ pub fn step(rows: @Array<u64>) -> Array<u64> {
         out.append(r1.try_into().unwrap());
         out.append(r2.try_into().unwrap());
         w += 1;
-    };
+    }
     // Last word: rows 39, 40 in lanes 0..1 (lane 2 all-zero in, all-zero out, discarded).
     let (t_38, tc_38, _, _) = *h[38];
     let (t_39, tc_39, p_39, pc_39) = *h[39];
@@ -196,7 +194,7 @@ pub fn lt(a: @Array<u64>, b: @Array<u64>) -> bool {
             break;
         }
         i += 1;
-    };
+    }
     result
 }
 
@@ -208,7 +206,7 @@ pub fn token_hash(rows: @Array<u64>) -> felt252 {
     while i < rows.len() {
         felts.append((*rows[i]).into());
         i += 1;
-    };
+    }
     poseidon_hash_span(felts.span())
 }
 
@@ -244,7 +242,7 @@ fn pack_felt(rows: @Array<u64>, start: usize, count: usize) -> felt252 {
         acc = acc + rv * p;
         p = p * POW_ROW;
         j += 1;
-    };
+    }
     acc
 }
 
@@ -317,7 +315,7 @@ fn pow2_table() -> Array<u64> {
             p = p * 2;
         }
         i += 1;
-    };
+    }
     t
 }
 
@@ -327,7 +325,7 @@ fn pow2_128(e: usize) -> u128 {
     while i < e {
         p = p * 2;
         i += 1;
-    };
+    }
     p
 }
 
@@ -377,7 +375,7 @@ pub fn apply_d4(d4: u8, rows: @Array<u64>) -> Array<u64> {
         }
         out.append(v);
         r += 1;
-    };
+    }
     out
 }
 
@@ -406,7 +404,7 @@ pub fn translate(rows: @Array<u64>, dr: usize, dc: usize) -> Array<u64> {
         let src = (r + N - drm) % N;
         out.append(rot_row_by_mul(*rows[src], mul));
         r += 1;
-    };
+    }
     out
 }
 
@@ -431,10 +429,10 @@ fn rows_to_grid(rows: @Array<u64>) -> Array<Array<bool>> {
             row.append((v & 1) == 1);
             v = v / 2;
             c += 1;
-        };
+        }
         grid.append(row);
         r += 1;
-    };
+    }
     grid
 }
 
@@ -454,10 +452,10 @@ fn grid_to_rows(grid: @Array<Array<bool>>) -> Array<u64> {
                 p = p * 2;
             }
             c += 1;
-        };
+        }
         rows.append(v);
         r += 1;
-    };
+    }
     rows
 }
 
@@ -524,10 +522,10 @@ fn step_bool(grid: @Array<Array<bool>>) -> Array<Array<bool>> {
             };
             single.append(lives);
             col += 1;
-        };
+        }
         next.append(single);
         row += 1;
-    };
+    }
     next
 }
 
@@ -555,10 +553,10 @@ pub fn grid_with(rowvals: @Array<(usize, u64)>) -> Array<u64> {
                 v = val;
             }
             k += 1;
-        };
+        }
         g.append(v);
         r += 1;
-    };
+    }
     g
 }
 
@@ -576,7 +574,7 @@ pub fn eq(a: @Array<u64>, b: @Array<u64>) -> bool {
             break;
         }
         i += 1;
-    };
+    }
     ok
 }
 
@@ -591,7 +589,7 @@ pub fn is_empty(rows: @Array<u64>) -> bool {
             break;
         }
         i += 1;
-    };
+    }
     empty
 }
 
@@ -602,19 +600,15 @@ pub fn is_empty(rows: @Array<u64>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        step, step_naive, lt, token_id, grid_with, eq, pack, unpack, N, apply_d4, translate,
-        apply_symmetry,
+        N, apply_d4, apply_symmetry, eq, grid_with, lt, pack, step, step_naive, token_id, translate,
+        unpack,
     };
 
     fn seed() -> Array<u64> {
         grid_with(
             @array![
-                (1_usize, 0b1110_u64),
-                (2_usize, 0b0100_u64),
-                (7_usize, 0x155_u64),
-                (15_usize, 0x3ff_u64),
-                (16_usize, 0x201_u64),
-                (25_usize, 0x12345_u64),
+                (1_usize, 0b1110_u64), (2_usize, 0b0100_u64), (7_usize, 0x155_u64),
+                (15_usize, 0x3ff_u64), (16_usize, 0x201_u64), (25_usize, 0x12345_u64),
                 (37_usize, 0b111_u64),
             ],
         )
@@ -646,7 +640,7 @@ mod tests {
                 all_zero = false;
             }
             i += 1;
-        };
+        }
         assert(all_zero, 'empty should stay empty');
     }
 
@@ -675,8 +669,7 @@ mod tests {
                 (2_usize, 0b111_u64), // lane 2/3 boundary of word 0
                 (3_usize, 0x10000000001_u64), // both column edges
                 (20_usize, 0x15555555555_u64), // alternating, lane boundary word 6/7
-                (21_usize, 0xaaaaaaaaaa_u64),
-                (38_usize, 0b1110000_u64), // last general-word row
+                (21_usize, 0xaaaaaaaaaa_u64), (38_usize, 0b1110000_u64), // last general-word row
                 (39_usize, 0x1f000000000_u64), // word-13 lanes
                 (40_usize, 0x1ffffffffff_u64) // full bottom row (wraps onto row 0)
             ],
@@ -712,8 +705,7 @@ mod tests {
         // edge bits: full first/last rows + top bit (40) and bottom bit (0) in a middle row
         let edge = grid_with(
             @array![
-                (0_usize, 0x1ffffffffff_u64),
-                (40_usize, 0x1ffffffffff_u64),
+                (0_usize, 0x1ffffffffff_u64), (40_usize, 0x1ffffffffff_u64),
                 (20_usize, 0x10000000001_u64),
             ],
         );
@@ -758,7 +750,7 @@ mod tests {
             let once = apply_d4(d, @g);
             assert(eq(@apply_d4(d, @once), @g), 'reflection^2 = id');
             d += 1;
-        };
+        }
         // identity is a copy
         assert(eq(@apply_d4(0, @g), @g), 'id is id');
     }
@@ -798,14 +790,14 @@ mod tests {
         while g < gens {
             cur = step(@cur);
             g += 1;
-        };
+        }
         // force full evaluation
         let mut s: u64 = 0;
         let mut i: usize = 0;
         while i < N {
             s = s ^ *cur[i];
             i += 1;
-        };
+        }
         s
     }
 

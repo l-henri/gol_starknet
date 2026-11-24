@@ -9,23 +9,21 @@
 
 #[starknet::contract]
 pub mod GolPetBonds {
+    use core::num::traits::Zero;
+    use gol_starknet::interfaces::{IGolNutrientTokenDispatcher, IGolNutrientTokenDispatcherTrait};
+    use gol_starknet::interfaces_v3::{
+        IGolLifeFormsV3Dispatcher, IGolLifeFormsV3DispatcherTrait, IGolPetBonds,
+    };
+    use openzeppelin::access::accesscontrol::{AccessControlComponent, DEFAULT_ADMIN_ROLE};
+    use openzeppelin::interfaces::upgrades::IUpgradeable;
     use openzeppelin::introspection::src5::SRC5Component;
     use openzeppelin::token::erc1155::ERC1155Component;
-    use openzeppelin::access::accesscontrol::AccessControlComponent;
-    use openzeppelin::access::accesscontrol::DEFAULT_ADMIN_ROLE;
     use openzeppelin::upgrades::UpgradeableComponent;
-    use openzeppelin::interfaces::upgrades::IUpgradeable;
-    use starknet::ClassHash;
-    use starknet::{ContractAddress, get_caller_address, get_block_timestamp};
-    use starknet::storage::{Map, StorageMapReadAccess, StorageMapWriteAccess};
-    use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
-    use core::num::traits::Zero;
-    use gol_starknet::interfaces_v3::{
-        IGolPetBonds, IGolLifeFormsV3Dispatcher, IGolLifeFormsV3DispatcherTrait,
+    use starknet::storage::{
+        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
+        StoragePointerWriteAccess,
     };
-    use gol_starknet::interfaces::{
-        IGolNutrientTokenDispatcher, IGolNutrientTokenDispatcherTrait,
-    };
+    use starknet::{ClassHash, ContractAddress, get_block_timestamp, get_caller_address};
 
     component!(path: ERC1155Component, storage: erc1155, event: ERC1155Event);
     component!(path: SRC5Component, storage: src5, event: SRC5Event);
@@ -34,18 +32,21 @@ pub mod GolPetBonds {
 
     /// 7 days without a pet → the bond is reapable.
     const LAPSE_SECONDS: u64 = 604800;
-    /// Reaper reward, freshly minted (proof-of-participation, like the feed faucet). Tunable PoC constant.
+    /// Reaper reward, freshly minted (proof-of-participation, like the feed faucet). Tunable PoC
+    /// constant.
     const REAP_REWARD: u256 = 1000000000000000000; // 1 NUT
 
     #[abi(embed_v0)]
     impl ERC1155Impl = ERC1155Component::ERC1155Impl<ContractState>;
     #[abi(embed_v0)]
-    impl ERC1155MetadataURIImpl = ERC1155Component::ERC1155MetadataURIImpl<ContractState>;
+    impl ERC1155MetadataURIImpl =
+        ERC1155Component::ERC1155MetadataURIImpl<ContractState>;
     #[abi(embed_v0)]
     impl SRC5Impl = SRC5Component::SRC5Impl<ContractState>;
     impl ERC1155InternalImpl = ERC1155Component::InternalImpl<ContractState>;
     #[abi(embed_v0)]
-    impl AccessControlImpl = AccessControlComponent::AccessControlImpl<ContractState>;
+    impl AccessControlImpl =
+        AccessControlComponent::AccessControlImpl<ContractState>;
     impl AccessControlInternalImpl = AccessControlComponent::InternalImpl<ContractState>;
     impl UpgradeableInternalImpl = UpgradeableComponent::InternalImpl<ContractState>;
 
@@ -166,10 +167,7 @@ pub mod GolPetBonds {
                 self
                     .erc1155
                     .update(
-                        Zero::zero(),
-                        holder,
-                        array![creature_id].span(),
-                        array![1_u256].span(),
+                        Zero::zero(), holder, array![creature_id].span(), array![1_u256].span(),
                     );
             }
             self.last_pet.write((creature_id, holder), get_block_timestamp());
@@ -192,9 +190,7 @@ pub mod GolPetBonds {
             let reaper = get_caller_address();
             self
                 .emit(
-                    Event::Reaped(
-                        ReapedEvent { creature_id, holder, reaper, reward: REAP_REWARD },
-                    ),
+                    Event::Reaped(ReapedEvent { creature_id, holder, reaper, reward: REAP_REWARD }),
                 );
             let nutrient_token = IGolNutrientTokenDispatcher {
                 contract_address: self.nutrient_token_contract.read(),
@@ -207,9 +203,7 @@ pub mod GolPetBonds {
             let from = get_caller_address();
             assert(self.erc1155.balance_of(from, creature_id) == 1, 'no bond');
             // internal update: the hook moves the clock; no acceptance check (wallet accounts).
-            self
-                .erc1155
-                .update(from, to, array![creature_id].span(), array![1_u256].span());
+            self.erc1155.update(from, to, array![creature_id].span(), array![1_u256].span());
         }
 
         fn last_pet_of(self: @ContractState, creature_id: u256, holder: ContractAddress) -> u64 {

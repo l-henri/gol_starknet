@@ -12,7 +12,11 @@ use crate::types::{felt_to_u128, Felt, TokenAttribute, TokenUri};
 
 /// Decode a Cairo `ByteArray` (as returned by a view) into its UTF-8 string.
 pub fn decode_byte_array(felts: &[Felt]) -> Result<String, GolError> {
-    let n = felt_to_u128(felts.first().ok_or_else(|| GolError::Encoding("byte array: empty".into()))?) as usize;
+    let n = felt_to_u128(
+        felts
+            .first()
+            .ok_or_else(|| GolError::Encoding("byte array: empty".into()))?,
+    ) as usize;
     // layout length = 1 (count) + n (full words) + 1 (pending word) + 1 (pending len)
     if felts.len() < n + 3 {
         return Err(GolError::Encoding(format!(
@@ -37,7 +41,8 @@ pub fn decode_byte_array(felts: &[Felt]) -> Result<String, GolError> {
         let b = pending.to_bytes_be();
         bytes.extend_from_slice(&b[32 - pending_len..32]);
     }
-    String::from_utf8(bytes).map_err(|e| GolError::Encoding(format!("byte array: invalid utf-8: {e}")))
+    String::from_utf8(bytes)
+        .map_err(|e| GolError::Encoding(format!("byte array: invalid utf-8: {e}")))
 }
 
 /// Parse a `token_uri` string into structured metadata (best-effort; unparseable payloads keep
@@ -51,8 +56,14 @@ pub fn parse_token_uri(raw: String) -> TokenUri {
     };
     if let Some(v) = parsed {
         uri.name = v.get("name").and_then(|x| x.as_str()).map(String::from);
-        uri.description = v.get("description").and_then(|x| x.as_str()).map(String::from);
-        uri.animation_url = v.get("animation_url").and_then(|x| x.as_str()).map(String::from);
+        uri.description = v
+            .get("description")
+            .and_then(|x| x.as_str())
+            .map(String::from);
+        uri.animation_url = v
+            .get("animation_url")
+            .and_then(|x| x.as_str())
+            .map(String::from);
         if let Some(arr) = v.get("attributes").and_then(|a| a.as_array()) {
             uri.attributes = arr.iter().filter_map(parse_attribute).collect();
         }
@@ -74,7 +85,9 @@ fn decode_data_uri_bytes(uri: &str) -> Option<Vec<u8>> {
     let prefix = &uri[..comma];
     let payload = &uri[comma + 1..];
     if prefix.contains(";base64") {
-        base64::engine::general_purpose::STANDARD.decode(payload).ok()
+        base64::engine::general_purpose::STANDARD
+            .decode(payload)
+            .ok()
     } else {
         Some(payload.as_bytes().to_vec())
     }
@@ -96,7 +109,11 @@ mod tests {
     #[test]
     fn byte_array_pending_only() {
         // "hello" = 5 bytes, no full words: [0, 0x68656c6c6f, 5]
-        let felts = [Felt::from(0u8), Felt::from(0x68656c6c6f_u64), Felt::from(5u8)];
+        let felts = [
+            Felt::from(0u8),
+            Felt::from(0x68656c6c6f_u64),
+            Felt::from(5u8),
+        ];
         assert_eq!(decode_byte_array(&felts).unwrap(), "hello");
     }
 
@@ -107,7 +124,12 @@ mod tests {
         for b in &mut w[1..32] {
             *b = b'a';
         }
-        let felts = [Felt::from(1u8), Felt::from_bytes_be(&w), Felt::ZERO, Felt::ZERO];
+        let felts = [
+            Felt::from(1u8),
+            Felt::from_bytes_be(&w),
+            Felt::ZERO,
+            Felt::ZERO,
+        ];
         assert_eq!(decode_byte_array(&felts).unwrap(), "a".repeat(31));
     }
 

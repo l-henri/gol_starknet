@@ -5,7 +5,9 @@ use async_trait::async_trait;
 
 use crate::config::ContractKey;
 use crate::error::GolError;
-use crate::types::{Felt, LifeformData, OwnedLifeform, OwnedPath, PathForm, RenderParams, TokenUri, U256};
+use crate::types::{
+    Felt, LifeformData, OwnedLifeform, OwnedPath, PathForm, RenderParams, TokenUri, U256,
+};
 
 #[async_trait(?Send)]
 // `?Send` so the same trait compiles on wasm32, where reqwest's fetch-backed futures are !Send.

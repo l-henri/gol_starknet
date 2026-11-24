@@ -3,7 +3,9 @@
 //!
 //!   cargo run -p gol-sdk --example read_sepolia
 
-use gol_sdk::{engine, felt_to_hex, grid, token_id, Felt, GolClient, GolConfig, GridState, Network};
+use gol_sdk::{
+    engine, felt_to_hex, grid, token_id, Felt, GolClient, GolConfig, GridState, Network,
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -48,22 +50,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if let Some(rp) = gol.reads().render_params(tid).await? {
-        println!("render_params: bg=0x{:06x} cell=0x{:06x} speed={}", rp.bg, rp.cell, rp.speed);
+        println!(
+            "render_params: bg=0x{:06x} cell=0x{:06x} speed={}",
+            rp.bg, rp.cell, rp.speed
+        );
     }
 
     if let Some(uri) = gol.reads().token_uri(tid).await? {
-        println!("token_uri: name={:?}, {} attributes", uri.name, uri.attributes.len());
+        println!(
+            "token_uri: name={:?}, {} attributes",
+            uri.name,
+            uri.attributes.len()
+        );
         for a in &uri.attributes {
             println!("    - {}: {}", a.trait_type, a.value);
         }
         if let Some(html) = uri.html() {
-            println!("  html: {} bytes, starts {:?}", html.len(), &html[..html.len().min(40)]);
+            println!(
+                "  html: {} bytes, starts {:?}",
+                html.len(),
+                &html[..html.len().min(40)]
+            );
         }
     }
 
     // Call-building (NOT sent — this is exactly what a wallet would sign + execute).
     let recipient =
-        Felt::from_hex("0x26d87a881bc82eb038c4cc214fbccd16ea72b424b523a7b2b2551a2e495e70f").unwrap();
+        Felt::from_hex("0x26d87a881bc82eb038c4cc214fbccd16ea72b424b523a7b2b2551a2e495e70f")
+            .unwrap();
     let calls = gol.writes().mint_loop(&blinker, 2, recipient);
     println!("mint_loop call-building -> {} calls:", calls.len());
     for c in &calls {

@@ -1,29 +1,30 @@
 //! v2 GolPathLifeforms ERC-721 — the NFT contract for PATH creatures (transients that lead into a
 //! loop but aren't in it). Separate from the loop NFT (`gol_lifeforms_v2`). A path is a static
 //! snapshot: it is NOT feedable (no `move_lifeform_forward`) and earns no NUT. Minting escrows
-//! `sequence_length` NUT and stamps a mint timestamp; `challenge_burn` is a permissionless anti-farm
-//! that burns a proven forward sub-path and pays its escrow to the challenger. See
+//! `sequence_length` NUT and stamps a mint timestamp; `challenge_burn` is a permissionless
+//! anti-farm that burns a proven forward sub-path and pays its escrow to the challenger. See
 //! `docs/path-creatures-spec.md`.
 
 #[starknet::contract]
 pub mod GolPathLifeformsV2 {
+    use core::num::traits::Zero;
+    use gol_starknet::interfaces_v2::{
+        IGolPathLifeFormsV2, LifeFormData, LifeState, PathFormData, RenderParams, SPEED_MAX,
+    };
+    use gol_starknet::{gol_grid_v2, gol_metadata_v2};
+    use openzeppelin::access::accesscontrol::{AccessControlComponent, DEFAULT_ADMIN_ROLE};
+    use openzeppelin::interfaces::erc20::{IERC20Dispatcher, IERC20DispatcherTrait};
+    use openzeppelin::interfaces::erc721::{IERC721Metadata, IERC721MetadataCamelOnly};
+    use openzeppelin::interfaces::upgrades::IUpgradeable;
     use openzeppelin::introspection::src5::SRC5Component;
     use openzeppelin::token::erc721::{ERC721Component, ERC721HooksEmptyImpl};
-    use openzeppelin::interfaces::erc721::{IERC721Metadata, IERC721MetadataCamelOnly};
-    use openzeppelin::interfaces::erc20::{IERC20Dispatcher, IERC20DispatcherTrait};
-    use openzeppelin::access::accesscontrol::AccessControlComponent;
-    use openzeppelin::access::accesscontrol::DEFAULT_ADMIN_ROLE;
     use openzeppelin::upgrades::UpgradeableComponent;
-    use openzeppelin::interfaces::upgrades::IUpgradeable;
-    use starknet::ClassHash;
-    use starknet::{ContractAddress, get_caller_address, get_contract_address, get_block_timestamp};
-    use starknet::storage::{Map, StorageMapReadAccess, StorageMapWriteAccess};
-    use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
-    use core::num::traits::Zero;
-    use gol_starknet::gol_grid_v2;
-    use gol_starknet::gol_metadata_v2;
-    use gol_starknet::interfaces_v2::{
-        IGolPathLifeFormsV2, PathFormData, LifeState, LifeFormData, RenderParams, SPEED_MAX,
+    use starknet::storage::{
+        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
+        StoragePointerWriteAccess,
+    };
+    use starknet::{
+        ClassHash, ContractAddress, get_block_timestamp, get_caller_address, get_contract_address,
     };
 
     component!(path: ERC721Component, storage: erc721, event: ERC721Event);
@@ -42,7 +43,8 @@ pub mod GolPathLifeformsV2 {
     impl SRC5Impl = SRC5Component::SRC5Impl<ContractState>;
     impl ERC721InternalImpl = ERC721Component::InternalImpl<ContractState>;
     #[abi(embed_v0)]
-    impl AccessControlImpl = AccessControlComponent::AccessControlImpl<ContractState>;
+    impl AccessControlImpl =
+        AccessControlComponent::AccessControlImpl<ContractState>;
     impl AccessControlInternalImpl = AccessControlComponent::InternalImpl<ContractState>;
     impl UpgradeableInternalImpl = UpgradeableComponent::InternalImpl<ContractState>;
 
@@ -88,8 +90,8 @@ pub mod GolPathLifeformsV2 {
         pub nutrient_token_contract: ContractAddress,
         pub render_params: Map<u256, RenderParams>,
         // Mint-order nonce (symmetry-challenge-spec §3): the challenge direction guard, replacing
-        // `minted_at` (kept for display). New maps only — safe for the in-place upgrade; unwritten
-        // slots read 0 = the grandfathered pre-upgrade tier.
+        // `minted_at` (kept for display). New maps only — safe for the in-place upgrade;
+        // unwritten slots read 0 = the grandfathered pre-upgrade tier.
         pub next_nonce: u64,
         pub mint_nonce: Map<u256, u64>,
     }
@@ -172,15 +174,17 @@ pub mod GolPathLifeformsV2 {
             }
             self.mint_nonce.write(token_id, nonce);
             self.next_nonce.write(nonce + 1);
-            // The contract stamps the timestamp + escrow (ignoring any values passed in) so they can't
-            // be forged: `minted_at` is the sub-path direction guard; `escrow` funds the bounty.
+            // The contract stamps the timestamp + escrow (ignoring any values passed in) so they
+            // can't be forged: `minted_at` is the sub-path direction guard; `escrow` funds the
+            // bounty.
             let escrow: u256 = path_data.sequence_length.into() * NUT_DECIMALS;
-            let stored = PathFormData {
-                minted_at: get_block_timestamp(), escrow, ..path_data,
-            };
+            let stored = PathFormData { minted_at: get_block_timestamp(), escrow, ..path_data };
             self.path_data.write(token_id, stored);
             self.render_params.write(token_id, gol_metadata_v2::derive_params(token_id));
-            self.emit(Event::NewPath(NewPathEvent { owner: recipient, token_id, path_data: stored }));
+            self
+                .emit(
+                    Event::NewPath(NewPathEvent { owner: recipient, token_id, path_data: stored }),
+                );
             self.total_supply.write(self.total_supply.read() + 1);
             // Escrow `sequence_length` NUT from the minter into this contract (held for the bounty;
             // an unchallenged path's escrow is a permanent sink — no withdrawal). See spec §6.
@@ -239,15 +243,16 @@ pub mod GolPathLifeformsV2 {
             // Direction guard: strict mint order (nonce replaces `minted_at`, which had same-block
             // ties; pre-upgrade tokens read 0 = tied oldest tier). Spec §3.
             assert(
-                self.mint_nonce.read(older_id) < self.mint_nonce.read(younger_id), 'older not older',
+                self.mint_nonce.read(older_id) < self.mint_nonce.read(younger_id),
+                'older not older',
             );
             let identity = d4 == 0 && dr == 0 && dc == 0;
             if identity {
                 // Same-terminal pre-filter only applies untransformed (a symmetry copy's terminal
                 // is the transformed loop — a different id).
                 assert(older.target_loop_id == younger.target_loop_id, 'different target loop');
-                // Identity witness with k = 0 would mean the same start state — impossible to mint
-                // twice — so require a strictly longer older path.
+                // Identity witness with k = 0 would mean the same start state — impossible to
+                // mint twice — so require a strictly longer older path.
                 assert(older.sequence_length > younger.sequence_length, 'older not longer');
             } else {
                 // A symmetry copy has the same length (k = 0 allowed).
@@ -261,7 +266,7 @@ pub mod GolPathLifeformsV2 {
             while i < k {
                 rows = gol_grid_v2::step(@rows);
                 i += 1;
-            };
+            }
             let cand = gol_grid_v2::apply_symmetry(d4, dr.into(), dc.into(), @rows);
             assert(gol_grid_v2::token_id(@cand) == younger_id, 'not a sub-path');
             // Burn the copy and pay its escrow to the challenger.
@@ -293,8 +298,8 @@ pub mod GolPathLifeformsV2 {
             }
         }
 
-        /// A LifeFormData view of a path, for reusing the loop metadata renderer. The path renders as
-        /// its START state; life-state maps to the still/alive/dead flags.
+        /// A LifeFormData view of a path, for reusing the loop metadata renderer. The path renders
+        /// as its START state; life-state maps to the still/alive/dead flags.
         fn lifeform_view(self: @ContractState, token_id: u256) -> LifeFormData {
             let p = self.path_data.read(token_id);
             LifeFormData {

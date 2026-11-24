@@ -3,32 +3,30 @@
 //! at mint; the stored `current_state` is the DRAWN state (display) while `canonical_state` is the
 //! identity preimage. Minimality is optimistic and permanently fraud-provable (`prove_malformed`,
 //! bounty = the token's mint escrow). Feed rewards carry the beneficiary (`_n_for`) and the feed
-//! event records the feeder (v3 ride-alongs). No symmetry challenge-burn here — copies can't mint.
+//! event records the feeder (v3 ride-alongs). No symmetry challenge-burn here — copies can't
+//! mint.
 
 #[starknet::contract]
 pub mod GolLifeformsV3 {
+    use core::num::traits::Zero;
+    use gol_starknet::gol_grid_v2::GridState;
+    use gol_starknet::interfaces::{IGolNutrientTokenDispatcher, IGolNutrientTokenDispatcherTrait};
+    use gol_starknet::interfaces_v2::{LifeFormData, RenderParams, SPEED_MAX};
+    use gol_starknet::interfaces_v3::IGolLifeFormsV3;
+    use gol_starknet::{gol_grid_v2, gol_metadata_v2};
+    use openzeppelin::access::accesscontrol::{AccessControlComponent, DEFAULT_ADMIN_ROLE};
+    use openzeppelin::interfaces::erc20::{IERC20Dispatcher, IERC20DispatcherTrait};
+    use openzeppelin::interfaces::erc721::{IERC721Metadata, IERC721MetadataCamelOnly};
+    use openzeppelin::interfaces::upgrades::IUpgradeable;
     use openzeppelin::introspection::src5::SRC5Component;
     use openzeppelin::token::erc721::{ERC721Component, ERC721HooksEmptyImpl};
-    use openzeppelin::interfaces::erc721::{IERC721Metadata, IERC721MetadataCamelOnly};
-    use openzeppelin::interfaces::erc20::{IERC20Dispatcher, IERC20DispatcherTrait};
-    use openzeppelin::access::accesscontrol::AccessControlComponent;
-    use openzeppelin::access::accesscontrol::DEFAULT_ADMIN_ROLE;
     use openzeppelin::upgrades::UpgradeableComponent;
-    use openzeppelin::interfaces::upgrades::IUpgradeable;
-    use starknet::ClassHash;
-    use starknet::{
-        ContractAddress, get_caller_address, get_contract_address, get_block_timestamp,
+    use starknet::storage::{
+        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
+        StoragePointerWriteAccess,
     };
-    use starknet::storage::{Map, StorageMapReadAccess, StorageMapWriteAccess};
-    use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
-    use core::num::traits::Zero;
-    use gol_starknet::gol_grid_v2;
-    use gol_starknet::gol_grid_v2::GridState;
-    use gol_starknet::gol_metadata_v2;
-    use gol_starknet::interfaces_v3::IGolLifeFormsV3;
-    use gol_starknet::interfaces_v2::{LifeFormData, RenderParams, SPEED_MAX};
-    use gol_starknet::interfaces::{
-        IGolNutrientTokenDispatcher, IGolNutrientTokenDispatcherTrait,
+    use starknet::{
+        ClassHash, ContractAddress, get_block_timestamp, get_caller_address, get_contract_address,
     };
 
     component!(path: ERC721Component, storage: erc721, event: ERC721Event);
@@ -47,7 +45,8 @@ pub mod GolLifeformsV3 {
     impl SRC5Impl = SRC5Component::SRC5Impl<ContractState>;
     impl ERC721InternalImpl = ERC721Component::InternalImpl<ContractState>;
     #[abi(embed_v0)]
-    impl AccessControlImpl = AccessControlComponent::AccessControlImpl<ContractState>;
+    impl AccessControlImpl =
+        AccessControlComponent::AccessControlImpl<ContractState>;
     impl AccessControlInternalImpl = AccessControlComponent::InternalImpl<ContractState>;
     impl UpgradeableInternalImpl = UpgradeableComponent::InternalImpl<ContractState>;
 
@@ -227,9 +226,7 @@ pub mod GolLifeformsV3 {
             assert(lifeform_data.sequence_length > 0, 'sequence_length_zero');
             // Identity integrity: the id IS the hash of the canonical preimage. (Family
             // membership of `canonical` was verified by the minter's witness check.)
-            assert(
-                gol_grid_v2::grid_hash(@canonical).into() == token_id, 'id != hash(canonical)',
-            );
+            assert(gol_grid_v2::grid_hash(@canonical).into() == token_id, 'id != hash(canonical)');
             // Copy prevention: a symmetry copy has the same canonical, hence the same id — the
             // ERC-721 mint below reverts on the collision.
             self.erc721.mint(recipient, token_id);
@@ -344,7 +341,7 @@ pub mod GolLifeformsV3 {
             while i < k {
                 rows = gol_grid_v2::step(@rows);
                 i += 1;
-            };
+            }
             let cand = gol_grid_v2::apply_symmetry(d4, dr.into(), dc.into(), @rows);
             // Family membership of `cand` holds by construction (derived from the canonical).
             assert(gol_grid_v2::lt(@cand, @canon_rows), 'id is minimal');
@@ -379,9 +376,7 @@ pub mod GolLifeformsV3 {
 
         /// Shared feed body: step `n` generations, mint `n` NUT to `beneficiary`, record the
         /// feeder in the event.
-        fn advance(
-            ref self: ContractState, token_id: u256, n: u32, beneficiary: ContractAddress,
-        ) {
+        fn advance(ref self: ContractState, token_id: u256, n: u32, beneficiary: ContractAddress) {
             assert(self.erc721.exists(token_id), 'Lifeform not minted');
             assert(n > 0, 'n must be positive');
             let mut lifeform_data = self.lifeform_data.read(token_id);
@@ -390,7 +385,7 @@ pub mod GolLifeformsV3 {
             while i < n {
                 rows = gol_grid_v2::step(@rows);
                 i += 1;
-            };
+            }
             lifeform_data.current_state = gol_grid_v2::pack(@rows);
             lifeform_data.age += n;
             self.lifeform_data.write(token_id, lifeform_data);
