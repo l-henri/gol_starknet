@@ -6,13 +6,15 @@ cd "$(dirname "$0")/.."
 
 # Cairo contracts (repository root; the formatter also covers spike/).
 scarb fmt --check
-# Not run yet: `scarb lint --test --deny-warnings` reports about 120 findings in the current
-# contracts. Add it here once they are cleaned up.
+# The contracts have existing lint findings, recorded in .ratchet/cairo-lint.txt. The ratchet
+# fails on any new finding and makes the record shrink as old ones are fixed.
+python3 scripts/ratchet.py cairo-lint -- scarb lint --test
 scarb build
 
 # Rust SDK workspace (crates/*).
 cargo fmt --check
-# Not run yet: `cargo clippy -- -D warnings` reports 6 findings in gol-sdk. Add it once fixed.
+# Same for Clippy: existing findings are recorded in .ratchet/clippy.txt.
+python3 scripts/ratchet.py clippy -- cargo clippy --locked --all-targets
 cargo build --locked --all-targets
 
 # Web app.
